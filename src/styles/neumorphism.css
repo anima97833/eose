@@ -1,0 +1,439 @@
+:root {
+  /* 轻拟物专属色彩基调 */
+  --nm-bg: #E9EEF5;
+  --nm-bg-darker: #DFE5EF;
+  --nm-bg-lighter: #F2F6FB;
+  
+  /* 双向漫反射光影 */
+  --nm-light: rgba(255, 255, 255, 0.95);
+  --nm-shadow: rgba(166, 180, 200, 0.55);
+  --nm-shadow-soft: rgba(166, 180, 200, 0.35);
+
+  /* 文字配色 */
+  --nm-text-main: #334257;
+  --nm-text-sub: #7D8CA3;
+  --nm-text-muted: #A3B1C6;
+
+  /* 强调色（对标参考图 87% 蓝色进度与指示标） */
+  --nm-primary: #5096C6;
+  --nm-primary-light: #6BA8D6;
+  --nm-primary-dark: #3E7FA9;
+  --nm-accent-green: #38D39F;
+  --nm-accent-orange: #FF9F43;
+  --nm-accent-red: #FF5E7E;
+
+  /* 外凸浮雕 (Convex / Extruded) 阴影阶梯 */
+  --nm-convex-xs: 2px 2px 5px var(--nm-shadow-soft), -2px -2px 5px var(--nm-light);
+  --nm-convex-sm: 4px 4px 8px var(--nm-shadow), -4px -4px 8px var(--nm-light);
+  --nm-convex: 5px 5px 12px var(--nm-shadow), -5px -5px 12px var(--nm-light);
+  --nm-convex-lg: 8px 8px 18px var(--nm-shadow), -8px -8px 18px var(--nm-light);
+  --nm-convex-round: 4px 4px 10px var(--nm-shadow), -4px -4px 10px var(--nm-light);
+
+  /* 内凹雕刻 (Inset / Concave) 阴影阶梯 */
+  --nm-inset-xs: inset 2px 2px 4px var(--nm-shadow-soft), inset -2px -2px 4px var(--nm-light);
+  --nm-inset-sm: inset 3px 3px 6px var(--nm-shadow), inset -3px -3px 6px var(--nm-light);
+  --nm-inset: inset 4px 4px 8px var(--nm-shadow), inset -4px -4px 8px var(--nm-light);
+  --nm-inset-deep: inset 5px 5px 10px var(--nm-shadow), inset -5px -5px 10px var(--nm-light);
+}
+
+/* 基础外凸卡片 */
+.nm-card {
+  background: var(--nm-bg);
+  box-shadow: var(--nm-convex);
+  border-radius: 20px;
+}
+
+.nm-card-sm {
+  background: var(--nm-bg);
+  box-shadow: var(--nm-convex-sm);
+  border-radius: 16px;
+}
+
+/* 基础内凹槽/底座 */
+.nm-inset {
+  background: var(--nm-bg);
+  box-shadow: var(--nm-inset);
+  border-radius: 20px;
+}
+
+.nm-inset-sm {
+  background: var(--nm-bg);
+  box-shadow: var(--nm-inset-sm);
+  border-radius: 12px;
+}
+
+/* 带有物理高弹性回弹感的按键（按压瞬间凹陷，抬起时产生真实弹簧 overshoot 动效） */
+.nm-rebound-btn, .nm-btn {
+  background: var(--nm-bg);
+  box-shadow: var(--nm-convex-sm);
+  border: none;
+  outline: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--nm-text-main);
+  /* 抬起时的回弹阻尼弹簧曲线 */
+  transition: transform 0.36s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+              color 0.2s ease;
+  will-change: transform, box-shadow;
+}
+
+/* 按下瞬间：即刻下陷变小，产生强烈物理撞底感 */
+.nm-rebound-btn:active, .nm-btn:active {
+  box-shadow: inset 4px 4px 8px rgba(150, 168, 190, 0.8),
+              inset -4px -4px 8px rgba(255, 255, 255, 0.95) !important;
+  transform: scale(0.91) !important;
+  color: var(--nm-primary);
+  transition: transform 0.06s ease-out,
+              box-shadow 0.06s ease-out;
+}
+
+/* 显式按下状态类（由 PointerDown 即时驱动） */
+.nm-pressed {
+  box-shadow: inset 4px 4px 8px rgba(150, 168, 190, 0.8),
+              inset -4px -4px 8px rgba(255, 255, 255, 0.95) !important;
+  transform: scale(0.91) !important;
+  color: var(--nm-primary) !important;
+  transition: transform 0.06s ease-out, box-shadow 0.06s ease-out !important;
+}
+
+/* 拖拽悬浮态：阴影扩大，立体感增强，跟随手指 */
+.nm-dragging {
+  box-shadow: 7px 7px 18px rgba(166, 180, 200, 0.65),
+              -7px -7px 18px rgba(255, 255, 255, 0.95) !important;
+  transform: scale(1.12) !important;
+  z-index: 100;
+  cursor: grabbing !important;
+  opacity: 0.95;
+}
+
+/* 圆形轻拟物按钮 */
+.nm-btn-circle {
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+}
+
+.nm-btn-circle-lg {
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  box-shadow: var(--nm-convex);
+}
+
+/* 轻拟物输入框 */
+.nm-input {
+  background: var(--nm-bg);
+  box-shadow: var(--nm-inset-sm);
+  border: none;
+  outline: none;
+  padding: 10px 16px;
+  border-radius: 16px;
+  color: var(--nm-text-main);
+  font-size: 13px;
+  width: 100%;
+  transition: box-shadow 0.2s ease;
+}
+
+.nm-input:focus {
+  box-shadow: var(--nm-inset);
+}
+
+/* 强调蓝色渐变主操作按钮 */
+.nm-btn-primary {
+  background: linear-gradient(135deg, var(--nm-primary-light), var(--nm-primary));
+  color: #FFFFFF;
+  box-shadow: 4px 4px 12px rgba(80, 150, 198, 0.4), -4px -4px 12px rgba(255, 255, 255, 0.8);
+  border-radius: 18px;
+  font-weight: 700;
+}
+
+.nm-btn-primary:active {
+  background: linear-gradient(135deg, var(--nm-primary), var(--nm-primary-dark));
+  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.25), inset -3px -3px 6px rgba(255, 255, 255, 0.3);
+  transform: scale(0.97);
+}
+
+/* 视窗打开缩放动画 */
+@keyframes appZoomIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.93);
+    pointer-events: none;
+  }
+  99% {
+    pointer-events: none;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+}
+
+.app-window-animate {
+  animation: appZoomIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 加载旋转动画 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin-animation {
+  animation: spin 1s linear infinite;
+}
+
+/* SillyTavern 正则与富文本美化样式 */
+.nm-think-box {
+  margin: 8px 0;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  font-size: 11px;
+}
+
+.nm-think-summary {
+  cursor: pointer;
+  padding: 6px 10px;
+  font-weight: 600;
+  color: #718096;
+  background: rgba(0, 0, 0, 0.02);
+  user-select: none;
+  outline: none;
+}
+
+.nm-think-content {
+  padding: 8px 12px;
+  color: #718096;
+  white-space: pre-wrap;
+  font-style: italic;
+  border-top: 1px dashed rgba(0, 0, 0, 0.06);
+}
+
+.nm-action-tag {
+  color: #5A6B5C;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.nm-thought-whisper {
+  color: #8C7B70;
+  font-style: italic;
+}
+
+.nm-dialogue-highlight {
+  color: #1A202C;
+  font-weight: 600;
+}
+
+/* === 神仙卡专属：马卡龙故障风前端 HUD 样式 === */
+.glitch-hud {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: rgba(20, 20, 25, 0.95);
+  border: 2px solid #ffb7b2;
+  border-radius: 12px;
+  color: #fff;
+  padding: 0;
+  margin: 10px 0;
+  width: 100%;
+  box-shadow: 3px 3px 0px #c7ceea, -3px -3px 0px #ffb7b2;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.hud-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border-bottom: 2px dashed #b5ead7;
+  font-family: monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #ffb7b2;
+}
+
+.hud-main {
+  padding: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.mind-float {
+  background: linear-gradient(90deg, transparent, rgba(199, 206, 234, 0.2), transparent);
+  text-align: center;
+  color: #c7ceea;
+  font-style: italic;
+  padding: 4px;
+  margin-bottom: 10px;
+  border-left: 3px solid #ffb7b2;
+  border-right: 3px solid #ffb7b2;
+  font-size: 11px;
+}
+
+.info-grid {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.info-label {
+  color: #b5ead7;
+  font-weight: bold;
+}
+
+.hud-details {
+  border-top: 1px solid #c7ceea;
+}
+
+.hud-details summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  background: rgba(181, 234, 215, 0.1);
+  color: #ffb7b2;
+  font-weight: bold;
+  font-size: 11px;
+  outline: none;
+}
+
+.private-content {
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.4);
+  white-space: pre-wrap;
+  color: #e2f0cb;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  border-left: 4px solid #ffb7b2;
+}
+
+.qiman-box {
+  margin: 10px;
+  padding: 10px;
+  background: #ffffff;
+  color: #000000;
+  border: 2px solid #000000;
+  position: relative;
+  box-shadow: 4px 4px 0px #2d2d2d;
+  border-radius: 6px;
+}
+
+.qiman-title {
+  display: inline-block;
+  background: #2d2d2d;
+  color: #ffb7b2;
+  padding: 2px 6px;
+  font-weight: bold;
+  font-family: monospace;
+  font-size: 10px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.qiman-text {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #1a202c;
+}
+
+.ads-scroller {
+  background: #ffb7b2;
+  color: #000;
+  padding: 4px 8px;
+  font-family: monospace;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  border-top: 1px solid #000;
+}
+
+.ads-content {
+  display: inline-block;
+  animation: marquee-anim 15s linear infinite;
+}
+
+@keyframes marquee-anim {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* === 神仙卡专属：全屏横幅直播弹幕流 === */
+.void-stream-container {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  background: linear-gradient(180deg, rgba(20, 10, 20, 0.95) 0%, rgba(30, 15, 30, 0.6) 80%, transparent 100%);
+  overflow: hidden;
+  border-radius: 12px;
+  margin: 10px 0;
+  user-select: none;
+  border: 1px solid #4a2b3a;
+  box-sizing: border-box;
+}
+
+.vs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  font-size: 10px;
+}
+
+.vs-live-tag {
+  background-color: #ff0055;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: bold;
+}
+
+.vs-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: #d1c4e9;
+}
+
+.vs-track-container {
+  position: relative;
+  height: 100px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.vs-danmaku {
+  position: absolute;
+  white-space: nowrap;
+  color: #ffffff;
+  font-size: 11px;
+  text-shadow: 1px 1px 2px #000;
+  left: 100%;
+  animation: danmaku-slide 9s linear infinite;
+}
+
+.d-color1 { color: #b388ff; }
+.d-color2 { color: #69f0ae; }
+.d-highlight { color: #ffeb3b; font-weight: bold; }
+.d-big { font-size: 13px; font-weight: bold; color: #ff0055; }
+.d-fast { animation-duration: 6s; }
+.d-slow { animation-duration: 12s; }
+
+@keyframes danmaku-slide {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-400px); }
+}
+
+
