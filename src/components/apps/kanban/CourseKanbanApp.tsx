@@ -397,7 +397,22 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
                   }}
                 >
                   {/* 卡片头部 */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                    {course.coverUrl && (
+                      <img
+                        src={course.coverUrl}
+                        alt="封面"
+                        referrerPolicy="no-referrer"
+                        style={{
+                          width: '56px',
+                          height: '40px',
+                          borderRadius: '8px',
+                          objectFit: 'cover',
+                          boxShadow: NM.insetXs,
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span
@@ -436,7 +451,7 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
                       </div>
                     </div>
 
-                    <span style={{ fontSize: '14px', fontWeight: 900, color: NM.amber }}>
+                    <span style={{ fontSize: '14px', fontWeight: 900, color: NM.amber, flexShrink: 0 }}>
                       {progress}%
                     </span>
                   </div>

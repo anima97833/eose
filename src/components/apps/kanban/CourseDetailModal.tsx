@@ -173,6 +173,25 @@ export const CourseDetailModal: React.FC<CourseDetailModalProps> = ({
         <div style={{ padding: '18px 20px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* 课程大标题与链接 */}
           <div>
+            {currentCourse.coverUrl && (
+              <div
+                style={{
+                  width: '100%',
+                  height: '140px',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  boxShadow: NM.insetSm,
+                  marginBottom: '10px',
+                }}
+              >
+                <img
+                  src={currentCourse.coverUrl}
+                  alt={currentCourse.title}
+                  referrerPolicy="no-referrer"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
+            )}
             <div style={{ fontSize: '16px', fontWeight: 800, color: NM.textMain, lineHeight: '1.4' }}>
               {currentCourse.title}
             </div>

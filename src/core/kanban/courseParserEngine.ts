@@ -23,107 +23,189 @@ export function estimateRemainingDays(remainingSeconds: number, dailyGoalMinutes
 }
 
 /**
- * 从文本中提取 Bilibili BV 号
+ * 从文本或链接中提取 Bilibili BV 号或 AV 号
  */
 export function extractBvid(input: string): string | null {
   const trimmed = input.trim();
   const bvMatch = trimmed.match(/BV[a-zA-Z0-9]{10}/i);
   if (bvMatch) return bvMatch[0];
+  const avMatch = trimmed.match(/av(\d+)/i);
+  if (avMatch) return avMatch[0];
   return null;
 }
 
 /**
- * 解析 B 站课程（根据 BV 号获取实际分P与时长）
+ * 解析 B 站课程（获取真实视频标题、UP主、封面、分P目录与时长）
  */
 export async function parseBilibiliCourse(inputUrlOrBvid: string): Promise<Course> {
-  const bvid = extractBvid(inputUrlOrBvid);
-  if (!bvid) {
-    throw new Error('未识别到有效的 B站 BV号或视频链接');
-  }
+  let targetId = extractBvid(inputUrlOrBvid);
 
-  const apiUrl = `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`;
-  const proxies = [
-    (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  ];
-
-  let rawData: any = null;
-
-  for (const makeProxy of proxies) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
-      const res = await fetch(makeProxy(apiUrl), { signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        const json = await res.json();
-        if (json && json.data) {
-          rawData = json.data;
-          break;
-        }
+  // 如果未能直接正则提取，但包含 http 链接（如 b23.tv 分享短链），尝试通过 Jina 追踪重定向
+  if (!targetId) {
+    const urlMatch = inputUrlOrBvid.match(/https?:\/\/[^\s]+/i);
+    if (urlMatch) {
+      try {
+        const resolveRes = await fetch(`https://r.jina.ai/${urlMatch[0]}`, {
+          signal: AbortSignal.timeout(6000),
+        });
+        const resolveText = await resolveRes.text();
+        targetId = extractBvid(resolveText);
+      } catch {
+        // 继续向下
       }
-    } catch {
-      // 容错继续下一个代理
     }
   }
 
-  if (rawData) {
-    const chapters: CourseChapter[] = (rawData.pages || []).map((p: any, idx: number) => ({
-      id: `ch_bili_${bvid}_${p.page || idx + 1}`,
-      index: idx,
-      title: p.part || `第${p.page || idx + 1}讲`,
-      durationSeconds: p.duration || 600,
-      isCompleted: false,
-      url: `https://www.bilibili.com/video/${bvid}?p=${p.page || idx + 1}`,
-    }));
-
-    const totalDurationSeconds = chapters.reduce((sum, ch) => sum + ch.durationSeconds, 0);
-
-    return {
-      id: `course_bili_${bvid}_${Date.now()}`,
-      title: rawData.title || `B站视频合集 (${bvid})`,
-      platform: 'bilibili',
-      status: 'backlog',
-      author: rawData.owner?.name || 'B站UP主',
-      coverUrl: rawData.pic ? rawData.pic.replace('http:', 'https:') : undefined,
-      sourceUrl: `https://www.bilibili.com/video/${bvid}`,
-      intro: rawData.desc?.slice(0, 150) || '源自 Bilibili 优质课程合集',
-      totalChapters: chapters.length || 1,
-      completedChapters: 0,
-      totalDurationSeconds: totalDurationSeconds || (rawData.duration || 1800),
-      chapters,
-      dailyGoalMinutes: 30,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
+  if (!targetId) {
+    throw new Error('未识别到有效的 B站 BV号或视频链接');
   }
 
-  // 离线/降级兜底生成：当无法访问外网或接口超时时，根据 BV 号自动构建高质量课程模版
-  const dummyChapters: CourseChapter[] = Array.from({ length: 12 }, (_, i) => ({
-    id: `ch_bili_${bvid}_${i + 1}`,
-    index: i,
-    title: `第 ${i + 1} 讲：核心知识精讲与实战演练`,
-    durationSeconds: 1200 + (i % 5) * 180,
-    isCompleted: false,
-    url: `https://www.bilibili.com/video/${bvid}?p=${i + 1}`,
-  }));
+  const isAid = /^av\d+/i.test(targetId);
+  const aid = isAid ? targetId.replace(/^av/i, '') : null;
+  const bvid = isAid ? '' : targetId;
+  const queryParam = bvid ? `bvid=${bvid}` : `aid=${aid}`;
 
-  return {
-    id: `course_bili_${bvid}_${Date.now()}`,
-    title: `B站精品课 · ${bvid}`,
-    platform: 'bilibili',
-    status: 'backlog',
-    author: '精选UP主',
-    sourceUrl: `https://www.bilibili.com/video/${bvid}`,
-    intro: '该课程已成功导入，已自动同步分P章节结构。',
-    totalChapters: dummyChapters.length,
-    completedChapters: 0,
-    totalDurationSeconds: dummyChapters.reduce((acc, c) => acc + c.durationSeconds, 0),
-    chapters: dummyChapters,
-    dailyGoalMinutes: 30,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
+  // 策略 1：通过 Jina 请求 B站官方 JSON 接口（避开浏览器 CORS 与 WAF 阻断）
+  try {
+    const jsonUrl = `https://r.jina.ai/https://api.bilibili.com/x/web-interface/view?${queryParam}`;
+    const res = await fetch(jsonUrl, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) {
+      const text = await res.text();
+      const jsonStart = text.indexOf('{"code":0');
+      if (jsonStart !== -1) {
+        const rawJson = text.slice(jsonStart).trim();
+        const json = JSON.parse(rawJson);
+        if (json.code === 0 && json.data) {
+          const d = json.data;
+          const actualBvid = d.bvid || targetId;
+          const chapters: CourseChapter[] = (d.pages || []).map((p: any, idx: number) => ({
+            id: `ch_bili_${actualBvid}_${p.page || idx + 1}`,
+            index: idx,
+            title: p.part ? p.part.trim() : `第 ${p.page || idx + 1} 讲`,
+            durationSeconds: p.duration || 600,
+            isCompleted: false,
+            url: `https://www.bilibili.com/video/${actualBvid}?p=${p.page || idx + 1}`,
+          }));
+
+          const totalDuration = chapters.reduce((sum, ch) => sum + ch.durationSeconds, 0);
+
+          return {
+            id: `course_bili_${actualBvid}_${Date.now()}`,
+            title: d.title ? d.title.trim() : `B站课程 (${actualBvid})`,
+            platform: 'bilibili',
+            status: 'backlog',
+            author: d.owner?.name ? d.owner.name.trim() : 'B站UP主',
+            coverUrl: d.pic ? d.pic.replace('http:', 'https:') : undefined,
+            sourceUrl: `https://www.bilibili.com/video/${actualBvid}`,
+            intro: d.desc ? d.desc.slice(0, 150).trim() : '源自 Bilibili 优质课程合集',
+            totalChapters: chapters.length || 1,
+            completedChapters: 0,
+            totalDurationSeconds: totalDuration || (d.duration || 1800),
+            chapters: chapters.length > 0 ? chapters : [{
+              id: `ch_bili_${actualBvid}_1`,
+              index: 0,
+              title: d.title || '完整视频',
+              durationSeconds: d.duration || 1800,
+              isCompleted: false,
+              url: `https://www.bilibili.com/video/${actualBvid}`,
+            }],
+            dailyGoalMinutes: 30,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Bilibili JSON 解析策略失败，尝试页面正文解析:', e);
+  }
+
+  // 策略 2：通过 Jina 抓取 B站网页 Markdown 正文（备用回退机制）
+  try {
+    const pageUrl = `https://r.jina.ai/https://www.bilibili.com/video/${bvid || targetId}`;
+    const pageRes = await fetch(pageUrl, { signal: AbortSignal.timeout(8000) });
+    if (pageRes.ok) {
+      const text = await pageRes.text();
+
+      // 提取真实标题
+      const titleMatch = text.match(/Title:\s*(.+)/i);
+      let title = titleMatch ? titleMatch[1] : `B站课程 (${targetId})`;
+      title = title
+        .replace(/_哔哩哔哩_bilibili/gi, '')
+        .replace(/ - 哔哩哔哩/gi, '')
+        .replace(/_bilibili/gi, '')
+        .replace(/- bilibili/gi, '')
+        .trim();
+
+      // 提取真实 UP 主
+      const authorMatch = text.match(/\[([^\]]+)\]\(https:\/\/space\.bilibili\.com\/\d+\/?\)/i);
+      const author = authorMatch ? authorMatch[1].trim() : 'B站UP主';
+
+      // 提取章节与时长
+      const lines = text.split(/\r?\n/).map(l => l.trim());
+      const timeRegex = /^(\d{1,2}:)?\d{1,2}:\d{2}$/;
+      const parsedChapters: CourseChapter[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (timeRegex.test(line)) {
+          let chTitle = '';
+          for (let j = i - 1; j >= 0 && j >= i - 4; j--) {
+            if (lines[j] && !timeRegex.test(lines[j]) && !lines[j].startsWith('http') && !lines[j].startsWith('Title:')) {
+              chTitle = lines[j];
+              break;
+            }
+          }
+          if (chTitle) {
+            const parts = line.split(':').map(Number);
+            let sec = 0;
+            if (parts.length === 3) sec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+            else if (parts.length === 2) sec = parts[0] * 60 + parts[1];
+            parsedChapters.push({
+              id: `ch_bili_${targetId}_${parsedChapters.length + 1}`,
+              index: parsedChapters.length,
+              title: chTitle,
+              durationSeconds: sec || 600,
+              isCompleted: false,
+              url: `https://www.bilibili.com/video/${targetId}?p=${parsedChapters.length + 1}`,
+            });
+          }
+        }
+      }
+
+      const finalChapters = parsedChapters.length > 0 ? parsedChapters : [{
+        id: `ch_bili_${targetId}_1`,
+        index: 0,
+        title: title,
+        durationSeconds: 1800,
+        isCompleted: false,
+        url: `https://www.bilibili.com/video/${targetId}`,
+      }];
+
+      const totalDuration = finalChapters.reduce((sum, ch) => sum + ch.durationSeconds, 0);
+
+      return {
+        id: `course_bili_${targetId}_${Date.now()}`,
+        title,
+        platform: 'bilibili',
+        status: 'backlog',
+        author,
+        sourceUrl: `https://www.bilibili.com/video/${targetId}`,
+        intro: `来自 Bilibili · 共 ${finalChapters.length} 讲`,
+        totalChapters: finalChapters.length,
+        completedChapters: 0,
+        totalDurationSeconds: totalDuration,
+        chapters: finalChapters,
+        dailyGoalMinutes: 30,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+    }
+  } catch (e) {
+    console.warn('Bilibili 网页抓取解析策略失败:', e);
+  }
+
+  throw new Error('未获取到有效视频，请确认链接或BV号正确且视频公开');
 }
 
 /**

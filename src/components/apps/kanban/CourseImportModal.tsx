@@ -27,6 +27,8 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
   const [biliInput, setBiliInput] = useState('');
   const [isParsingBili, setIsParsingBili] = useState(false);
   const [biliParsedCourse, setBiliParsedCourse] = useState<Course | null>(null);
+  const [biliParsedTitle, setBiliParsedTitle] = useState('');
+  const [biliParsedAuthor, setBiliParsedAuthor] = useState('');
 
   // 网盘导入表单
   const [panTitle, setPanTitle] = useState('');
@@ -57,6 +59,8 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
     try {
       const course = await parseBilibiliCourse(biliInput.trim());
       setBiliParsedCourse(course);
+      setBiliParsedTitle(course.title);
+      setBiliParsedAuthor(course.author);
       showToast('解析成功');
     } catch (err: any) {
       console.warn(err);
@@ -68,8 +72,13 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
 
   const handleConfirmBili = () => {
     if (!biliParsedCourse) return;
-    saveCourse(biliParsedCourse);
-    onCourseAdded(biliParsedCourse);
+    const finalCourse: Course = {
+      ...biliParsedCourse,
+      title: biliParsedTitle.trim() || biliParsedCourse.title,
+      author: biliParsedAuthor.trim() || biliParsedCourse.author,
+    };
+    saveCourse(finalCourse);
+    onCourseAdded(finalCourse);
     showToast('已入看板');
     onClose();
   };
@@ -278,6 +287,42 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
                 </div>
               </div>
 
+              {/* 快捷示例 */}
+              {!biliParsedCourse && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: NM.textMuted }}>
+                  <span>试一试示例:</span>
+                  <button
+                    onClick={() => setBiliInput('BV14J4114768')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: NM.gold,
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      textDecoration: 'underline',
+                      padding: 0,
+                    }}
+                  >
+                    前端精讲(BV14J4114768)
+                  </button>
+                  <span>·</span>
+                  <button
+                    onClick={() => setBiliInput('BV1xx411c7mD')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: NM.gold,
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      textDecoration: 'underline',
+                      padding: 0,
+                    }}
+                  >
+                    交流演示(BV1xx411c7mD)
+                  </button>
+                </div>
+              )}
+
               {/* 解析成功预览 */}
               {biliParsedCourse && (
                 <div
@@ -289,44 +334,207 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
                     border: NM.borderLight,
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '8px',
+                    gap: '10px',
                   }}
                 >
-                  <div style={{ fontSize: '13px', fontWeight: 800, color: NM.textMain }}>
-                    {biliParsedCourse.title}
-                  </div>
-                  <div style={{ fontSize: '11px', color: NM.textMuted }}>
-                    UP主: {biliParsedCourse.author} · 共 {biliParsedCourse.totalChapters} 讲 · 总时长 {formatDuration(biliParsedCourse.totalDurationSeconds)}
-                  </div>
-                  <div
-                    style={{
-                      maxHeight: '120px',
-                      overflowY: 'auto',
-                      padding: '8px',
-                      borderRadius: '8px',
-                      backgroundColor: NM.bgInset,
-                      boxShadow: NM.insetXs,
-                      fontSize: '11px',
-                      color: NM.textSub,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                    }}
-                  >
-                    {biliParsedCourse.chapters.slice(0, 8).map(c => (
-                      <div key={c.id} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {c.title} ({formatDuration(c.durationSeconds)})
+                  {/* 课程封面 */}
+                  {biliParsedCourse.coverUrl && (
+                    <div
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        height: '110px',
+                        borderRadius: '10px',
+                        overflow: 'hidden',
+                        boxShadow: NM.insetSm,
+                      }}
+                    >
+                      <img
+                        src={biliParsedCourse.coverUrl}
+                        alt="课程封面"
+                        referrerPolicy="no-referrer"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: '6px',
+                          right: '8px',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: 'rgba(0,0,0,0.65)',
+                          color: '#fff',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                        }}
+                      >
+                        共 {biliParsedCourse.totalChapters} 讲
                       </div>
-                    ))}
-                    {biliParsedCourse.chapters.length > 8 && (
-                      <div style={{ color: NM.textMuted }}>...等共 {biliParsedCourse.chapters.length} 讲</div>
-                    )}
+                    </div>
+                  )}
+
+                  {/* 课程名称（可编辑微调） */}
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: NM.textSub,
+                        marginBottom: '4px',
+                      }}
+                    >
+                      课程名称 (可编辑)
+                    </label>
+                    <input
+                      type="text"
+                      value={biliParsedTitle}
+                      onChange={e => setBiliParsedTitle(e.target.value)}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: NM.borderSoft,
+                        backgroundColor: NM.bgInset,
+                        boxShadow: NM.insetXs,
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color: NM.textMain,
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  {/* UP主 / 讲师（可编辑微调） */}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label
+                        style={{
+                          display: 'block',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: NM.textSub,
+                          marginBottom: '4px',
+                        }}
+                      >
+                        UP主 / 讲师
+                      </label>
+                      <input
+                        type="text"
+                        value={biliParsedAuthor}
+                        onChange={e => setBiliParsedAuthor(e.target.value)}
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '7px 10px',
+                          borderRadius: '8px',
+                          border: NM.borderSoft,
+                          backgroundColor: NM.bgInset,
+                          boxShadow: NM.insetXs,
+                          fontSize: '11px',
+                          color: NM.textMain,
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label
+                        style={{
+                          display: 'block',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: NM.textSub,
+                          marginBottom: '4px',
+                        }}
+                      >
+                        预计总学时
+                      </label>
+                      <div
+                        style={{
+                          padding: '7px 10px',
+                          borderRadius: '8px',
+                          backgroundColor: NM.bgLighter,
+                          fontSize: '11px',
+                          color: NM.amber,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {formatDuration(biliParsedCourse.totalDurationSeconds)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 分P章节列表预览 */}
+                  <div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: NM.textSub }}>
+                        解析目录清单 (共 {biliParsedCourse.totalChapters} 讲)
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        maxHeight: '130px',
+                        overflowY: 'auto',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        backgroundColor: NM.bgInset,
+                        boxShadow: NM.insetXs,
+                        fontSize: '11px',
+                        color: NM.textSub,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '5px',
+                      }}
+                    >
+                      {biliParsedCourse.chapters.slice(0, 20).map(c => (
+                        <div
+                          key={c.id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <span
+                            style={{
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              flex: 1,
+                            }}
+                          >
+                            {c.title}
+                          </span>
+                          <span style={{ fontSize: '10px', color: NM.textMuted, flexShrink: 0 }}>
+                            {formatDuration(c.durationSeconds)}
+                          </span>
+                        </div>
+                      ))}
+                      {biliParsedCourse.chapters.length > 20 && (
+                        <div style={{ color: NM.textMuted, textAlign: 'center', paddingTop: '4px' }}>
+                          ...已同步全部 {biliParsedCourse.chapters.length} 讲
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <button
                     onClick={handleConfirmBili}
                     style={{
-                      marginTop: '6px',
+                      marginTop: '4px',
                       padding: '10px 0',
                       borderRadius: '10px',
                       backgroundColor: NM.amber,
