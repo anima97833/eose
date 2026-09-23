@@ -38,7 +38,7 @@ export const CHALLENGE_PROJECTS: ChallengeProjectConfig[] = [
     desc: '7:00 起床，07:00:00 - 07:30:00 间准时打卡',
     timeWindowText: '07:00:00 - 07:30:00',
     dailyRewardText: '精神 +2 · 钻石碎片 +2',
-    finalRewardText: '精神 +10 · 完整钻石 +1 · 称号「晨光破晓者」',
+    finalRewardText: '精神 +10 · 完整钻石 +1 · 许愿券 +1 · 称号「晨光破晓者」',
     accentColor: '#FF6B4A',
   },
   {
@@ -49,7 +49,7 @@ export const CHALLENGE_PROJECTS: ChallengeProjectConfig[] = [
     desc: '22:00 睡眠，21:30:00 - 22:00:00 间准时打卡',
     timeWindowText: '21:30:00 - 22:00:00',
     dailyRewardText: '体魄 +2 · 体力回满 · 钻石碎片 +2',
-    finalRewardText: '体魄 +10 · 完整钻石 +1 · 称号「夜巡安眠者」',
+    finalRewardText: '体魄 +10 · 完整钻石 +1 · 许愿券 +1 · 称号「夜巡安眠者」',
     accentColor: '#6366F1',
   },
   {
@@ -60,7 +60,7 @@ export const CHALLENGE_PROJECTS: ChallengeProjectConfig[] = [
     desc: '每天专注运动 15 分钟以上并打卡',
     timeWindowText: '全天可打卡 (需运动≥15分钟)',
     dailyRewardText: '力量 +1 · 敏捷 +1 · 钻石碎片 +2',
-    finalRewardText: '力量 +5 · 敏捷 +5 · 完整钻石 +1 · 称号「暴风行者」',
+    finalRewardText: '力量 +5 · 敏捷 +5 · 完整钻石 +1 · 许愿券 +1 · 称号「暴风行者」',
     accentColor: '#10B981',
   },
   {
@@ -71,7 +71,7 @@ export const CHALLENGE_PROJECTS: ChallengeProjectConfig[] = [
     desc: '每天摄入新鲜水果或蔬菜并打卡',
     timeWindowText: '全天可打卡',
     dailyRewardText: '体魄 +1 · 心情 +5 · 钻石碎片 +2',
-    finalRewardText: '体魄 +5 · 心情 +15 · 完整钻石 +1 · 称号「自然之子」',
+    finalRewardText: '体魄 +5 · 心情 +15 · 完整钻石 +1 · 许愿券 +1 · 称号「自然之子」',
     accentColor: '#F59E0B',
   },
 ];
@@ -191,6 +191,7 @@ export function executeExtremeCheckIn(
   // 基础打卡奖励：+2 钻石碎片
   let shardsEarned = 2;
   let wholeDiamondsEarned = isFinalDay ? 1 : 0;
+  let wishVouchersEarned = isFinalDay ? 1 : 0;
 
   // 根据项目发放属性成长
   if (challengeType === 'early_bird') {
@@ -198,7 +199,7 @@ export function executeExtremeCheckIn(
     updatedAttrs.SPI = { ...updatedAttrs.SPI, value: Math.min(updatedAttrs.SPI.maxValue || 100, spiVal) };
     if (isFinalDay) {
       updatedTitle = '晨光破晓者';
-      rewardDesc = '精神 +10 · 完整钻石 +1 · 称号「晨光破晓者」';
+      rewardDesc = '精神 +10 · 完整钻石 +1 · 许愿券 +1 · 称号「晨光破晓者」';
     } else {
       rewardDesc = '精神 +2 · 钻石碎片 +2';
     }
@@ -208,7 +209,7 @@ export function executeExtremeCheckIn(
     updatedHp = profile.maxHp || 100; // 体力回满
     if (isFinalDay) {
       updatedTitle = '夜巡安眠者';
-      rewardDesc = '体魄 +10 · 体力已回满 · 完整钻石 +1 · 称号「夜巡安眠者」';
+      rewardDesc = '体魄 +10 · 体力已回满 · 完整钻石 +1 · 许愿券 +1 · 称号「夜巡安眠者」';
     } else {
       rewardDesc = '体魄 +2 · 体力已回满 · 钻石碎片 +2';
     }
@@ -219,7 +220,7 @@ export function executeExtremeCheckIn(
     updatedAttrs.DEX = { ...updatedAttrs.DEX, value: Math.min(updatedAttrs.DEX.maxValue || 100, dexVal) };
     if (isFinalDay) {
       updatedTitle = '暴风行者';
-      rewardDesc = '力量 +5 · 敏捷 +5 · 完整钻石 +1 · 称号「暴风行者」';
+      rewardDesc = '力量 +5 · 敏捷 +5 · 完整钻石 +1 · 许愿券 +1 · 称号「暴风行者」';
     } else {
       rewardDesc = '力量 +1 · 敏捷 +1 · 钻石碎片 +2';
     }
@@ -229,7 +230,7 @@ export function executeExtremeCheckIn(
     updatedMood = Math.min(100, updatedMood + (isFinalDay ? 15 : 5));
     if (isFinalDay) {
       updatedTitle = '自然之子';
-      rewardDesc = '体魄 +5 · 心情 +15 · 完整钻石 +1 · 称号「自然之子」';
+      rewardDesc = '体魄 +5 · 心情 +15 · 完整钻石 +1 · 许愿券 +1 · 称号「自然之子」';
     } else {
       rewardDesc = '体魄 +1 · 心情 +5 · 钻石碎片 +2';
     }
@@ -277,6 +278,7 @@ export function executeExtremeCheckIn(
     hp: updatedHp,
     title: updatedTitle,
     crystals: updatedCrystals,
+    wishVouchers: (profile.wishVouchers || 0) + wishVouchersEarned,
     signInState: profile.signInState
       ? { ...profile.signInState, diamondShards: remainingShards }
       : {

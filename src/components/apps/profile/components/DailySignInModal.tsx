@@ -7,6 +7,7 @@ import {
   executeSignIn,
   SignInEligibilityResult,
 } from '../../../../core/rpg/signInStorage';
+import { WishWandIcon } from './WishWandIcon';
 
 interface DailySignInModalProps {
   profile: RPGProfile;
@@ -250,54 +251,29 @@ export const DailySignInModal: React.FC<DailySignInModalProps> = ({
     </div>
   );
 
-  // 第七天专属金色整钻图标
-  const renderWholeDiamondIcon = () => (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '8px',
-      }}
-    >
-      <svg width="42" height="34" viewBox="0 0 42 34" style={{ overflow: 'visible' }}>
-        <defs>
-          <linearGradient id="wholeGemGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#FF77BA" />
-            <stop offset="45%" stopColor="#F43F5E" />
-            <stop offset="100%" stopColor="#BE123C" />
-          </linearGradient>
-        </defs>
-        {/* 整颗大红钻/耀光钻 */}
-        <polygon
-          points="21,2 38,10 30,30 12,30 4,10"
-          fill="url(#wholeGemGrad)"
-          stroke="#3D1812"
-          strokeWidth="2.2"
-          strokeLinejoin="round"
-        />
-        <polygon points="21,2 30,11 21,24 12,11" fill="#FFC1E3" opacity="0.9" />
-        <polygon points="21,24 30,30 12,30" fill="#9F1239" opacity="0.6" />
-        {/* 闪烁十字星芒 */}
-        <path d="M 33 4 L 34 8 L 38 9 L 34 10 L 33 14 L 32 10 L 28 9 L 32 8 Z" fill="#FFE066" />
-      </svg>
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <span
-          style={{
-            fontSize: '15px',
-            fontWeight: 900,
-            color: '#7C2D12',
-            letterSpacing: '0.5px',
-            fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", cursive, sans-serif',
-          }}
-        >
-          整颗完整钻石
-        </span>
-        <span style={{ fontSize: '11px', fontWeight: 800, color: '#B45309' }}>
-          +1 自由天数
-        </span>
-      </div>
-    </div>
+  // 第七天专属金色整钻图形（纯粹图标无文字）
+  const renderWholeDiamondSvg = (size = 32) => (
+    <svg width={size} height={(size * 34) / 42} viewBox="0 0 42 34" style={{ overflow: 'visible', flexShrink: 0 }}>
+      <defs>
+        <linearGradient id="wholeGemGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FF77BA" />
+          <stop offset="45%" stopColor="#F43F5E" />
+          <stop offset="100%" stopColor="#BE123C" />
+        </linearGradient>
+      </defs>
+      {/* 整颗大红钻/耀光钻 */}
+      <polygon
+        points="21,2 38,10 30,30 12,30 4,10"
+        fill="url(#wholeGemGrad)"
+        stroke="#3D1812"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      <polygon points="21,2 30,11 21,24 12,11" fill="#FFC1E3" opacity="0.9" />
+      <polygon points="21,24 30,30 12,30" fill="#9F1239" opacity="0.6" />
+      {/* 闪烁十字星芒 */}
+      <path d="M 33 4 L 34 8 L 38 9 L 34 10 L 33 14 L 32 10 L 28 9 L 32 8 Z" fill="#FFE066" />
+    </svg>
   );
 
   return (
@@ -582,8 +558,53 @@ export const DailySignInModal: React.FC<DailySignInModalProps> = ({
                     7 日 · 大奖
                   </div>
 
-                  {/* 第7天大奖图标 */}
-                  <div style={{ zIndex: 1 }}>{renderWholeDiamondIcon()}</div>
+                  {/* 第7天大奖：两个图标并列，各自在旁边直接标记 +1 */}
+                  <div
+                    style={{
+                      zIndex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '12px',
+                      padding: '8px 4px 2px',
+                    }}
+                  >
+                    {/* 钻石 +1 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      {renderWholeDiamondSvg(32)}
+                      <span
+                        style={{
+                          fontSize: '15px',
+                          fontWeight: 900,
+                          color: '#7C2D12',
+                          fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", "幼圆", cursive, sans-serif',
+                          textShadow: '0 1px 1px rgba(255, 255, 255, 0.8)',
+                          lineHeight: 1,
+                        }}
+                      >
+                        +1
+                      </span>
+                    </div>
+
+                    {/* 许愿券 +1 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <div style={{ transform: 'rotate(-8deg)', filter: 'drop-shadow(0 2px 4px rgba(245, 158, 11, 0.45))' }}>
+                        <WishWandIcon size={26} />
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '15px',
+                          fontWeight: 900,
+                          color: '#7C2D12',
+                          fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", "幼圆", cursive, sans-serif',
+                          textShadow: '0 1px 1px rgba(255, 255, 255, 0.8)',
+                          lineHeight: 1,
+                        }}
+                      >
+                        +1
+                      </span>
+                    </div>
+                  </div>
 
                   {isClaimed && (
                     <div
@@ -661,6 +682,21 @@ export const DailySignInModal: React.FC<DailySignInModalProps> = ({
             <span style={{ color: '#0284C7', fontWeight: 700 }}>
               (满20自动合成+1天)
             </span>
+          </div>
+
+          {/* 第7天终极奖励 */}
+          <div
+            style={{
+              fontSize: '10.5px',
+              color: '#B45309',
+              fontWeight: 700,
+              paddingLeft: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <span>🌟 满 7 天大奖: <b>1 颗完整钻石 + 1 张许愿券</b></span>
           </div>
         </div>
 

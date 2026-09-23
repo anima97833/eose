@@ -30,14 +30,20 @@ export interface RPGDebuff {
 
 export interface RPGItem {
   id: string;
-  name: string; // <=5字，如：降噪耳机
-  type: 'gear' | 'consumable';
+  name: string; // 如：降噪耳机
+  type: 'gear' | 'consumable' | 'wish';
   slot?: 'head' | 'body' | 'wrist' | 'tool';
   icon: string;
-  effect: string; // 如：专注+5 或 体力+20
+  effect: string; // 如：专注+5 或 奖励寄语
   equipped?: boolean;
   count?: number;
   imageUrl?: string; // 用户上传至 IndexedDB 的图片或外部 URL
+  // 心愿专属字段
+  wishVouchersCost?: number; // 所需心愿券数目 (用户自拟，如 15)
+  lockedUntil?: number;      // 7天冷静期截止时间戳
+  wishNote?: string;         // 寄语 / 理由
+  isAchieved?: boolean;      // 是否已兑换圆满
+  achievedAt?: number;
 }
 
 export interface RPGClass {
@@ -80,6 +86,7 @@ export interface RPGProfile {
   maxMp: number;
   gold: number;
   crystals: number;
+  wishVouchers?: number; // 仙女棒心愿券数量
   mood?: number; // 心情数值，对齐用户参考图 (每天北京时间初始重置为 100)
   zodiac?: string; // 星座 (如: 天秤座)
   mbti?: string; // MBTI (如: INFP)
@@ -127,6 +134,7 @@ export interface DailySettlementSnapshot {
   ratingTitle: string; // 评级称号 (S: 气冲霄汉, A: 精进不休, B: 步履不停, C: 休养生息)
   diamondReward?: number; // 额外完整钻石奖励
   shardReward?: number; // 额外钻石碎片奖励
+  wishVoucherReward?: number; // 升级获得的许愿券奖励
   oldLevel: number;
   oldExp: number;
   newLevel: number;

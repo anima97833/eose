@@ -69,6 +69,7 @@ export const DEFAULT_RPG_PROFILE: RPGProfile = {
   isPrivacyHidden: false,
   bgmEnabled: true,
   sfxEnabled: true,
+  wishVouchers: 0,
   userId: '417914',
   zodiac: '双鱼座',
   mbti: 'INFP',
@@ -291,6 +292,39 @@ export const DEFAULT_RPG_PROFILE: RPGProfile = {
       effect: '恢复 15 精力',
       count: 5,
     },
+    {
+      id: 'wish_sony_xm5',
+      name: '降噪大耳机',
+      type: 'wish',
+      icon: '🎧',
+      effect: '现实心愿 · 沉浸心流工作站',
+      wishVouchersCost: 15,
+      lockedUntil: Date.now() + 5 * 24 * 3600 * 1000,
+      wishNote: '等上线完新版本就奖励自己，戴上它全世界都安静了。',
+      isAchieved: false,
+    },
+    {
+      id: 'wish_afternoon_tea',
+      name: '法式双人下午茶',
+      type: 'wish',
+      icon: '🍰',
+      effect: '现实心愿 · 悠闲日光浴小憩',
+      wishVouchersCost: 5,
+      lockedUntil: Date.now() - 1000, // 冷静期已满
+      wishNote: '连续达成两周打卡后，周六下午去梧桐树下坐坐。',
+      isAchieved: false,
+    },
+    {
+      id: 'wish_lego_gt3',
+      name: '乐高机械超跑',
+      type: 'wish',
+      icon: '🏎️',
+      effect: '现实心愿 · 桌面终极男/女人的浪漫',
+      wishVouchersCost: 28,
+      lockedUntil: Date.now() + 6 * 24 * 3600 * 1000,
+      wishNote: '拼装需要整整一个周末，升到 10 级时再兑换！',
+      isAchieved: false,
+    },
   ],
 };
 
@@ -390,6 +424,17 @@ export function loadRPGProfile(): RPGProfile {
 
       merged.maxExp = getMaxExpForLevel(merged.level || 1);
       let needsSave = false;
+
+      // 确保心愿券初始为 0
+      if (typeof merged.wishVouchers !== 'number' || merged.wishVouchers === 18) {
+        merged.wishVouchers = 0;
+        needsSave = true;
+      }
+      if (!merged.items || !merged.items.some((i) => i.type === 'wish')) {
+        const defaultWishes = DEFAULT_RPG_PROFILE.items.filter((i) => i.type === 'wish');
+        merged.items = [...(merged.items || []), ...defaultWishes];
+        needsSave = true;
+      }
 
       // 修正历史遗留假数据与溢出超标经验：当等级异常或经验超过上限时，彻底重置为正规初始状态 (Lv.1, 0/100)
       if (
@@ -636,7 +681,71 @@ export function settlePomodoroBreak(isLong: boolean): { hpRecover: number; mpRec
   return { hpRecover, mpRecover };
 }
 
-// 亲缘关系图谱存储键
+/**
+ * 户外地图打卡消耗体力 (方案 A: 极简纯随机 6 ~ 12 点)
+ * 体力见底时不阻断打卡，提示温馨疲劳提醒
+ */
+export function consumeStaminaOnCheckIn(): {
+  consumed: number;
+  currentHp: number;
+  maxHp: number;
+  isExhausted: boolean;
+} {
+  const profile = loadRPGProfile();
+  const maxHp = profile.maxHp || 100;
+  const currentHp = profile.hp ?? maxHp;
+
+  if (currentHp <= 0) {
+    return {
+      consumed: 0,
+      currentHp: 0,
+      maxHp,
+      isExhausted: true,
+    };
+  }
+
+  // 纯随机扣除 6 ~ 12 点体力
+  const cost = randRange(6, 12);
+  const newHp = Math.max(0, currentHp - cost);
+  profile.hp = newHp;
+  saveRPGProfile(profile);
+  window.dispatchEvent(new CustomEvent('cloudfly_rpg_updated'));
+
+  return {
+    consumed: cost,
+    currentHp: newHp,
+    maxHp,
+    isExhausted: newHp === 0,
+  };
+}
+
+/**
+ * 增加或减少 RPG 六维属性（如精神 SPI +5）
+ */
+export function addRPGAttribute(
+  key: 'STR' | 'DEX' | 'INT' | 'SPI' | 'CON' | 'CHA',
+  delta: number
+): {
+  oldValue: number;
+  newValue: number;
+  maxValue: number;
+} {
+  const profile = loadRPGProfile();
+  const maxVal = computeAttributeMax(profile.level || 1);
+  const currentAttr = profile.attributes[key];
+  const oldVal = currentAttr?.value || 0;
+  const newVal = Math.min(maxVal, Math.max(0, oldVal + delta));
+
+  if (profile.attributes[key]) {
+    profile.attributes[key].value = newVal;
+    profile.attributes[key].maxValue = maxVal;
+  }
+  saveRPGProfile(profile);
+  window.dispatchEvent(new CustomEvent('cloudfly_rpg_updated'));
+  return { oldValue: oldVal, newValue: newVal, maxValue: maxVal };
+}
+
+
 const RELATIONSHIP_STORAGE_KEY = 'cloudfly_user_relationship_data_v1';
 import { RelationshipData, DEFAULT_RELATIONSHIP_DATA } from './relationshipTypes';
 

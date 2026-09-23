@@ -20,6 +20,7 @@ import {
 import { MomentCard } from './components/MomentCard';
 import { PublishMomentSheet } from './components/PublishMomentSheet';
 import { BannerUploadModal } from './components/BannerUploadModal';
+import { recordMomentLike } from '../../../core/quest/easterEggEngine';
 
 interface MomentsAppProps {
   onBack: () => void;
@@ -73,6 +74,9 @@ export const MomentsApp: React.FC<MomentsAppProps> = ({ onBack }) => {
     setMoments((prev) =>
       prev.map((m) => (m.id === id ? { ...m, isStarred: isNowStarred } : m))
     );
+    if (isNowStarred) {
+      recordMomentLike();
+    }
     showToast(isNowStarred ? '已加星标' : '已移出星标');
   };
 

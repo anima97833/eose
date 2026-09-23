@@ -7,6 +7,13 @@ export default defineConfig({
   base: './',
   server: {
     port: 5173,
-    host: true
-  }
+    host: true,
+    proxy: {
+      '/api/colormind': {
+        target: 'http://colormind.io',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/colormind/, '/api/'),
+      },
+    },
+  },
 });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Check } from 'lucide-react';
+import { X, Check, Sparkles, RefreshCw } from 'lucide-react';
 import { MemoCategory } from '../../../../core/memo/memoTypes';
+import { fetchColormindPalette, rgbToHex } from '../../../../core/theme/colormindService';
 
 interface CreateCategoryModalProps {
   onSave: (category: MemoCategory) => void;
@@ -8,7 +9,7 @@ interface CreateCategoryModalProps {
   existingCount: number;
 }
 
-const PRESET_COLORS = ['#D97706', '#059669', '#2563EB', '#DC2626', '#7C3AED', '#DB2777', '#4B5563'];
+const DEFAULT_PRESET_COLORS = ['#D97706', '#059669', '#2563EB', '#DC2626', '#7C3AED', '#DB2777', '#4B5563'];
 const PRESET_ICONS = [
   { id: 'book', label: '📖 书籍' },
   { id: 'wallet', label: '💰 记账' },
@@ -24,8 +25,26 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
   existingCount,
 }) => {
   const [name, setName] = useState('');
-  const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0]);
+  const [colorOptions, setColorOptions] = useState<string[]>(DEFAULT_PRESET_COLORS);
+  const [selectedColor, setSelectedColor] = useState(DEFAULT_PRESET_COLORS[0]);
   const [selectedIcon, setSelectedIcon] = useState(PRESET_ICONS[0].id);
+  const [isGeneratingColors, setIsGeneratingColors] = useState(false);
+
+  // 调用 Colormind 生成 5 组艺术信纸配色
+  const handleAIColormindPalette = async () => {
+    setIsGeneratingColors(true);
+    try {
+      const palette = await fetchColormindPalette({ model: 'default' });
+      const hexes = palette.map(rgbToHex);
+      setColorOptions(hexes);
+      // 默认选中第 3 个或最饱和的强调色
+      setSelectedColor(hexes[2] || hexes[0]);
+    } catch {
+      // 兜底已由 service 内置
+    } finally {
+      setIsGeneratingColors(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,11 +193,38 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
 
           {/* 选择书签色 */}
           <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 800, color: '#502428', marginBottom: '6px' }}>
-              书签颜色
-            </label>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-              {PRESET_COLORS.map((c) => (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 800, color: '#502428', margin: 0 }}>
+                书签颜色
+              </label>
+              <button
+                type="button"
+                onClick={handleAIColormindPalette}
+                disabled={isGeneratingColors}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#7C3AED',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  cursor: isGeneratingColors ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  padding: '2px 4px',
+                  borderRadius: '6px',
+                }}
+              >
+                {isGeneratingColors ? (
+                  <RefreshCw size={11} className="animate-spin" />
+                ) : (
+                  <Sparkles size={11} />
+                )}
+                <span>{isGeneratingColors ? '推算中...' : '🎲 AI 灵感配色'}</span>
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {colorOptions.map((c) => (
                 <div
                   key={c}
                   onClick={() => setSelectedColor(c)}
@@ -193,6 +239,7 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     boxShadow: selectedColor === c ? '0 0 0 2px #FFFFFF, 0 0 0 4px #502428' : 'none',
+                    transition: 'transform 0.1s ease',
                   }}
                 >
                   {selectedColor === c && <Check size={14} color="#FFFFFF" strokeWidth={3} />}

@@ -23,6 +23,48 @@ export function getMaxExpForLevel(level: number): number {
 }
 
 /**
+ * 升级许愿券奖励计算公式（数值策划阶梯模型）：
+ * 1. 基础升级：每升 1 级必定发放 +1 张许愿券（小步快跑，持续确定性正向心流）；
+ * 2. 逢五突破里程碑（Lv.5, 15, 25, 35...）：额外赠送 +3 张许愿券（单级累计可得 4 张）；
+ * 3. 逢十跨阶里程碑（Lv.10, 20, 30, 40...）：额外赠送 +5 张许愿券（单级累计可得 6 张）；
+ * 4. 满级/大破阶（Lv.50）：额外赠送 +10 张许愿券（单级累计可得 11 张）。
+ */
+export function calculateLevelUpWishVouchers(oldLevel: number, newLevel: number): number {
+  if (newLevel <= oldLevel) return 0;
+  let total = 0;
+  for (let lvl = oldLevel + 1; lvl <= newLevel; lvl++) {
+    total += 1;
+    if (lvl === 50) {
+      total += 10;
+    } else if (lvl % 10 === 0) {
+      total += 5;
+    } else if (lvl % 5 === 0) {
+      total += 3;
+    }
+  }
+  return total;
+}
+
+/**
+ * 预览升到目标等级可获得的许愿券奖励（用于等级详情面板 UI 提示）
+ */
+export function getNextLevelWishVoucherReward(targetLevel: number): { vouchers: number; isMilestone: boolean } {
+  let vouchers = 1;
+  let isMilestone = false;
+  if (targetLevel === 50) {
+    vouchers += 10;
+    isMilestone = true;
+  } else if (targetLevel % 10 === 0) {
+    vouchers += 5;
+    isMilestone = true;
+  } else if (targetLevel % 5 === 0) {
+    vouchers += 3;
+    isMilestone = true;
+  }
+  return { vouchers, isMilestone };
+}
+
+/**
  * 根据昨日六维表现，计算昨日修行业报快照
  */
 export function calculateDailySettlement(
@@ -126,6 +168,8 @@ export function calculateDailySettlement(
     simMaxExp = getMaxExpForLevel(simLevel);
   }
 
+  const wishVoucherReward = calculateLevelUpWishVouchers(oldLevel, simLevel);
+
   return {
     dateStr: settlementDateStr,
     attributes: extractedAttrs,
@@ -140,6 +184,7 @@ export function calculateDailySettlement(
     ratingTitle,
     diamondReward,
     shardReward,
+    wishVoucherReward,
     oldLevel,
     oldExp,
     newLevel: simLevel,
@@ -193,6 +238,11 @@ export function applyDailySettlement(
       ...updatedProfile.signInState,
       diamondShards: remainingShards,
     };
+  }
+
+  // 4. 升级奖励许愿券
+  if (snapshot.wishVoucherReward && snapshot.wishVoucherReward > 0) {
+    updatedProfile.wishVouchers = (updatedProfile.wishVouchers || 0) + snapshot.wishVoucherReward;
   }
 
   return updatedProfile;

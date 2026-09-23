@@ -38,9 +38,9 @@ const APP_TITLES: Record<string, { title: string; step: string; desc: string }> 
     desc: '桌面智能体快速问答与灵感卡片正在规划中。',
   },
   diary: {
-    title: '心事日记本',
-    step: '待建设',
-    desc: '记录专属心情日志与角色的日常心事絮语。',
+    title: '日记',
+    step: '待定',
+    desc: '日记应用通道目前设为待定规划中，敬请期待。',
   },
   camera: {
     title: '相册胶卷',

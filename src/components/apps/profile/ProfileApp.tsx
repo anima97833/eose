@@ -25,6 +25,7 @@ import { SkillTreeSheet } from './components/SkillTreeSheet';
 import { StatusDebuffSheet } from './components/StatusDebuffSheet';
 import { AchievementSheet } from './components/AchievementSheet';
 import { InventorySheet } from './components/InventorySheet';
+import { WishWandIcon } from './components/WishWandIcon';
 import { JobClassSheet } from './components/JobClassSheet';
 import { AvatarUploadModal } from './components/AvatarUploadModal';
 import { PetHouseIcon } from './components/PetHouseIcon';
@@ -53,7 +54,12 @@ import { ActivityLogModal } from './components/ActivityLogModal';
 import { DailySignInModal } from './components/DailySignInModal';
 import { ExtremeChallengeModal } from './components/ExtremeChallengeModal';
 import { DailySettlementModal } from './components/DailySettlementModal';
-import { applyDailySettlement, getMaxExpForLevel } from '../../../core/rpg/dailySettlementEngine';
+import {
+  applyDailySettlement,
+  getMaxExpForLevel,
+  calculateLevelUpWishVouchers,
+  getNextLevelWishVoucherReward,
+} from '../../../core/rpg/dailySettlementEngine';
 
 interface ProfileAppProps {
   onBack: () => void;
@@ -666,6 +672,46 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
     });
   };
 
+  // 心愿兑换：消耗心愿券，标记心愿圆满达成
+  const handleRedeemWish = (wishId: string) => {
+    setProfile((prev) => {
+      const targetWish = prev.items.find((i) => i.id === wishId);
+      if (!targetWish) return prev;
+      const cost = targetWish.wishVouchersCost ?? 1;
+      const currentVouchers = prev.wishVouchers ?? 0;
+
+      if (currentVouchers < cost) {
+        showToast(`心愿券不足，还差 ${cost - currentVouchers} 张`);
+        return prev;
+      }
+
+      showToast(`✨ 愿望达成！已兑换「${targetWish.name}」`);
+
+      const updatedItems = prev.items.map((i) =>
+        i.id === wishId ? { ...i, isAchieved: true, achievedAt: Date.now() } : i
+      );
+
+      return {
+        ...prev,
+        wishVouchers: currentVouchers - cost,
+        items: updatedItems,
+      };
+    });
+  };
+
+  // 手动调整心愿券（自律打赏）
+  const handleChangeWishVouchers = (delta: number) => {
+    setProfile((prev) => {
+      const current = prev.wishVouchers ?? 0;
+      const next = Math.max(0, current + delta);
+      showToast(delta > 0 ? `心愿券 +${delta}` : `心愿券 ${delta}`);
+      return {
+        ...prev,
+        wishVouchers: next,
+      };
+    });
+  };
+
   // 穿戴/卸下装备
   const handleToggleEquip = (itemId: string) => {
     setProfile((prev) => {
@@ -760,8 +806,8 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
           position: 'relative',
         }}
       >
-        {/* 左侧主组：返回键 + 等级(可展开) + 紧随等级右侧的猫爪金币与粉红钻石胶囊 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        {/* 左侧主组：返回键 + 等级(可展开) + 紧随等级右侧的猫爪金币、粉红钻石、心情与心愿券胶囊 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
           <button
             onClick={onBack}
             className="nm-btn"
@@ -858,6 +904,33 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
             <HeartMoodIcon />
             <span style={{ fontSize: '11px', fontWeight: 900, color: '#502428', letterSpacing: '-0.3px', minWidth: '14px', textAlign: 'center' }}>
               {profile.mood ?? 100}
+            </span>
+          </div>
+
+          {/* 心愿券数值胶囊（位于心情栏右边，初始为 0，点击直接打开背包心愿箱） */}
+          <div
+            onClick={() => setActiveSheet('inventory')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '2px 8px 2px 3px',
+              borderRadius: '9999px',
+              background: '#FAF4E8',
+              border: '1.8px solid #502428',
+              boxShadow: '0 2px 4px rgba(80, 36, 40, 0.15)',
+              gap: '3px',
+              flexShrink: 0,
+              cursor: 'pointer',
+              userSelect: 'none',
+              transition: 'transform 0.12s ease',
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.94)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+            title="心愿券 · 初始为 0 (点击打开背包心愿箱)"
+          >
+            <WishWandIcon size={14} />
+            <span style={{ fontSize: '11px', fontWeight: 900, color: '#502428', letterSpacing: '-0.3px', minWidth: '14px', textAlign: 'center' }}>
+              {profile.wishVouchers ?? 0}
             </span>
           </div>
         </div>
@@ -958,6 +1031,36 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
                   }}
                 />
               </div>
+
+              {/* 1.5 晋升许愿券犒赏提示 */}
+              {(() => {
+                const nextLevel = (profile.level || 1) + 1;
+                const { vouchers, isMilestone } = getNextLevelWishVoucherReward(nextLevel);
+                return (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '4px 8px',
+                      borderRadius: '8px',
+                      background: isMilestone ? '#FEF9C3' : '#F1F5F9',
+                      border: isMilestone ? '1.5px solid #F59E0B' : '1px dashed #CBD5E1',
+                      fontSize: '9.5px',
+                    }}
+                  >
+                    <span style={{ color: isMilestone ? '#92400E' : '#64748B', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span>🎯</span>
+                      <span>升至 Lv.{nextLevel} 奖励</span>
+                    </span>
+                    <span style={{ color: isMilestone ? '#B45309' : '#0284C7', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <WishWandIcon size={12} />
+                      <span>+{vouchers} 许愿券</span>
+                      {isMilestone && <span style={{ fontSize: '8px', color: '#DC2626', background: '#FEE2E2', padding: '1px 3px', borderRadius: '4px' }}>里程碑</span>}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 2. 今日体力 */}
@@ -1446,8 +1549,11 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
       {activeSheet === 'inventory' && (
         <InventorySheet
           items={profile.items}
+          wishVouchers={profile.wishVouchers ?? 0}
           onToggleEquip={handleToggleEquip}
           onUseConsumable={handleUseConsumable}
+          onRedeemWish={handleRedeemWish}
+          onChangeWishVouchers={handleChangeWishVouchers}
           onAddItem={handleAddItem}
           onDeleteItem={handleDeleteItem}
           onClose={() => setActiveSheet(null)}
@@ -1572,7 +1678,17 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
                 curLevel += 1;
                 curMaxExp = getMaxExpForLevel(curLevel);
               }
-              return { ...p, level: curLevel, currentExp: curExp, maxExp: curMaxExp };
+              const vouchersEarned = calculateLevelUpWishVouchers(p.level, curLevel);
+              if (vouchersEarned > 0) {
+                setTimeout(() => showToast(`🎉 突破升级至 Lv.${curLevel}！获赠 ${vouchersEarned} 张许愿券！`), 350);
+              }
+              return {
+                ...p,
+                level: curLevel,
+                currentExp: curExp,
+                maxExp: curMaxExp,
+                wishVouchers: (p.wishVouchers || 0) + vouchersEarned,
+              };
             });
             showToast(`经验 +${exp}`);
           }}

@@ -15,7 +15,8 @@ import {
   Sliders,
   Palette,
   Layout,
-  Check
+  Check,
+  RefreshCw,
 } from 'lucide-react';
 import {
   CharacterProfile,
@@ -26,6 +27,7 @@ import {
 import { PRESET_REGEX_SCRIPTS } from '../../../core/regex/regexEngine';
 import { RegexScriptEditorModal } from './RegexScriptEditorModal';
 import { LiveSandboxPreview } from './LiveSandboxPreview';
+import { fetchColormindPalette, hexToRgb, rgbToHex } from '../../../core/theme/colormindService';
 
 interface CharacterWorkspaceProps {
   character: CharacterProfile;
@@ -144,6 +146,40 @@ export const CharacterWorkspace: React.FC<CharacterWorkspaceProps> = ({
   // Theme application
   const handleApplyTheme = (theme: CharacterTheme) => {
     updateField('customTheme', theme);
+  };
+
+  const [isGeneratingCharTheme, setIsGeneratingCharTheme] = useState(false);
+
+  // 调用 Colormind 基于角色特征生成专属羁绊色盘
+  const handleAIColormindCharacterTheme = async () => {
+    setIsGeneratingCharTheme(true);
+    try {
+      const seedHex = character.customTheme?.accentColor || '#ED64A6';
+      const seedRgb = hexToRgb(seedHex);
+      const palette = await fetchColormindPalette({
+        model: 'ui',
+        input: [seedRgb, 'N', 'N', 'N', 'N'],
+      });
+      const chatBg = rgbToHex(palette[0]);
+      const bubbleTextColor = rgbToHex(palette[3]);
+      const accentColor = rgbToHex(palette[2]);
+      const actionTextColor = rgbToHex(palette[4]);
+      const generatedTheme: CharacterTheme = {
+        name: `AI 羁绊印象 · ${character.name || '专属'}`,
+        chatBg,
+        bubbleBg: '#FFFFFF',
+        bubbleTextColor,
+        bubbleBorder: `1px solid ${accentColor}33`,
+        bubbleShadow: `0 4px 14px ${accentColor}18, inset 0 1px 2px #FFFFFF`,
+        accentColor,
+        actionTextColor,
+      };
+      handleApplyTheme(generatedTheme);
+    } catch {
+      // 容灾由 service 兜底
+    } finally {
+      setIsGeneratingCharTheme(false);
+    }
   };
 
   // Variable JSON change handler
@@ -554,8 +590,37 @@ export const CharacterWorkspace: React.FC<CharacterWorkspaceProps> = ({
               <div style={{ fontSize: '14px', fontWeight: 700, color: '#2D3748', marginBottom: '4px' }}>
                 角色专属视觉主题 (Visual Atmosphere)
               </div>
-              <div style={{ fontSize: '11px', color: '#718096', marginBottom: '12px' }}>
-                点击一键套用精心调配的专属聊天室氛围、气泡配色与微拟物阴影。
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <div style={{ fontSize: '11px', color: '#718096' }}>
+                  点击一键套用精心调配的专属聊天室氛围、气泡配色与微拟物阴影。
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAIColormindCharacterTheme}
+                  disabled={isGeneratingCharTheme}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #EC4899, #8B5CF6)',
+                    color: '#FFFFFF',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: isGeneratingCharTheme ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    boxShadow: '0 2px 6px rgba(139, 92, 246, 0.3)',
+                    flexShrink: 0,
+                  }}
+                >
+                  {isGeneratingCharTheme ? (
+                    <RefreshCw size={12} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={12} />
+                  )}
+                  <span>{isGeneratingCharTheme ? 'Colormind 推算中...' : '🎲 AI 专属羁绊色盘'}</span>
+                </button>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '10px' }}>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Wifi, BatteryMedium, Signal } from 'lucide-react';
+import { recordClockTap } from '../../core/quest/easterEggEngine';
 
 interface StatusBarProps {
   isMobileScreen?: boolean;
@@ -39,7 +40,13 @@ export const StatusBar: React.FC<StatusBarProps> = () => {
       }}
     >
       {/* 左侧时钟 */}
-      <span style={{ letterSpacing: '0.2px' }}>{timeStr || '12:00'}</span>
+      <span
+        onClick={recordClockTap}
+        style={{ letterSpacing: '0.2px', cursor: 'pointer', userSelect: 'none' }}
+        title="双击或轻触"
+      >
+        {timeStr || '12:00'}
+      </span>
 
       {/* 右侧状态图标组 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

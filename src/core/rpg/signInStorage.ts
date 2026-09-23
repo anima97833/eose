@@ -27,6 +27,7 @@ export interface SignInExecuteResult {
   wholeDiamondsEarned: number;
   convertedDiamonds: number;
   currentShards: number;
+  wishVouchersEarned: number;
   updatedProfile: RPGProfile;
 }
 
@@ -70,6 +71,7 @@ export function executeSignIn(profile: RPGProfile): SignInExecuteResult {
       wholeDiamondsEarned: 0,
       convertedDiamonds: 0,
       currentShards: profile.signInState?.diamondShards || 0,
+      wishVouchersEarned: 0,
       updatedProfile: profile,
     };
   }
@@ -82,6 +84,7 @@ export function executeSignIn(profile: RPGProfile): SignInExecuteResult {
       wholeDiamondsEarned: 0,
       convertedDiamonds: 0,
       currentShards: profile.signInState?.diamondShards || 0,
+      wishVouchersEarned: 0,
       updatedProfile: profile,
     };
   }
@@ -97,11 +100,13 @@ export function executeSignIn(profile: RPGProfile): SignInExecuteResult {
   const dayIndex = state.currentDayIndex; // 1 ~ 7
   let shardsEarned = 0;
   let wholeDiamondsEarned = 0;
+  let wishVouchersEarned = 0;
 
   if (dayIndex >= 1 && dayIndex <= 6) {
     shardsEarned = DAILY_SHARDS_REWARDS[dayIndex - 1];
   } else if (dayIndex === 7) {
     wholeDiamondsEarned = 1; // 第七天直接赠送一整颗钻石
+    wishVouchersEarned = 1;  // 第七天额外荣获一张许愿券
   }
 
   // 碎片自动兑换钻石：每20个钻石碎片兑换一个钻石
@@ -111,6 +116,7 @@ export function executeSignIn(profile: RPGProfile): SignInExecuteResult {
 
   const totalNewCrystals = wholeDiamondsEarned + convertedDiamonds;
   const updatedCrystals = (profile.crystals || 0) + totalNewCrystals;
+  const updatedWishVouchers = (profile.wishVouchers || 0) + wishVouchersEarned;
 
   // 轮次推进逻辑（方向 A：按累计达成天数推进，满7天开启下一轮）
   let nextRound = state.currentRound;
@@ -135,12 +141,13 @@ export function executeSignIn(profile: RPGProfile): SignInExecuteResult {
   const updatedProfile: RPGProfile = {
     ...profile,
     crystals: updatedCrystals,
+    wishVouchers: updatedWishVouchers,
     signInState: updatedSignInState,
   };
 
   let msg = '';
   if (dayIndex === 7) {
-    msg = '🎉 恭喜达成第七天！荣获【1 颗完整钻石】并已同步加入自由天数！新一轮即将开启！';
+    msg = '🎉 恭喜达成第七天！荣获【1 颗完整钻石】+【1 张许愿券】并已同步加入！新一轮即将开启！';
   } else if (convertedDiamonds > 0) {
     msg = `✨ 签到成功！获得 ${shardsEarned} 碎片，碎片累计满 20 自动合成了 ${convertedDiamonds} 颗钻石！`;
   } else {
@@ -154,6 +161,7 @@ export function executeSignIn(profile: RPGProfile): SignInExecuteResult {
     wholeDiamondsEarned,
     convertedDiamonds,
     currentShards: remainingShards,
+    wishVouchersEarned,
     updatedProfile,
   };
 }

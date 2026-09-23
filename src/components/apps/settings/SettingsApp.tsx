@@ -16,7 +16,10 @@ import {
   Database,
   Download,
   Upload,
+  Palette,
+  Sparkles,
 } from 'lucide-react';
+import { ThemeStudioModal } from './components/ThemeStudioModal';
 import { LLMTestResult } from '../../../core/llm/types';
 import { createLLMAdapter, fetchEndpointModels } from '../../../core/llm';
 import { getStorage } from '../../../core/storage';
@@ -57,6 +60,7 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({ onBack }) => {
   const [isAddingPreset, setIsAddingPreset] = useState<boolean>(false);
   const [newPresetName, setNewPresetName] = useState<string>('');
 
+  const [showThemeStudio, setShowThemeStudio] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const storage = getStorage();
@@ -277,15 +281,27 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({ onBack }) => {
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => showNotification('配置已保存')}
-          className="nm-rebound-btn nm-btn-circle"
-          style={{ width: '38px', height: '38px', color: 'var(--nm-primary)' }}
-          title="保存全部"
-        >
-          <Check size={18} strokeWidth={2.5} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button
+            type="button"
+            onClick={() => setShowThemeStudio(true)}
+            className="nm-rebound-btn nm-btn-circle"
+            style={{ width: '38px', height: '38px', color: 'var(--nm-primary)' }}
+            title="拟物色彩工坊 (Colormind AI 换肤)"
+          >
+            <Palette size={18} strokeWidth={2.3} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => showNotification('配置已保存')}
+            className="nm-rebound-btn nm-btn-circle"
+            style={{ width: '38px', height: '38px', color: 'var(--nm-primary)' }}
+            title="保存全部"
+          >
+            <Check size={18} strokeWidth={2.5} />
+          </button>
+        </div>
       </div>
 
       {/* 轻提示 Toast */}
@@ -311,8 +327,41 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({ onBack }) => {
         </div>
       )}
 
+      {/* 拟物个性主题工坊快捷卡片 */}
+      <div style={{ padding: '8px 16px 4px' }}>
+        <button
+          type="button"
+          onClick={() => setShowThemeStudio(true)}
+          className="nm-card-sm"
+          style={{
+            width: '100%',
+            padding: '9px 12px',
+            borderRadius: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            border: '1px solid rgba(255, 255, 255, 0.75)',
+            background: 'var(--nm-bg-lighter)',
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '16px' }}>🎨</span>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '11.5px', fontWeight: 800, color: 'var(--nm-text-main)' }}>
+                拟物色彩工坊 · AI 灵感换肤
+              </div>
+              <div style={{ fontSize: '9.5px', color: 'var(--nm-text-sub)' }}>
+                由 Colormind 深度学习算法驱动，一键摇出全局个性主题
+              </div>
+            </div>
+          </div>
+          <Sparkles size={14} color="var(--nm-primary)" />
+        </button>
+      </div>
+
       {/* 1. 主区线路 vs 分支线路 双通道分段切换标签 */}
-      <div style={{ padding: '8px 16px 2px' }}>
+      <div style={{ padding: '4px 16px 2px' }}>
         <div
           className="nm-inset-sm"
           style={{
@@ -865,6 +914,14 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({ onBack }) => {
           </div>
         </div>
       </div>
+
+      {/* 拟物主题工坊弹窗 (Colormind 换肤) */}
+      {showThemeStudio && (
+        <ThemeStudioModal
+          onClose={() => setShowThemeStudio(false)}
+          onToast={showNotification}
+        />
+      )}
     </div>
   );
 };

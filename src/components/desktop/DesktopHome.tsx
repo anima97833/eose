@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { DateWidget } from './widgets/DateWidget';
 import { MusicWidget } from './widgets/MusicWidget';
-import { NetworkControls } from './widgets/SwitchWidget';
-import { ProfileGreetingWidget } from './widgets/ProfileGreetingWidget';
+import { TaskDropWidget } from './widgets/TaskDropWidget';
+import { HoroscopeWidget } from './widgets/HoroscopeWidget';
+import { HoroscopeModal } from './widgets/HoroscopeModal';
+import { HoroscopeData } from '../../core/horoscope/horoscopeService';
 import { DesktopPage2 } from './DesktopPage2';
 import {
   loadDesktopLayout,
@@ -46,6 +48,9 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
   // 长按弹窗管理菜单
   const [managingAppId, setManagingAppId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // 今日星轨运势弹窗状态（顶层挂载，避免受 200% transform 切页视窗裁剪）
+  const [activeHoroscopeData, setActiveHoroscopeData] = useState<HoroscopeData | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
@@ -494,7 +499,7 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
             {/* 2. 音乐组件（深蓝轻拟物胶囊） */}
             <MusicWidget />
 
-            {/* 3. 双列卡片：左侧角色卡 + 右侧 WI-FI / 移动数据双开关 */}
+            {/* 3. 双列卡片：左侧今日星座运势卡 + 右侧奇遇任务掉落卡 */}
             <div
               style={{
                 display: 'grid',
@@ -504,12 +509,8 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
                 height: '138px',
               }}
             >
-              <ProfileGreetingWidget
-                name="云梦"
-                subtitle="Online"
-                onClick={() => handleAppClick('profile')}
-              />
-              <NetworkControls />
+              <HoroscopeWidget onOpenModal={setActiveHoroscopeData} />
+              <TaskDropWidget />
             </div>
 
             {/* 4. 第一页应用图标区：支持自由跨区增减与拖拽调序 */}
@@ -1142,6 +1143,14 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 今日星轨运势手账弹窗 (脱离 200% 滑动视窗，居中贴合手机屏幕) */}
+      {activeHoroscopeData && (
+        <HoroscopeModal
+          data={activeHoroscopeData}
+          onClose={() => setActiveHoroscopeData(null)}
+        />
       )}
     </div>
   );

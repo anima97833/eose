@@ -8,6 +8,7 @@ import {
   getBeijingTimeInfo,
   getProjectProgress,
 } from '../../../../core/rpg/extremeChallengeStorage';
+import { WishWandIcon } from './WishWandIcon';
 
 interface ExtremeChallengeModalProps {
   profile: RPGProfile;
@@ -447,9 +448,14 @@ export const ExtremeChallengeModal: React.FC<ExtremeChallengeModalProps> = ({
                 {/* 卡牌中心奖励图标 */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {isFinalDay ? (
-                    <span style={{ fontSize: '20px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}>
-                      👑
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1px' }}>
+                      <span style={{ fontSize: '15px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}>
+                        👑
+                      </span>
+                      <div style={{ transform: 'rotate(-10deg)', filter: 'drop-shadow(0 1px 2px rgba(245, 158, 11, 0.4))' }}>
+                        <WishWandIcon size={14} />
+                      </div>
+                    </div>
                   ) : (
                     <span style={{ fontSize: '18px' }}>{currentProject.icon}</span>
                   )}
@@ -458,13 +464,13 @@ export const ExtremeChallengeModal: React.FC<ExtremeChallengeModalProps> = ({
                 {/* 底部奖励数值 */}
                 <span
                   style={{
-                    fontSize: '9.5px',
+                    fontSize: isFinalDay ? '8.5px' : '9.5px',
                     fontWeight: 900,
                     color: isClaimed ? '#854D0E' : isFinalDay ? '#78350F' : '#E11D48',
                     lineHeight: 1,
                   }}
                 >
-                  {isFinalDay ? '+1钻' : '+2片'}
+                  {isFinalDay ? '+1钻+1券' : '+2片'}
                 </span>
 
                 {/* 已打卡绿色对勾章 */}
@@ -509,7 +515,7 @@ export const ExtremeChallengeModal: React.FC<ExtremeChallengeModalProps> = ({
           }}
         >
           <span>🎯 今日打卡奖励: <b>{currentProject.dailyRewardText}</b></span>
-          <span style={{ color: '#D97706', fontWeight: 800 }}>7天大奖 👑</span>
+          <span style={{ color: '#D97706', fontWeight: 800 }}>7天大奖: 👑 1钻 + 1许愿券</span>
         </div>
 
         {/* ================= 4. 底部亮绿果冻胶囊大打卡按钮（100% 临摹图1 Claim 按钮） ================= */}

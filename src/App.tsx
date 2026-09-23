@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PhoneFrame } from './components/shell/PhoneFrame';
 import { DesktopHome } from './components/desktop/DesktopHome';
 import { SettingsApp } from './components/apps/settings/SettingsApp';
@@ -20,15 +20,30 @@ import { BookVaultApp } from './components/apps/books/BookVaultApp';
 import { StoryWordApp } from './components/apps/storyword/StoryWordApp';
 import { CourseKanbanApp } from './components/apps/kanban/CourseKanbanApp';
 import { SecurityApp } from './components/apps/security/SecurityApp';
+import { CompassApp } from './components/apps/compass/CompassApp';
+import { QuestJournalApp } from './components/apps/quest/QuestJournalApp';
 import { getCustomAppById } from './core/sdk/customAppRegistry';
+import { initIdleMasterDetector, checkLateNightActivity } from './core/quest/easterEggEngine';
 
 export const App: React.FC = () => {
   const [activeApp, setActiveApp] = useState<string | null>(null);
   const [isOpeningApp, setIsOpeningApp] = useState<boolean>(false);
 
+  // 初始化桌面 15 秒静止白日梦沉思侦听
+  useEffect(() => {
+    const cleanup = initIdleMasterDetector();
+    return () => cleanup();
+  }, []);
+
   const handleOpenApp = (appId: string) => {
     setIsOpeningApp(true);
     setActiveApp(appId);
+
+    // 深夜 23:00 之后打开微聊触发夜雨寄语彩蛋
+    if (appId === 'chat') {
+      checkLateNightActivity();
+    }
+
     // 300ms 内屏蔽桌面抬起带来的幽灵穿透点击
     window.setTimeout(() => {
       setIsOpeningApp(false);
@@ -79,8 +94,13 @@ export const App: React.FC = () => {
             <ProfileApp onBack={() => setActiveApp(null)} />
           ) : activeApp === 'moments' ? (
             <MomentsApp onBack={() => setActiveApp(null)} />
-          ) : activeApp === 'memo' || activeApp === 'diary' ? (
+          ) : activeApp === 'memo' ? (
             <MemoApp onBack={() => setActiveApp(null)} />
+          ) : activeApp === 'diary' ? (
+            <QuestJournalApp
+              onBack={() => setActiveApp(null)}
+              onOpenApp={(id) => setActiveApp(id)}
+            />
           ) : activeApp === 'arcade' || activeApp === 'games' ? (
             <ArcadeApp onBack={() => setActiveApp(null)} />
           ) : activeApp === 'cinema' || activeApp === 'movie' ? (
@@ -95,6 +115,8 @@ export const App: React.FC = () => {
             <CourseKanbanApp onBack={() => setActiveApp(null)} />
           ) : activeApp === 'security' ? (
             <SecurityApp onBack={() => setActiveApp(null)} />
+          ) : activeApp === 'compass' ? (
+            <CompassApp onBack={() => setActiveApp(null)} />
           ) : isCustomApp ? (
             <CustomAppRunner
               appId={activeApp!}

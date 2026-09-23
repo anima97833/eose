@@ -3,6 +3,7 @@ import { Sparkles, Trophy, Award, ArrowUpRight, Check, Flame, Star, ShieldCheck 
 import { DailySettlementSnapshot, RPGProfile } from '../../../../core/rpg/types';
 import { ATTR_CHINESE_NAMES } from '../../../../core/rpg/dailySettlementEngine';
 import { computeAttributeMax } from '../../../../core/rpg/rpgStorage';
+import { WishWandIcon } from './WishWandIcon';
 
 interface DailySettlementModalProps {
   snapshot: DailySettlementSnapshot;
@@ -362,8 +363,10 @@ export const DailySettlementModal: React.FC<DailySettlementModalProps> = ({
             </div>
           )}
 
-          {/* 额外物资奖励条（钻石 / 碎片） */}
-          {((snapshot.diamondReward && snapshot.diamondReward > 0) || (snapshot.shardReward && snapshot.shardReward > 0)) && (
+          {/* 额外物资奖励条（钻石 / 碎片 / 升级许愿券） */}
+          {((snapshot.diamondReward && snapshot.diamondReward > 0) ||
+            (snapshot.shardReward && snapshot.shardReward > 0) ||
+            (snapshot.wishVoucherReward && snapshot.wishVoucherReward > 0)) && (
             <div
               style={{
                 display: 'flex',
@@ -379,12 +382,18 @@ export const DailySettlementModal: React.FC<DailySettlementModalProps> = ({
               }}
             >
               <span>🎁 自律犒赏物资:</span>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {snapshot.diamondReward && snapshot.diamondReward > 0 && (
                   <span>💎 完整钻石 +{snapshot.diamondReward}</span>
                 )}
                 {snapshot.shardReward && snapshot.shardReward > 0 && (
                   <span>✨ 钻石碎片 +{snapshot.shardReward}</span>
+                )}
+                {snapshot.wishVoucherReward && snapshot.wishVoucherReward > 0 && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#B45309' }}>
+                    <WishWandIcon size={13} />
+                    <span>许愿券 +{snapshot.wishVoucherReward}</span>
+                  </span>
                 )}
               </div>
             </div>
