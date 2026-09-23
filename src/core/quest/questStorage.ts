@@ -256,6 +256,19 @@ export const DEFAULT_PRESET_QUESTS: QuestItem[] = [
     targetProgress: 1,
     status: 'in_progress',
   },
+  {
+    id: 'egg_disney_wish',
+    category: 'easter_egg',
+    title: '【童话星愿签 · 温暖治愈】',
+    desc: '夜晚打卡完成全天所有手账后，星空悄然飘落一张温暖治愈的童话小信片。',
+    easterEggClue: '完成全天所有日常手账（洗漱、晚餐、副本等），星光信笺将随夜色飘落…',
+    easterEggCode: 'DISNEY_WISH',
+    icon: '💌',
+    tag: '✨ 纯愈',
+    currentProgress: 0,
+    targetProgress: 1,
+    status: 'in_progress',
+  },
 ];
 
 /**

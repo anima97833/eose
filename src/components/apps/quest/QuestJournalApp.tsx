@@ -16,6 +16,7 @@ import { CreateQuestModal } from './components/CreateQuestModal';
 import { FloatingStatToast } from './components/FloatingStatToast';
 import { FactQuizModal } from './components/FactQuizModal';
 import { MultiverseAgentModal } from './components/MultiverseAgentModal';
+import { DisneyWishModal } from './components/DisneyWishModal';
 
 interface QuestJournalAppProps {
   onBack: () => void;
@@ -28,6 +29,7 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFactQuizModal, setShowFactQuizModal] = useState(false);
   const [showMultiverseModal, setShowMultiverseModal] = useState(false);
+  const [showDisneyWishModal, setShowDisneyWishModal] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [floatingStat, setFloatingStat] = useState<AwardedStatResult | null>(null);
   const [palette, setPalette] = useState<string[]>(loadQuestPalette);
@@ -140,6 +142,10 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
       setShowMultiverseModal(true);
       return;
     }
+    if (questId === 'egg_disney_wish') {
+      setShowDisneyWishModal(true);
+      return;
+    }
 
     const { items: updated, awardedStat } = markQuestDone(questId);
     setQuests(updated);
@@ -148,15 +154,26 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
       setTimeout(() => setFloatingStat(null), 1900);
     }
 
-    // 随机完成一项主线或者支线任务后触发彩蛋掉落 (概率严格控制在 10%~15%，取 12%，绝不频繁打扰)
-    const targetQuest = quests.find((q) => q.id === questId);
-    if (targetQuest && (targetQuest.category === 'main' || targetQuest.category === 'side')) {
-      const luckyRoll = Math.random() < 0.12;
-      if (luckyRoll) {
-        setTimeout(() => {
-          triggerEasterEgg('MULTIVERSE_PORTAL');
-          setShowMultiverseModal(true);
-        }, 750);
+    // 1. 玩法 2：童话星愿签 · 温暖治愈寄语（夜晚打卡完成一天所有手账后掉落）
+    // 检查更新后当天主线任务是否已全量完成
+    const remainingMain = updated.filter((q) => q.category === 'main' && q.status !== 'completed').length;
+    const totalMainCount = updated.filter((q) => q.category === 'main').length;
+    if (totalMainCount > 0 && remainingMain === 0) {
+      setTimeout(() => {
+        triggerEasterEgg('DISNEY_WISH');
+        setShowDisneyWishModal(true);
+      }, 850);
+    } else {
+      // 2. 随机完成一项主线或者支线任务后触发多元宇宙彩蛋 (概率严格控制在 10%~15%，取 12%)
+      const targetQuest = quests.find((q) => q.id === questId);
+      if (targetQuest && (targetQuest.category === 'main' || targetQuest.category === 'side')) {
+        const luckyRoll = Math.random() < 0.12;
+        if (luckyRoll) {
+          setTimeout(() => {
+            triggerEasterEgg('MULTIVERSE_PORTAL');
+            setShowMultiverseModal(true);
+          }, 750);
+        }
       }
     }
   };
@@ -289,6 +306,38 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
             title="多元宇宙传送门 (完成任务随机跃迁，亦可手动开启)"
           >
             <span style={{ fontSize: '15px' }}>🛸</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerEasterEgg('DISNEY_WISH');
+              setShowDisneyWishModal(true);
+            }}
+            className="nm-rebound-btn nm-btn-circle"
+            style={{
+              width: '36px',
+              height: '36px',
+              color: '#EC4899',
+              position: 'relative',
+            }}
+            title="童话星愿签 · 温暖治愈寄语 (夜晚打卡完成全天手账自动降落)"
+          >
+            <span style={{ fontSize: '15px' }}>💌</span>
+            {mainTotal > 0 && mainDone === mainTotal && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '2px',
+                  right: '2px',
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  backgroundColor: '#F59E0B',
+                  boxShadow: '0 0 6px #F59E0B',
+                }}
+              />
+            )}
           </button>
 
           <button
@@ -628,6 +677,19 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
             setQuests(res.items);
           }}
           onClose={() => setShowMultiverseModal(false)}
+        />
+      )}
+
+      {/* 玩法 2：日常手账彩蛋【童话星愿签 · 温暖治愈寄语】（绝不和六维联动） */}
+      {showDisneyWishModal && (
+        <DisneyWishModal
+          isOpen={showDisneyWishModal}
+          onClose={() => {
+            setShowDisneyWishModal(false);
+            // 标记彩蛋手账为已阅读打卡（无六维加成）
+            const res = markQuestDone('egg_disney_wish');
+            setQuests(res.items);
+          }}
         />
       )}
     </div>
