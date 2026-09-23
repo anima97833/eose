@@ -496,8 +496,8 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
             {/* 1. 顶部日期看板 */}
             <DateWidget />
 
-            {/* 2. 音乐组件（深蓝轻拟物胶囊） */}
-            <MusicWidget />
+            {/* 2. 音乐组件（深蓝轻拟物胶囊，无缝同步声音电台流） */}
+            <MusicWidget onOpenApp={() => onOpenApp?.('radio')} />
 
             {/* 3. 双列卡片：左侧今日星座运势卡 + 右侧奇遇任务掉落卡 */}
             <div

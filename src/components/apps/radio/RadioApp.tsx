@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   Play,
@@ -6,11 +6,9 @@ import {
   Volume2,
   VolumeX,
   Palette,
-  Timer,
   Radio as RadioIcon,
   Globe2,
 } from 'lucide-react';
-import Hls from 'hls.js';
 import {
   RadioStation,
   PRESET_STATIONS,
@@ -19,12 +17,9 @@ import {
 import {
   loadRadioPalette,
   saveRadioPalette,
-  loadLastStationId,
-  saveLastStationId,
-  loadRadioVolume,
-  saveRadioVolume,
 } from '../../../core/radio/radioThemeStorage';
 import { fetchColormindPalette, rgbToHex } from '../../../core/theme/colormindService';
+import { radioGlobalPlayer, RadioPlayerState } from '../../../core/radio/radioGlobalPlayer';
 import { FrequencyDial } from './components/FrequencyDial';
 import { TuningKnob } from './components/TuningKnob';
 import { SpeakerGrill } from './components/SpeakerGrill';
@@ -35,18 +30,16 @@ interface RadioAppProps {
 }
 
 export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
-  // 电台与音频状态
+  // 电台列表
   const [stationList, setStationList] = useState<RadioStation[]>(PRESET_STATIONS);
-  const [currentStation, setCurrentStation] = useState<RadioStation>(() => {
-    const lastId = loadLastStationId();
-    return PRESET_STATIONS.find((s) => s.id === lastId) || PRESET_STATIONS[0];
-  });
+
+  // 全局播放器状态同步
+  const [playerState, setPlayerState] = useState<RadioPlayerState>(() =>
+    radioGlobalPlayer.getState()
+  );
+
+  const { currentStation, isPlaying, isLoading, errorMsg, volume, isMuted } = playerState;
   const [currentFreq, setCurrentFreq] = useState<number>(currentStation.freqMhz);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [volume, setVolume] = useState<number>(loadRadioVolume);
-  const [isMuted, setIsMuted] = useState(false);
 
   // 换源抽屉
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -54,163 +47,52 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
   // 旋钮旋转角度
   const [knobAngle, setKnobAngle] = useState(45);
 
-  // 定时睡眠关闭 (分钟: 0 | 15 | 30 | 60)
-  const [sleepTimerMinutes, setSleepTimerMinutes] = useState<number>(0);
-  const [sleepTimeRemaining, setSleepTimeRemaining] = useState<number | null>(null);
-
   // Colormind 调色盘
   const [palette, setPalette] = useState<string[]>(loadRadioPalette);
   const [isColoring, setIsColoring] = useState(false);
 
-  // 实际 audio 与 HLS 实例引用
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const hlsRef = useRef<Hls | null>(null);
-
-  // 1. 初始化 Audio 元素与事件监听
+  // 订阅全局音频播放器状态 (退出后台不中断)
   useEffect(() => {
-    const audio = new Audio();
-    audio.preload = 'none';
-    audio.volume = volume;
-    try {
-      (audio as any).referrerPolicy = 'no-referrer';
-    } catch {}
-    audioRef.current = audio;
-
-    const handleWaiting = () => setIsLoading(true);
-    const handleCanPlay = () => setIsLoading(false);
-    const handlePlaying = () => {
-      setIsLoading(false);
-      setIsPlaying(true);
-      setErrorMsg(null);
-    };
-    const handlePause = () => setIsPlaying(false);
-
-    audio.addEventListener('waiting', handleWaiting);
-    audio.addEventListener('canplay', handleCanPlay);
-    audio.addEventListener('playing', handlePlaying);
-    audio.addEventListener('pause', handlePause);
-
-    return () => {
-      audio.pause();
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-      audio.removeEventListener('waiting', handleWaiting);
-      audio.removeEventListener('canplay', handleCanPlay);
-      audio.removeEventListener('playing', handlePlaying);
-      audio.removeEventListener('pause', handlePause);
-      audio.src = '';
-    };
+    const unsubscribe = radioGlobalPlayer.subscribe((state) => {
+      setPlayerState(state);
+      setCurrentFreq(state.currentStation.freqMhz);
+    });
+    return () => unsubscribe();
   }, []);
 
-  // 2. 音量与静音同步
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : volume;
-    }
-    saveRadioVolume(volume);
-  }, [volume, isMuted]);
-
-  // 3. 通用播放核心函数（支持 HLS .m3u8 与原生 MP3 / AAC）
-  const playStreamUrl = (url: string, backupUrl?: string) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
-
-    setIsLoading(true);
-    setErrorMsg(null);
-
-    const onPlayFail = () => {
-      if (backupUrl && audio.src !== backupUrl) {
-        console.warn('Primary stream failed, attempting backup stream:', backupUrl);
-        playStreamUrl(backupUrl);
-      } else {
-        setIsLoading(false);
-        setIsPlaying(false);
-        setErrorMsg('电台网络连接微弱，请点击换源或拨动旋钮换台');
-      }
-    };
-
-    if (url.includes('.m3u8')) {
-      if (audio.canPlayType('application/vnd.apple.mpegurl')) {
-        audio.src = url;
-        audio.load();
-        audio.play().then(() => setIsPlaying(true)).catch(onPlayFail);
-      } else if (Hls.isSupported()) {
-        const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
-        hls.loadSource(url);
-        hls.attachMedia(audio);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          audio.play().then(() => setIsPlaying(true)).catch(onPlayFail);
-        });
-        hls.on(Hls.Events.ERROR, (_, data) => {
-          if (data.fatal) {
-            hls.destroy();
-            hlsRef.current = null;
-            onPlayFail();
-          }
-        });
-        hlsRef.current = hls;
-      } else {
-        audio.src = url;
-        audio.load();
-        audio.play().then(() => setIsPlaying(true)).catch(onPlayFail);
-      }
-    } else {
-      audio.src = url;
-      audio.load();
-      audio.play().then(() => setIsPlaying(true)).catch(onPlayFail);
-    }
-  };
-
-  // 4. 切换电台
-  const playStation = (station: RadioStation) => {
-    // 若不在列表中，自动追加
+  // 切换电台
+  const handlePlayStation = (station: RadioStation) => {
     if (!stationList.some((s) => s.id === station.id)) {
       setStationList((prev) => [station, ...prev]);
     }
-    setCurrentStation(station);
-    setCurrentFreq(station.freqMhz);
-    saveLastStationId(station.id);
-    playStreamUrl(station.streamUrl, station.backupStreamUrl);
+    radioGlobalPlayer.playStation(station);
   };
 
   // 播放 / 暂停切换
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
+  const handleTogglePlay = () => {
+    radioGlobalPlayer.togglePlay();
+  };
+
+  // 旋钮步进切换
+  const handleRotateStep = (delta: number) => {
+    setKnobAngle((prev) => (prev + delta * 30) % 360);
+    if (delta > 0) {
+      radioGlobalPlayer.nextStation(stationList);
     } else {
-      playStreamUrl(currentStation.streamUrl, currentStation.backupStreamUrl);
+      radioGlobalPlayer.prevStation(stationList);
     }
   };
 
-  // 5. 旋钮步进切换上一个/下一个电台
-  const handleRotateStep = (delta: number) => {
-    setKnobAngle((prev) => (prev + delta * 30) % 360);
-    const currentIndex = stationList.findIndex((s) => s.id === currentStation.id);
-    let nextIndex = currentIndex + delta;
-    if (nextIndex < 0) nextIndex = stationList.length - 1;
-    if (nextIndex >= stationList.length) nextIndex = 0;
-    playStation(stationList[nextIndex]);
-  };
-
-  // 6. 点击刻度盘调频
+  // 点击刻度盘调频
   const handleDialFreqChange = (newFreq: number) => {
     setCurrentFreq(newFreq);
     const matched = findStationByFrequency(newFreq, stationList);
     if (matched && matched.id !== currentStation.id) {
-      playStation(matched);
+      handlePlayStation(matched);
     }
   };
 
-  // 7. Colormind 自由配色换肤
+  // Colormind 自由配色换肤
   const handleRandomizePalette = async () => {
     if (isColoring) return;
     setIsColoring(true);
@@ -236,37 +118,6 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
     }
   };
 
-  // 8. 定时助眠倒计时
-  useEffect(() => {
-    if (!sleepTimerMinutes) {
-      setSleepTimeRemaining(null);
-      return;
-    }
-
-    setSleepTimeRemaining(sleepTimerMinutes * 60);
-    const interval = setInterval(() => {
-      setSleepTimeRemaining((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(interval);
-          if (audioRef.current) audioRef.current.pause();
-          setIsPlaying(false);
-          setSleepTimerMinutes(0);
-          return null;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [sleepTimerMinutes]);
-
-  const cycleSleepTimer = () => {
-    const options = [0, 15, 30, 60];
-    const currIdx = options.indexOf(sleepTimerMinutes);
-    const nextIdx = (currIdx + 1) % options.length;
-    setSleepTimerMinutes(options[nextIdx]);
-  };
-
   const primaryAccent = palette[2] || '#4A6B82';
   const glowAccent = palette[4] || '#D97706';
 
@@ -283,7 +134,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
         boxSizing: 'border-box',
       }}
     >
-      {/* 顶部标题控制栏 */}
+      {/* 顶部标题控制栏：彻底去掉了计时器按钮 */}
       <div
         style={{
           display: 'flex',
@@ -300,7 +151,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
           onClick={onBack}
           className="nm-rebound-btn nm-btn-circle"
           style={{ width: '38px', height: '38px' }}
-          title="返回主屏"
+          title="返回主屏 (后台持续播放不中断)"
         >
           <ArrowLeft size={18} strokeWidth={2.4} />
         </button>
@@ -322,12 +173,12 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
             <RadioIcon size={15} style={{ color: primaryAccent }} />
           </h2>
           <span style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--nm-text-sub, #7D8CA3)' }}>
-            FM Tuner · Radio Browser & Live
+            FM Tuner · Background Audio
           </span>
         </div>
 
-        {/* 右侧动作区：换源 + Colormind 换色 + 定时睡眠 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        {/* 右侧动作区：换源 + Colormind 换色（已移除计时器） */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {/* 换源 / 在线电台库 */}
           <button
             type="button"
@@ -341,40 +192,6 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
             title="电台换源与全球电台库 (Radio Browser API)"
           >
             <Globe2 size={16} strokeWidth={2.4} />
-          </button>
-
-          {/* 定时睡眠 */}
-          <button
-            type="button"
-            onClick={cycleSleepTimer}
-            className="nm-rebound-btn nm-btn-circle"
-            style={{
-              width: '36px',
-              height: '36px',
-              color: sleepTimerMinutes > 0 ? '#10B981' : '#64748B',
-              position: 'relative',
-            }}
-            title={
-              sleepTimerMinutes > 0
-                ? `定时睡眠已开启：${Math.ceil((sleepTimeRemaining || 0) / 60)} 分钟后关机`
-                : '开启定时睡眠关机'
-            }
-          >
-            <Timer size={16} strokeWidth={2.4} />
-            {sleepTimerMinutes > 0 && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: '2px',
-                  right: '2px',
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  backgroundColor: '#10B981',
-                  boxShadow: '0 0 5px #10B981',
-                }}
-              />
-            )}
           </button>
 
           {/* Colormind 自由配色 */}
@@ -515,7 +332,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
             {/* 播放 / 暂停拟物大按钮 */}
             <button
               type="button"
-              onClick={togglePlay}
+              onClick={handleTogglePlay}
               className="nm-rebound-btn nm-btn-circle"
               style={{
                 width: '44px',
@@ -565,7 +382,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
                   type="button"
-                  onClick={() => setIsMuted(!isMuted)}
+                  onClick={() => radioGlobalPlayer.toggleMute()}
                   style={{
                     background: 'none',
                     border: 'none',
@@ -596,8 +413,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
                 step="0.05"
                 value={isMuted ? 0 : volume}
                 onChange={(e) => {
-                  setVolume(parseFloat(e.target.value));
-                  if (isMuted) setIsMuted(false);
+                  radioGlobalPlayer.setVolume(parseFloat(e.target.value));
                 }}
                 style={{
                   width: '100%',
@@ -636,7 +452,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
                 letterSpacing: '0.08em',
               }}
             >
-              CHANNELS · 电台列表 ({stationList.length})
+              CHANNELS · 频段列表 ({stationList.length})
             </span>
             <button
               type="button"
@@ -670,7 +486,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
               return (
                 <div
                   key={station.id}
-                  onClick={() => playStation(station)}
+                  onClick={() => handlePlayStation(station)}
                   className="nm-flat"
                   style={{
                     padding: '9px 10px',
@@ -755,7 +571,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         currentStationId={currentStation.id}
-        onSelectStation={playStation}
+        onSelectStation={handlePlayStation}
         accentColor={primaryAccent}
       />
     </div>
