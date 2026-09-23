@@ -65,6 +65,10 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
     const audio = new Audio();
     audio.preload = 'none';
     audio.volume = volume;
+    // 关键：阻止发送 Referer 头，防止触发防盗链 403
+    try {
+      (audio as any).referrerPolicy = 'no-referrer';
+    } catch {}
     audioRef.current = audio;
 
     const handleWaiting = () => setIsLoading(true);
@@ -79,9 +83,10 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
       setIsLoading(false);
       setIsPlaying(false);
       // 尝试备用流
-      if (audio.src === currentStation.streamUrl && currentStation.backupStreamUrl) {
+      if (currentStation.backupStreamUrl && audio.src !== currentStation.backupStreamUrl) {
         audio.src = currentStation.backupStreamUrl;
-        audio.play().catch(() => setErrorMsg('电台网络连接微弱，请轻拨旋钮换台'));
+        audio.load();
+        audio.play().catch(() => setErrorMsg('该电台源暂不可用，轻拨换一台吧'));
       } else {
         setErrorMsg('该电台源暂不可用，轻拨换一台吧');
       }
@@ -102,7 +107,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
       audio.removeEventListener('error', handleError);
       audio.src = '';
     };
-  }, []);
+  }, [currentStation]);
 
   // 2. 音量与静音同步
   useEffect(() => {
@@ -121,11 +126,16 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
 
     if (audioRef.current) {
       audioRef.current.src = station.streamUrl;
+      audioRef.current.load();
       setIsLoading(true);
       audioRef.current
         .play()
-        .then(() => setIsPlaying(true))
-        .catch(() => {
+        .then(() => {
+          setIsPlaying(true);
+          setErrorMsg(null);
+        })
+        .catch((err) => {
+          console.warn('Play error:', err);
           setIsLoading(false);
           setIsPlaying(false);
         });
@@ -139,17 +149,20 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      if (!audioRef.current.src || audioRef.current.src !== currentStation.streamUrl) {
+      if (!audioRef.current.src || !audioRef.current.src.includes(currentStation.streamUrl)) {
         audioRef.current.src = currentStation.streamUrl;
       }
+      audioRef.current.load();
       setIsLoading(true);
+      setErrorMsg(null);
       audioRef.current
         .play()
         .then(() => {
           setIsPlaying(true);
           setErrorMsg(null);
         })
-        .catch(() => {
+        .catch((err) => {
+          console.warn('Toggle play error:', err);
           setIsLoading(false);
           setIsPlaying(false);
           setErrorMsg('轻触播放失败，请检查网络或重试');

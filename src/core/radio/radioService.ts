@@ -19,7 +19,22 @@ export interface RadioStation {
  * 精选高可靠 100% 稳定直链电台池（HTTPS、免 Key、24小时稳定开播、无需任何跨域代理）
  */
 export const PRESET_STATIONS: RadioStation[] = [
-  // 1. 治愈慢摇与氛围（SomaFM 官方超清直链）
+  // 1. 经典蒸汽波与复古调频 (Nightwave Plaza 直连，国内访问极佳)
+  {
+    id: 'plaza_one',
+    name: 'Nightwave Plaza · 蒸汽波漫游',
+    frequency: 'FM 93.3',
+    freqMhz: 93.3,
+    category: 'lofi',
+    categoryLabel: '蒸汽波',
+    streamUrl: 'https://radio.plaza.one/mp3',
+    backupStreamUrl: 'https://plaza.one/mp3',
+    description: '全天候经典 CityPop 与 Vaporwave 怀旧电波，仿佛漫步在 80 年代雨夜街道。',
+    coverUrl: 'https://plaza.one/apple-touch-icon.png',
+    bitrate: '128 kbps MP3',
+  },
+
+  // 2. 治愈慢摇与氛围（SomaFM 官方超清直链，免 Referer 保护）
   {
     id: 'groove_salad',
     name: 'Groove Salad · 慢摇治愈',
