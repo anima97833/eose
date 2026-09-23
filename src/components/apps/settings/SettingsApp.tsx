@@ -21,6 +21,12 @@ import { LLMTestResult } from '../../../core/llm/types';
 import { createLLMAdapter, fetchEndpointModels } from '../../../core/llm';
 import { getStorage } from '../../../core/storage';
 import {
+  exportFullDatabase,
+  downloadBackupBlob,
+  parseAndValidateBackup,
+  importFullDatabase,
+} from '../../../core/storage/databaseBackupService';
+import {
   DualRouteSettings,
   RouteConfig,
   UserPreset,
@@ -158,25 +164,19 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({ onBack }) => {
     showNotification('预设已删除');
   };
 
-  // 导出 IndexedDB 完整备份 (JSON)
+  // 导出 IndexedDB 完整全量备份 (JSON)
   const handleExportBackup = async () => {
     try {
-      const jsonStr = await storage.exportBackup();
-      const blob = new Blob([jsonStr], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `neumorphic_phone_backup_${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showNotification('数据备份 JSON 导出成功');
+      const res = await exportFullDatabase();
+      downloadBackupBlob(res.blob, res.filename);
+      showNotification(`全量备份导出成功，共 ${res.totalRecords} 条记录`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       showNotification(`导出失败: ${msg}`);
     }
   };
 
-  // 导入备份文件 (JSON)
+  // 导入全量备份文件 (JSON)
   const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -184,14 +184,16 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({ onBack }) => {
     reader.onload = async (event) => {
       try {
         const content = event.target?.result as string;
-        const success = await storage.importBackup(content);
-        if (success) {
-          const freshSettings = await storage.getSettings();
-          setSettings(freshSettings);
-          showNotification('备份数据恢复成功！');
-        } else {
-          showNotification('备份文件格式解析失败');
+        const validation = parseAndValidateBackup(content);
+        if (!validation.valid || !validation.payload) {
+          showNotification(`备份文件校验失败: ${validation.error || '格式不符'}`);
+          return;
         }
+        const res = await importFullDatabase(validation.payload);
+        showNotification(`全量数据恢复成功！共还原 ${res.restoredRecords} 条记录`);
+        setTimeout(() => {
+          window.location.reload();
+        }, 1200);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         showNotification(`导入失败: ${msg}`);

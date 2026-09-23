@@ -106,7 +106,7 @@ export function getAppTitle(appId: string): string {
     case 'games': return '电玩';
     case 'files': return '文件';
     case 'compass': return '指南针';
-    case 'security': return '安全';
+    case 'security': return '隐私与安全';
     case 'memo': return '便签';
     case 'browser': return '网络探索';
     case 'memories': return '过往';

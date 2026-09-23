@@ -301,14 +301,14 @@ export const DEFAULT_STORE_CATALOG: AppStoreItem[] = [
   },
   {
     id: 'security',
-    name: '隐私安全',
+    name: '隐私与安全',
     version: '1.0.0',
     category: 'tools',
     categoryLabel: '安全',
     iconName: 'ShieldCheck',
-    description: '本地沙盒加密、应用锁与私密防窥防护。',
-    features: ['拟物九宫格手势锁', '伪装桌面模式', '隐私权限审计'],
-    isInstalled: false,
+    description: '全量数据库一键导出导入备份、本地离线沙盒与隐私安全保障。',
+    features: ['全量数据库一键导出', '全量数据覆盖还原', '28张数据表本地沙盒审计'],
+    isInstalled: true,
     isSystem: false,
   },
   {
@@ -402,6 +402,17 @@ export function listStoreCatalog(): AppStoreItem[] {
         if (kanbanItem && !kanbanItem.isInstalled) {
           kanbanItem.isInstalled = true;
           hasNew = true;
+        }
+        const securityItem = parsed.find((item) => item.id === 'security');
+        if (securityItem) {
+          if (securityItem.name !== '隐私与安全') {
+            securityItem.name = '隐私与安全';
+            hasNew = true;
+          }
+          if (!securityItem.isInstalled) {
+            securityItem.isInstalled = true;
+            hasNew = true;
+          }
         }
         if (hasNew) {
           saveStoreCatalog(parsed);

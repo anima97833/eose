@@ -19,6 +19,7 @@ import { PoetryApp } from './components/apps/poetry/PoetryApp';
 import { BookVaultApp } from './components/apps/books/BookVaultApp';
 import { StoryWordApp } from './components/apps/storyword/StoryWordApp';
 import { CourseKanbanApp } from './components/apps/kanban/CourseKanbanApp';
+import { SecurityApp } from './components/apps/security/SecurityApp';
 import { getCustomAppById } from './core/sdk/customAppRegistry';
 
 export const App: React.FC = () => {
@@ -92,6 +93,8 @@ export const App: React.FC = () => {
             <StoryWordApp onBack={() => setActiveApp(null)} />
           ) : activeApp === 'course_kanban' || activeApp === 'kanban' ? (
             <CourseKanbanApp onBack={() => setActiveApp(null)} />
+          ) : activeApp === 'security' ? (
+            <SecurityApp onBack={() => setActiveApp(null)} />
           ) : isCustomApp ? (
             <CustomAppRunner
               appId={activeApp!}
