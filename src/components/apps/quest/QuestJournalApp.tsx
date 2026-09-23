@@ -148,10 +148,10 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
       setTimeout(() => setFloatingStat(null), 1900);
     }
 
-    // 随机完成一项主线或者支线任务后触发传送门跃迁 (45% 几率惊喜触发)
+    // 随机完成一项主线或者支线任务后触发彩蛋掉落 (概率严格控制在 10%~15%，取 12%，绝不频繁打扰)
     const targetQuest = quests.find((q) => q.id === questId);
     if (targetQuest && (targetQuest.category === 'main' || targetQuest.category === 'side')) {
-      const luckyRoll = Math.random() < 0.45;
+      const luckyRoll = Math.random() < 0.12;
       if (luckyRoll) {
         setTimeout(() => {
           triggerEasterEgg('MULTIVERSE_PORTAL');
