@@ -118,8 +118,7 @@ export async function submitClozeAnswer(
       const attrGain = 1;
       const attrKey = profile.currentClassId === 'scholar' || profile.currentClassId === 'mage' ? 'INT' : 'SPI';
 
-      profile.currentExp += expGain;
-      profile.gold += goldGain;
+      profile.currentExp += (expGain + goldGain);
 
       let leveledUp = false;
       while (profile.currentExp >= profile.maxExp) {

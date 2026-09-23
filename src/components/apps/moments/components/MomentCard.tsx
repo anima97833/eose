@@ -1,12 +1,14 @@
 import React from 'react';
 import { Star, Trash2, Image as ImageIcon } from 'lucide-react';
 import { MomentItem } from '../../../../core/moments/momentsTypes';
+import { MOMENT_ATTR_INFO } from '../../../../core/moments/momentsStorage';
 
 interface MomentCardProps {
   moment: MomentItem;
   onToggleStar: (id: string) => void;
   onDelete: (id: string) => void;
   onPreviewImage: (url: string) => void;
+  onSelectTheme?: (theme: string) => void;
 }
 
 // 纯手工绘制绿叶装饰
@@ -37,7 +39,7 @@ const WoodLeaf: React.FC<{ flip?: boolean }> = ({ flip }) => (
   </svg>
 );
 
-// 木桩切片底座相框（100% 深度复刻原画下层木墩展示台）
+// 木桩切片底座相框
 const WoodLogPodium: React.FC<{
   imageUrl: string;
   onClick: () => void;
@@ -77,7 +79,7 @@ const WoodLogPodium: React.FC<{
       />
     </div>
 
-    {/* 下层木桩切片椭圆底座（带小绿星标志，深度对齐原图） */}
+    {/* 下层木桩切片椭圆底座 */}
     <div
       style={{
         position: 'relative',
@@ -112,7 +114,7 @@ const WoodLogPodium: React.FC<{
           fontWeight: 900,
         }}
       >
-        C
+        ★
       </div>
     </div>
   </div>
@@ -123,7 +125,10 @@ export const MomentCard: React.FC<MomentCardProps> = ({
   onToggleStar,
   onDelete,
   onPreviewImage,
+  onSelectTheme,
 }) => {
+  const attrInfo = MOMENT_ATTR_INFO[moment.attributeTag || 'SPI'] || MOMENT_ATTR_INFO.SPI;
+
   return (
     <div
       style={{
@@ -139,7 +144,7 @@ export const MomentCard: React.FC<MomentCardProps> = ({
         marginBottom: '14px',
       }}
     >
-      {/* ================= 1. 顶部木板抬头（对齐原图 Basic Theme 悬挂木牌） ================= */}
+      {/* ================= 1. 顶部木板抬头（支持点击筛选同类木标） ================= */}
       <div
         style={{
           width: '100%',
@@ -152,8 +157,22 @@ export const MomentCard: React.FC<MomentCardProps> = ({
           justifyContent: 'space-between',
         }}
       >
-        {/* 左侧绿叶 + 萌系主题名 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        {/* 左侧绿叶 + 萌系主题名（可点击过滤） */}
+        <div
+          onClick={() => onSelectTheme?.(moment.themeTitle || '生活碎念')}
+          title="点击筛选此木标动态"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            cursor: onSelectTheme ? 'pointer' : 'default',
+            padding: '2px 6px',
+            borderRadius: '8px',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+        >
           <WoodLeaf />
           <span
             style={{
@@ -201,7 +220,7 @@ export const MomentCard: React.FC<MomentCardProps> = ({
         </div>
       </div>
 
-      {/* ================= 2. 卡片核心区：左侧内容 + 右侧虚线奖励与星标 ================= */}
+      {/* ================= 2. 卡片核心区：左侧内容 + 右侧六维成长与星标 ================= */}
       <div
         style={{
           display: 'flex',
@@ -218,30 +237,33 @@ export const MomentCard: React.FC<MomentCardProps> = ({
             flexDirection: 'column',
             justifyContent: 'space-between',
             boxSizing: 'border-box',
+            minWidth: 0,
           }}
         >
           {/* 碎碎念正文 */}
           <div
             style={{
-              fontSize: '12.5px',
-              lineHeight: '18px',
+              fontSize: '13px',
+              lineHeight: '19px',
               fontWeight: 700,
               color: '#451A03',
               wordBreak: 'break-word',
-              marginBottom: moment.images && moment.images.length > 0 ? '10px' : '4px',
+              marginBottom: moment.images && moment.images.length > 0 ? '10px' : '0px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             }}
           >
             {moment.content}
           </div>
 
-          {/* 图片展示排版：木桩立牌展示台 */}
+          {/* 树桩木墩底座相框（若发布了图片） */}
           {moment.images && moment.images.length > 0 && (
             <div
               style={{
                 display: 'flex',
-                gap: '8px',
-                flexWrap: 'wrap',
-                marginTop: '4px',
+                gap: '10px',
+                overflowX: 'auto',
+                paddingBottom: '4px',
+                alignItems: 'flex-end',
               }}
             >
               {moment.images.map((img, idx) => (
@@ -255,10 +277,10 @@ export const MomentCard: React.FC<MomentCardProps> = ({
           )}
         </div>
 
-        {/* 右侧：纵向虚线分割线 + Reward 金币 + 星标 OK 键 (100% 对齐原图) */}
+        {/* ================= 右侧：六维修行成长水晶与珍藏键 (方向 B) ================= */}
         <div
           style={{
-            width: '68px',
+            width: '72px',
             borderLeft: '2px dashed #CBB59D',
             display: 'flex',
             flexDirection: 'column',
@@ -270,7 +292,7 @@ export const MomentCard: React.FC<MomentCardProps> = ({
             flexShrink: 0,
           }}
         >
-          {/* Reward 奖励字标 */}
+          {/* Growth 修行字标 */}
           <span
             style={{
               fontSize: '11px',
@@ -280,66 +302,66 @@ export const MomentCard: React.FC<MomentCardProps> = ({
               marginBottom: '2px',
             }}
           >
-            Reward
+            Growth
           </span>
 
-          {/* 金币大图标 (对齐原图金币压纹) */}
+          {/* 六维能量水晶大徽标 (按对应属性如精神/魅力/智力等动态着色) */}
           <div
+            title={`此动态蕴含 ${attrInfo.name} 能量`}
             style={{
               width: '38px',
               height: '38px',
               borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 35%, #FDE047 0%, #F59E0B 70%, #D97706 100%)',
+              background: `radial-gradient(circle at 35% 35%, #FFFFFF 0%, ${attrInfo.bg} 40%, ${attrInfo.color} 100%)`,
               border: '2px solid #502428',
-              boxShadow: '0 2px 0 #87470E',
+              boxShadow: `0 2px 0 #502428, 0 0 8px ${attrInfo.glow}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               position: 'relative',
-              marginBottom: '1px',
+              marginBottom: '2px',
             }}
           >
-            {/* 金币内双环凹槽 */}
+            {/* 水晶内圈凹槽与 Emoji */}
             <div
               style={{
                 width: '26px',
                 height: '26px',
                 borderRadius: '50%',
-                border: '1.2px solid #D97706',
+                border: `1.2px solid ${attrInfo.border}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontWeight: 900,
-                fontSize: '12px',
-                color: '#87470E',
+                fontSize: '13px',
               }}
             >
-              ★
+              {attrInfo.icon}
             </div>
           </div>
 
-          {/* 奖励数值 (如 5000) */}
+          {/* 属性增益数值 (如 精神 +2) */}
           <span
             style={{
-              fontSize: '11px',
+              fontSize: '10.5px',
               fontWeight: 900,
-              color: '#502428',
+              color: attrInfo.color,
               marginBottom: '6px',
+              textShadow: '0 0.5px 0 rgba(0,0,0,0.08)',
             }}
           >
-            {moment.rewardCoins || 5000}
+            {attrInfo.name} +{moment.attributeGain || 2}
           </span>
 
-          {/* 星标 OK 交互键（深度对齐原画灰色/黄色圆角 OK 胶囊，点击点亮/收藏） */}
+          {/* 星标珍藏键（点击点亮/珍藏） */}
           <button
             onClick={() => onToggleStar(moment.id)}
             style={{
-              width: '54px',
+              width: '56px',
               height: '24px',
               borderRadius: '12px',
               background: moment.isStarred
                 ? 'linear-gradient(180deg, #FBBF24 0%, #F59E0B 100%)'
-                : 'linear-gradient(180deg, #E5E7EB 0%, #CBD5E1 100%)',
+                : 'linear-gradient(180deg, #FFFFFF 0%, #E5E7EB 100%)',
               border: '2px solid #502428',
               boxShadow: moment.isStarred ? '0 2px 0 #B45309' : '0 2px 0 #64748B',
               cursor: 'pointer',
@@ -350,7 +372,7 @@ export const MomentCard: React.FC<MomentCardProps> = ({
               padding: 0,
               transition: 'all 0.15s ease',
             }}
-            title={moment.isStarred ? '已加入星标' : '点击星标'}
+            title={moment.isStarred ? '已加入星标珍藏' : '点击星标珍藏'}
           >
             <Star
               size={11}
@@ -366,7 +388,7 @@ export const MomentCard: React.FC<MomentCardProps> = ({
                 fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", sans-serif',
               }}
             >
-              {moment.isStarred ? '已星标' : 'OK'}
+              {moment.isStarred ? '已珍藏' : '珍藏'}
             </span>
           </button>
         </div>

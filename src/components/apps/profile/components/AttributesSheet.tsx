@@ -245,6 +245,20 @@ export const AttributesSheet: React.FC<AttributesSheetProps> = ({
               <Sparkles size={11} color="#059669" />
               总评 {totalScore}
             </span>
+            <span
+              style={{
+                fontSize: '10px',
+                fontWeight: 700,
+                color: 'rgba(255, 255, 255, 0.92)',
+                background: 'rgba(20, 48, 42, 0.45)',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                padding: '2px 7px',
+                borderRadius: '8px',
+                letterSpacing: '0.2px',
+              }}
+            >
+              每日0点(北京时间)重置
+            </span>
           </div>
 
           {/* 圆形关闭按钮 */}

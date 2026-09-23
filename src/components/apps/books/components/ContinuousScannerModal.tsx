@@ -22,6 +22,7 @@ import { Settings } from 'lucide-react';
 interface ContinuousScannerModalProps {
   onClose: () => void;
   onBookScanned: (book: PhysicalBookRecord) => void;
+  onOpenManualAdd?: () => void;
 }
 
 // 供快捷测试演示的常见图书真实 ISBN
@@ -36,6 +37,7 @@ const SAMPLE_TEST_ISBNS = [
 export const ContinuousScannerModal: React.FC<ContinuousScannerModalProps> = ({
   onClose,
   onBookScanned,
+  onOpenManualAdd,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -660,6 +662,29 @@ export const ContinuousScannerModal: React.FC<ContinuousScannerModalProps> = ({
             录入
           </button>
         </div>
+
+        {onOpenManualAdd && (
+          <div style={{ padding: '6px 16px 8px', textAlign: 'center', backgroundColor: NM.bg, borderBottom: NM.borderSoft }}>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenManualAdd();
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: NM.primaryDark,
+                fontSize: '0.74rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
+            >
+              无条形码或特殊古籍？点击切换至完整手动建档 &gt;
+            </button>
+          </div>
+        )}
 
         {/* 刚刚已扫入的书籍流水队列（轻拟物卡片流） */}
         <div

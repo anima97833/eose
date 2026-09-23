@@ -16,6 +16,7 @@ export interface SavedPoemRecord {
   lastReviewedAt?: string; // 最近温故时间
   userNotes?: string;      // 用户赏析随笔 / 记忆口诀
   createdAt: string;
+  passedExamModes?: ('cloze' | 'dictation' | 'recitation')[]; // 已通关的考核关卡（三关任选通过两关即算熟背）
 }
 
 export interface PoetryOnlineItem {

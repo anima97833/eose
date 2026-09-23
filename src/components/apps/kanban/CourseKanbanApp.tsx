@@ -5,11 +5,12 @@ import {
   getKanbanStats,
   changeCourseStatus,
   resetDefaultCourses,
-  MAX_IN_PROGRESS_COURSES,
+  ATTR_TAG_INFO,
 } from '../../../core/kanban/courseKanbanStorage';
 import { formatDuration, estimateRemainingDays } from '../../../core/kanban/courseParserEngine';
 import { CourseImportModal } from './CourseImportModal';
 import { CourseDetailModal } from './CourseDetailModal';
+import { CourseReflectionsModal } from './CourseReflectionsModal';
 import { NM } from '../storyword/storyWordNeumorphism';
 import {
   ArrowLeft,
@@ -23,6 +24,7 @@ import {
   RotateCcw,
   Sparkles,
   BookOpen,
+  BookOpenCheck,
 } from 'lucide-react';
 
 interface CourseKanbanAppProps {
@@ -43,6 +45,7 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isReflectionsModalOpen, setIsReflectionsModalOpen] = useState(false);
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -61,35 +64,32 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
     loadData();
   }, []);
 
+  // 当前分类课程列表
+  const filteredCourses = courses.filter(c => c.status === activeTab);
+
+  // 打开课程详情弹窗
   const handleOpenDetail = (course: Course) => {
     setSelectedCourse(course);
     setIsDetailModalOpen(true);
   };
 
-  // 快捷开始学习（带 WIP 限制提示）
-  const handleQuickStart = (e: React.MouseEvent, courseId: string) => {
+  // 快捷流转课程状态
+  const handleQuickStatusChange = (e: React.MouseEvent, courseId: string, newStatus: CourseStatus) => {
     e.stopPropagation();
-    const res = changeCourseStatus(courseId, 'in_progress');
+    const res = changeCourseStatus(courseId, newStatus);
     if (!res.success) {
       showToast(res.message || '操作受限');
       return;
     }
     loadData();
-    showToast('已开始攻克');
+    showToast(newStatus === 'in_progress' ? '已转入正在学' : newStatus === 'completed' ? '结课达成！' : '已移入待学');
   };
 
-  // 快捷标记结课
-  const handleQuickComplete = (e: React.MouseEvent, courseId: string) => {
-    e.stopPropagation();
-    const res = changeCourseStatus(courseId, 'completed');
-    if (res.success) {
-      loadData();
-      showToast('恭喜结课！');
-    }
+  const handleResetPresets = () => {
+    resetDefaultCourses();
+    loadData();
+    showToast('已恢复预设课程');
   };
-
-  // 过滤当前栏目课程
-  const filteredCourses = courses.filter(c => c.status === activeTab);
 
   return (
     <div
@@ -99,46 +99,42 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
         height: '100%',
         backgroundColor: NM.bg,
         color: NM.textMain,
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif',
         overflowY: 'auto',
-        boxSizing: 'border-box',
       }}
     >
-      {/* 顶部应用栏 */}
+      {/* 顶部导航栏 */}
       <div
         style={{
           padding: '16px 20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: NM.cardBg,
-          boxShadow: NM.convexSm,
-          borderBottom: NM.borderLight,
+          borderBottom: NM.borderSoft,
+          position: 'sticky',
+          top: 0,
+          backgroundColor: NM.bg,
+          zIndex: 10,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {onBack && (
             <button
               onClick={onBack}
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: NM.textMain,
+                width: '36px',
+                height: '36px',
+                borderRadius: '12px',
                 backgroundColor: NM.cardBg,
                 boxShadow: NM.convexSm,
                 border: NM.borderLight,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 cursor: 'pointer',
-                padding: 0,
-                marginRight: '4px',
+                color: NM.textSub,
               }}
-              title="返回桌面"
             >
-              <ArrowLeft size={17} />
+              <ArrowLeft size={18} />
             </button>
           )}
           <div
@@ -146,8 +142,8 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
               width: '36px',
               height: '36px',
               borderRadius: '12px',
-              backgroundColor: NM.cardBg,
-              boxShadow: NM.convexXs,
+              backgroundColor: NM.bgInset,
+              boxShadow: NM.insetSm,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -165,27 +161,48 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* 顶部快捷操作 */}
+        {/* 顶部快捷操作：感想按钮与导入按钮，纯图标无文字 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
-            onClick={() => setIsImportModalOpen(true)}
+            onClick={() => setIsReflectionsModalOpen(true)}
+            title="课时心得手账阁"
             style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '11px',
+              backgroundColor: NM.cardBg,
+              boxShadow: NM.convexSm,
+              border: NM.borderLight,
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-              padding: '6px 12px',
-              borderRadius: '10px',
-              backgroundColor: NM.amber,
-              boxShadow: NM.convexXs,
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 700,
-              color: '#fff',
+              justifyContent: 'center',
+              color: NM.amber,
+              transition: 'all 0.15s ease',
             }}
           >
-            <Plus size={14} />
-            <span>导入课程</span>
+            <BookOpenCheck size={18} />
+          </button>
+
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            title="导入课程"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '11px',
+              backgroundColor: NM.amber,
+              boxShadow: NM.convexSm,
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Plus size={18} />
           </button>
         </div>
       </div>
@@ -222,41 +239,38 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '13px', fontWeight: 800, color: NM.textMain }}>
-                  正在攻克: {stats.inProgressCount}/{MAX_IN_PROGRESS_COURSES}
+                  正在攻克: {stats.inProgressCount} 门
                 </span>
                 <span
                   style={{
                     fontSize: '10px',
                     padding: '1px 5px',
                     borderRadius: '4px',
-                    backgroundColor:
-                      stats.inProgressCount >= MAX_IN_PROGRESS_COURSES ? '#FEE2E2' : '#FEF3C7',
-                    color: stats.inProgressCount >= MAX_IN_PROGRESS_COURSES ? '#B91C1C' : '#B45309',
+                    backgroundColor: stats.inProgressCount >= 2 ? '#FEE2E2' : '#FEF3C7',
+                    color: stats.inProgressCount >= 2 ? '#DC2626' : '#D97706',
                     fontWeight: 700,
                   }}
                 >
-                  {stats.inProgressCount >= MAX_IN_PROGRESS_COURSES ? '槽位已满' : '精力充沛'}
+                  WIP限额: 最多2门
                 </span>
               </div>
-              <div style={{ fontSize: '11px', color: NM.textSub, marginTop: '2px' }}>
-                已结课 {stats.completedCount} 门 · 累计消化 {stats.completedHours} 小时
+              <div style={{ fontSize: '11px', color: NM.textMuted, marginTop: '2px' }}>
+                已完成 {stats.completedHours}h / 累计总规划 {stats.totalHours}h
               </div>
             </div>
           </div>
 
           <button
-            onClick={() => {
-              resetDefaultCourses();
-              loadData();
-              showToast('已重置示例');
-            }}
+            onClick={handleResetPresets}
             style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '11px',
+              padding: '6px 10px',
+              borderRadius: '8px',
+              backgroundColor: NM.bgInset,
+              boxShadow: NM.insetXs,
+              border: NM.borderLight,
+              fontSize: '10px',
               color: NM.textMuted,
               cursor: 'pointer',
-              padding: '4px 6px',
             }}
           >
             重置示例
@@ -320,7 +334,7 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
           })}
         </div>
 
-        {/* 正在学特别提醒横幅 */}
+        {/* 正在学状态提示横幅 */}
         {activeTab === 'in_progress' && (
           <div
             style={{
@@ -335,9 +349,9 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
               justifyContent: 'space-between',
             }}
           >
-            <span>💡 <b>专注准则</b>：同时在学最多 2 门，防止注意力涣散。</span>
+            <span>💡 <b>学习准则</b>：坚持按部就班打卡，稳步攻克每一讲！</span>
             <span style={{ color: NM.amber, fontWeight: 700 }}>
-              {stats.inProgressCount} / {MAX_IN_PROGRESS_COURSES}
+              共 {stats.inProgressCount} 门进行中
             </span>
           </div>
         )}
@@ -378,6 +392,7 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
                 course.totalDurationSeconds * (1 - progress / 100)
               );
               const days = estimateRemainingDays(remainingSec, course.dailyGoalMinutes);
+              const tagInfo = ATTR_TAG_INFO[course.attributeTag || 'INT'] || ATTR_TAG_INFO.INT;
 
               return (
                 <div
@@ -433,6 +448,27 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
                         >
                           {course.platform === 'bilibili' ? 'B站' : course.platform === 'pan' ? '网盘' : '自学'}
                         </span>
+
+                        {/* 六维分类属性胶囊 */}
+                        <span
+                          style={{
+                            fontSize: '9.5px',
+                            fontWeight: 800,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            backgroundColor: tagInfo.bg,
+                            color: tagInfo.color,
+                            border: `1px solid ${tagInfo.color}33`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <span>{tagInfo.icon}</span>
+                          <span>{tagInfo.name}</span>
+                        </span>
+
                         <span
                           style={{
                             fontSize: '13px',
@@ -450,81 +486,100 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
                         讲师: {course.author} · 共 {course.totalChapters} 讲
                       </div>
                     </div>
-
-                    <span style={{ fontSize: '14px', fontWeight: 900, color: NM.amber, flexShrink: 0 }}>
-                      {progress}%
-                    </span>
                   </div>
 
-                  {/* 拟物进度条 */}
-                  <div
-                    style={{
-                      height: '6px',
-                      borderRadius: '4px',
-                      backgroundColor: NM.bgInset,
-                      boxShadow: NM.insetXs,
-                      overflow: 'hidden',
-                    }}
-                  >
+                  {/* 进度条与预计通关 */}
+                  <div>
                     <div
                       style={{
-                        height: '100%',
-                        width: `${progress}%`,
-                        borderRadius: '4px',
-                        background: 'linear-gradient(90deg, #F59E0B, #10B981)',
-                        transition: 'width 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '11px',
+                        marginBottom: '4px',
                       }}
-                    />
+                    >
+                      <span style={{ color: NM.textSub, fontWeight: 600 }}>
+                        通关: {course.completedChapters} / {course.totalChapters} 讲 ({progress}%)
+                      </span>
+                      <span style={{ color: NM.textMuted }}>
+                        预计通关: 约 {days} 天
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '6px',
+                        borderRadius: '3px',
+                        backgroundColor: NM.bgInset,
+                        boxShadow: NM.insetXs,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${progress}%`,
+                          height: '100%',
+                          borderRadius: '3px',
+                          background: `linear-gradient(90deg, ${NM.amber}, ${tagInfo.color})`,
+                        }}
+                      />
+                    </div>
                   </div>
 
-                  {/* 心理降维提示与快捷动作 */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '10px', color: NM.textSub }}>
-                      已学 {course.completedChapters}/{course.totalChapters} 讲
-                      {progress < 100 && ` · 需 ${formatDuration(remainingSec)} (约${days}天)`}
+                  {/* 卡片底栏操作 */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingTop: '6px',
+                      borderTop: '1px solid rgba(0,0,0,0.04)',
+                    }}
+                  >
+                    <span style={{ fontSize: '10px', color: NM.textMuted }}>
+                      课时奖励: {tagInfo.name} +3 · 精神 +1
                     </span>
 
-                    {/* 快捷操作按键 */}
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      {course.status === 'backlog' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {course.status !== 'in_progress' && (
                         <button
-                          onClick={e => handleQuickStart(e, course.id)}
+                          onClick={e => handleQuickStatusChange(e, course.id, 'in_progress')}
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            padding: '4px 8px',
+                            padding: '3px 8px',
                             borderRadius: '6px',
                             backgroundColor: NM.amber,
                             color: '#fff',
                             border: 'none',
                             fontSize: '10px',
                             fontWeight: 700,
-                            boxShadow: NM.convexXs,
                             cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px',
                           }}
                         >
                           <Play size={10} fill="#fff" />
-                          <span>开学</span>
+                          <span>开始攻克</span>
                         </button>
                       )}
 
                       {course.status === 'in_progress' && (
                         <button
-                          onClick={e => handleQuickComplete(e, course.id)}
+                          onClick={e => handleQuickStatusChange(e, course.id, 'completed')}
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            padding: '4px 8px',
+                            padding: '3px 8px',
                             borderRadius: '6px',
                             backgroundColor: NM.cardBg,
                             color: NM.emerald,
                             border: NM.borderLight,
                             fontSize: '10px',
                             fontWeight: 700,
-                            boxShadow: NM.convexXs,
                             cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px',
                           }}
                         >
                           <Award size={11} />
@@ -550,12 +605,19 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
         }}
       />
 
-      {/* 弹窗：课程详情与逐章打卡 */}
+      {/* 弹窗：课程详情与逐章打卡 (支持课时感想提交) */}
       <CourseDetailModal
         course={selectedCourse}
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
         onCourseUpdated={loadData}
+        onShowToast={showToast}
+      />
+
+      {/* 弹窗：全栈学习心得阁 (汇总展示所有课时感悟与自留心得) */}
+      <CourseReflectionsModal
+        isOpen={isReflectionsModalOpen}
+        onClose={() => setIsReflectionsModalOpen(false)}
         onShowToast={showToast}
       />
 

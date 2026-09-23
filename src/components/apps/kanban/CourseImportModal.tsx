@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Course } from '../../../core/kanban/courseKanbanTypes';
+import { Course, CourseAttributeTag } from '../../../core/kanban/courseKanbanTypes';
 import {
   parseBilibiliCourse,
   parsePanDirectoryText,
   createCustomCourse,
   formatDuration,
 } from '../../../core/kanban/courseParserEngine';
-import { saveCourse } from '../../../core/kanban/courseKanbanStorage';
+import { saveCourse, ATTR_TAG_INFO } from '../../../core/kanban/courseKanbanStorage';
 import { NM } from '../storyword/storyWordNeumorphism';
 import { X, Sparkles, Tv, Folder, Plus, Check } from 'lucide-react';
 
@@ -22,6 +22,7 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
   onCourseAdded,
 }) => {
   const [activeTab, setActiveTab] = useState<'bilibili' | 'pan' | 'custom'>('bilibili');
+  const [selectedAttrTag, setSelectedAttrTag] = useState<CourseAttributeTag>('INT');
 
   // B站导入表单
   const [biliInput, setBiliInput] = useState('');
@@ -76,6 +77,7 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
       ...biliParsedCourse,
       title: biliParsedTitle.trim() || biliParsedCourse.title,
       author: biliParsedAuthor.trim() || biliParsedCourse.author,
+      attributeTag: selectedAttrTag,
     };
     saveCourse(finalCourse);
     onCourseAdded(finalCourse);
@@ -94,6 +96,7 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
       return;
     }
     const course = parsePanDirectoryText(panTitle, panText, panAuthor);
+    course.attributeTag = selectedAttrTag;
     saveCourse(course);
     onCourseAdded(course);
     showToast('已入看板');
@@ -107,11 +110,51 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
       return;
     }
     const course = createCustomCourse(customTitle, customAuthor, customChapters);
+    course.attributeTag = selectedAttrTag;
     saveCourse(course);
     onCourseAdded(course);
     showToast('已入看板');
     onClose();
   };
+
+  const renderAttrSelector = () => (
+    <div>
+      <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: NM.textSub, marginBottom: '6px' }}>
+        六维属性归属分类
+      </label>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+        {(['INT', 'SPI', 'CHA', 'DEX', 'STR', 'CON'] as CourseAttributeTag[]).map(t => {
+          const info = ATTR_TAG_INFO[t];
+          const isSel = selectedAttrTag === t;
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setSelectedAttrTag(t)}
+              style={{
+                padding: '6px 8px',
+                borderRadius: '8px',
+                border: isSel ? `1.5px solid ${info.color}` : NM.borderLight,
+                backgroundColor: isSel ? info.bg : NM.cardBg,
+                color: isSel ? info.color : NM.textSub,
+                fontSize: '11px',
+                fontWeight: isSel ? 800 : 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                boxShadow: isSel ? NM.convexXs : 'none',
+              }}
+            >
+              <span>{info.icon}</span>
+              <span>{info.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -531,6 +574,9 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
                     </div>
                   </div>
 
+                  {/* 六维分类选择器 */}
+                  {renderAttrSelector()}
+
                   <button
                     onClick={handleConfirmBili}
                     style={{
@@ -648,6 +694,9 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
                 />
               </div>
 
+              {/* 六维分类选择器 */}
+              {renderAttrSelector()}
+
               <button
                 onClick={handleConfirmPan}
                 style={{
@@ -733,6 +782,9 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
                   }}
                 />
               </div>
+
+              {/* 六维分类选择器 */}
+              {renderAttrSelector()}
 
               <button
                 onClick={handleConfirmCustom}

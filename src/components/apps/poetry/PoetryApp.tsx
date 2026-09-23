@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Search, BookOpen, Award, Heart, Sparkles, Plus } from 'lucide-react';
+import { ArrowLeft, Search, BookOpen, Award, Heart, Sparkles, Plus, Feather } from 'lucide-react';
 import { SavedPoemRecord, PoemStatus, PoetryStats } from '../../../core/poetry/poetryTypes';
 import {
   loadAllSavedPoems,
@@ -16,6 +16,7 @@ import { PoetryCard } from './components/PoetryCard';
 import { PoetrySearchModal } from './components/PoetrySearchModal';
 import { PoetryExamModal } from './components/PoetryExamModal';
 import { PoetryDetailModal } from './components/PoetryDetailModal';
+import { PoetryManualEntryModal } from './components/PoetryManualEntryModal';
 
 interface PoetryAppProps {
   onBack: () => void;
@@ -27,6 +28,7 @@ export const PoetryApp: React.FC<PoetryAppProps> = ({ onBack }) => {
   const [poems, setPoems] = useState<SavedPoemRecord[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>('learning');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isEntryOpen, setIsEntryOpen] = useState(false);
   const [examPoem, setExamPoem] = useState<SavedPoemRecord | null>(null);
   const [detailPoem, setDetailPoem] = useState<SavedPoemRecord | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -227,28 +229,54 @@ export const PoetryApp: React.FC<PoetryAppProps> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* 顶部寻诗按钮 */}
-        <button
-          type="button"
-          onClick={() => setIsSearchOpen(true)}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '6px 12px',
-            borderRadius: 8,
-            border: '1px solid #b91c1c',
-            background: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)',
-            color: '#ffffff',
-            fontSize: '0.8rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(185, 28, 28, 0.25)',
-          }}
-        >
-          <Plus size={15} strokeWidth={2.4} />
-          <span>寻诗</span>
-        </button>
+        {/* 顶部操作按钮组合：录入 + 寻诗 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* 手动录入按钮 */}
+          <button
+            type="button"
+            onClick={() => setIsEntryOpen(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '6px 11px',
+              borderRadius: 8,
+              border: '1px solid #B0894C',
+              background: 'linear-gradient(180deg, #FDFBF7 0%, #FAEDD9 100%)',
+              color: '#78350F',
+              fontSize: '0.8rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 2px 5px rgba(120, 53, 15, 0.12)',
+            }}
+          >
+            <Feather size={14} strokeWidth={2.4} />
+            <span>录入</span>
+          </button>
+
+          {/* 顶部寻诗按钮 */}
+          <button
+            type="button"
+            onClick={() => setIsSearchOpen(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: '1px solid #b91c1c',
+              background: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)',
+              color: '#ffffff',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(185, 28, 28, 0.25)',
+            }}
+          >
+            <Plus size={15} strokeWidth={2.4} />
+            <span>寻诗</span>
+          </button>
+        </div>
       </div>
 
       {/* 诗阁统计与功名进度胶囊 */}
@@ -465,12 +493,22 @@ export const PoetryApp: React.FC<PoetryAppProps> = ({ onBack }) => {
         />
       )}
 
-      {/* 考核通关考场模态框（方向B交互） */}
+      {/* 考核通关考场模态框（支持选字、默写、语音背诵） */}
       {examPoem && (
         <PoetryExamModal
           poem={examPoem}
           onClose={() => setExamPoem(null)}
           onExamSuccess={handleExamSuccess}
+          onToast={showToast}
+        />
+      )}
+
+      {/* 诗词手动录入模态框 */}
+      {isEntryOpen && (
+        <PoetryManualEntryModal
+          onClose={() => setIsEntryOpen(false)}
+          onSavePoem={handleAddPoem}
+          onToast={showToast}
         />
       )}
 

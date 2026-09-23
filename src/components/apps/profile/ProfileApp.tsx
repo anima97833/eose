@@ -18,6 +18,7 @@ import {
   loadRPGProfile,
   saveRPGProfile,
   RPG_CLASSES,
+  getBeijingDateString,
 } from '../../../core/rpg/rpgStorage';
 import { AttributesSheet } from './components/AttributesSheet';
 import { SkillTreeSheet } from './components/SkillTreeSheet';
@@ -33,6 +34,21 @@ import { QuestStageSheet } from './components/QuestStageSheet';
 import { MealDiaryIcon } from './components/MealDiaryIcon';
 import { MealDiarySheet } from './components/MealDiarySheet';
 import { ProfileDossierSheet } from './components/ProfileDossierSheet';
+import { LifeDaisyIcon } from './components/LifeDaisyIcon';
+import { LifeJourneySheet } from './components/LifeJourneySheet';
+import { SettingsVaultModal } from './components/SettingsVaultModal';
+import { calculateFreeDays } from '../../../core/rpg/vaultStorage';
+import {
+  getCustomBackground,
+  saveCustomBackground,
+  deleteCustomBackground,
+} from '../../../core/rpg/backgroundImageStorage';
+import { ChestIcon } from './components/ChestIcon';
+import { ActivityLogModal } from './components/ActivityLogModal';
+import { DailySignInModal } from './components/DailySignInModal';
+import { ExtremeChallengeModal } from './components/ExtremeChallengeModal';
+import { DailySettlementModal } from './components/DailySettlementModal';
+import { applyDailySettlement, getMaxExpForLevel } from '../../../core/rpg/dailySettlementEngine';
 
 interface ProfileAppProps {
   onBack: () => void;
@@ -460,17 +476,58 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
   const [showRelationshipModal, setShowRelationshipModal] = useState(false);
   const [showQuestModal, setShowQuestModal] = useState(false);
   const [showMealModal, setShowMealModal] = useState(false);
+  const [showLifeModal, setShowLifeModal] = useState(false);
   const [showDossierModal, setShowDossierModal] = useState(false);
+  const [showVaultModal, setShowVaultModal] = useState(false);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [toastText, setToastText] = useState<string | null>(null);
 
   // 挂载时间戳，防止从桌面打开应用时的幽灵穿透点击
   const mountedAtRef = useRef<number>(Date.now());
 
   useEffect(() => {
-    // 强制初始等级严格从 1 开始
+    // 强制初始等级与历史超标溢出经验矫正
     if (profile.level !== 1 && (!profile.currentExp || profile.currentExp === 0)) {
-      setProfile((prev) => ({ ...prev, level: 1, currentExp: 0, maxExp: 100 }));
+      setProfile((prev) => {
+        const fixed = { ...prev, level: 1, currentExp: 0, maxExp: getMaxExpForLevel(1) };
+        saveRPGProfile(fixed);
+        return fixed;
+      });
+    } else if (profile.currentExp >= profile.maxExp) {
+      setProfile((prev) => {
+        const safeLevel = Math.max(1, prev.level || 1);
+        const fixed = { ...prev, level: safeLevel, currentExp: 0, maxExp: getMaxExpForLevel(safeLevel) };
+        saveRPGProfile(fixed);
+        return fixed;
+      });
     }
+    // 强制今日首次加载/跨日时心情初始重置为 100
+    const today = getBeijingDateString();
+    if (profile.lastMoodResetDate !== today || profile.mood !== 100) {
+      setProfile((prev) => ({ ...prev, mood: 100, lastMoodResetDate: today }));
+    }
+    // 从 IndexedDB 异步加载舞台自定义背景
+    getCustomBackground().then((bg) => {
+      if (bg) {
+        setProfile((prev) => ({ ...prev, customBgUrl: bg }));
+      }
+    });
+  }, []);
+
+  // 跨日检测：当用户切回标签页或应用恢复可见时，自动检测北京时间跨日重置
+  useEffect(() => {
+    const handleCheckDayChange = () => {
+      const refreshed = loadRPGProfile();
+      setProfile(refreshed);
+    };
+    window.addEventListener('focus', handleCheckDayChange);
+    document.addEventListener('visibilitychange', handleCheckDayChange);
+    return () => {
+      window.removeEventListener('focus', handleCheckDayChange);
+      document.removeEventListener('visibilitychange', handleCheckDayChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -716,55 +773,10 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
             onClick={() => setShowLevelDetail((prev) => !prev)}
           />
 
-          {/* 猫爪金币胶囊（图片样式，移至等级右侧） */}
+          {/* 猫爪金币胶囊（现实存款 · 点击打开设置金库） */}
           <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '2px 8px 2px 2px',
-              borderRadius: '9999px',
-              background: '#FAF4E8',
-              border: '1.8px solid #502428',
-              boxShadow: '0 2px 4px rgba(80, 36, 40, 0.15)',
-              gap: '3px',
-              flexShrink: 0,
-            }}
-          >
-            <PawCoinIcon />
-            <span style={{ fontSize: '11px', fontWeight: 900, color: '#502428', letterSpacing: '-0.3px' }}>
-              {profile.gold.toLocaleString()}
-            </span>
-          </div>
-
-          {/* 粉红切面钻石胶囊（图片样式，移至等级右侧） */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '2px 8px 2px 2px',
-              borderRadius: '9999px',
-              background: '#FAF4E8',
-              border: '1.8px solid #502428',
-              boxShadow: '0 2px 4px rgba(80, 36, 40, 0.15)',
-              gap: '3px',
-              flexShrink: 0,
-            }}
-          >
-            <PinkGemIcon />
-            <span style={{ fontSize: '11px', fontWeight: 900, color: '#502428', letterSpacing: '-0.3px' }}>
-              {profile.crystals.toLocaleString()}
-            </span>
-          </div>
-
-          {/* 萌萌心形心情数值胶囊（对齐用户参考图，放置在钻石右侧） */}
-          <div
-            onClick={() => {
-              setProfile((prev) => {
-                const nextMood = Math.min(100, (prev.mood ?? 16) + 1);
-                return { ...prev, mood: nextMood };
-              });
-              showToast('心情良好');
-            }}
+            onClick={() => setShowVaultModal(true)}
+            title="现实存款 · 点击打开设置金库"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -776,12 +788,62 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
               gap: '3px',
               flexShrink: 0,
               cursor: 'pointer',
+              transition: 'transform 0.12s ease',
             }}
-            title="心情数值"
+            onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.94)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+          >
+            <PawCoinIcon />
+            <span style={{ fontSize: '11px', fontWeight: 900, color: '#502428', letterSpacing: '-0.3px' }}>
+              {profile.isPrivacyHidden ? '****' : profile.gold.toLocaleString()}
+            </span>
+          </div>
+
+          {/* 粉红切面钻石胶囊（自由天数 FIRE · 点击打开设置金库） */}
+          <div
+            onClick={() => setShowVaultModal(true)}
+            title="自由天数 (FIRE) · 点击打开设置金库"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '2px 8px 2px 2px',
+              borderRadius: '9999px',
+              background: '#FAF4E8',
+              border: '1.8px solid #502428',
+              boxShadow: '0 2px 4px rgba(80, 36, 40, 0.15)',
+              gap: '3px',
+              flexShrink: 0,
+              cursor: 'pointer',
+              transition: 'transform 0.12s ease',
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.94)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+          >
+            <PinkGemIcon />
+            <span style={{ fontSize: '11px', fontWeight: 900, color: '#502428', letterSpacing: '-0.3px' }}>
+              {calculateFreeDays(profile.gold, profile.dailyCost || 100, profile.crystals || 0).toLocaleString()}
+            </span>
+          </div>
+
+          {/* 萌萌心形心情数值胶囊（每天北京时间初始重置为 100，后续由系统联动） */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '2px 8px 2px 2px',
+              borderRadius: '9999px',
+              background: '#FAF4E8',
+              border: '1.8px solid #502428',
+              boxShadow: '0 2px 4px rgba(80, 36, 40, 0.15)',
+              gap: '3px',
+              flexShrink: 0,
+              userSelect: 'none',
+            }}
+            title="心情数值 · 每日初始为 100 (由生活与学习状态自动联动)"
           >
             <HeartMoodIcon />
             <span style={{ fontSize: '11px', fontWeight: 900, color: '#502428', letterSpacing: '-0.3px', minWidth: '14px', textAlign: 'center' }}>
-              {profile.mood ?? 16}
+              {profile.mood ?? 100}
             </span>
           </div>
         </div>
@@ -891,30 +953,10 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
                   <Heart size={11} />
                   今日体力
                 </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
                   <span style={{ fontWeight: 800, color: '#334257' }}>
                     {profile.hp} / {profile.maxHp}
                   </span>
-                  <button
-                    onClick={() => {
-                      setProfile((p) => ({ ...p, hp: Math.min(p.maxHp, p.hp + 20) }));
-                      showToast('体力 +20');
-                    }}
-                    className="nm-btn"
-                    style={{
-                      width: '14px',
-                      height: '14px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#059669',
-                      padding: 0,
-                      border: 'none',
-                    }}
-                  >
-                    <Plus size={9} />
-                  </button>
                 </div>
               </div>
               <div
@@ -948,30 +990,10 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
                   <Zap size={11} />
                   精神专注
                 </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
                   <span style={{ fontWeight: 800, color: '#334257' }}>
                     {profile.mp} / {profile.maxMp}
                   </span>
-                  <button
-                    onClick={() => {
-                      setProfile((p) => ({ ...p, mp: Math.min(p.maxMp, p.mp + 20) }));
-                      showToast('精力 +20');
-                    }}
-                    className="nm-btn"
-                    style={{
-                      width: '14px',
-                      height: '14px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#6366f1',
-                      padding: 0,
-                      border: 'none',
-                    }}
-                  >
-                    <Plus size={9} />
-                  </button>
                 </div>
               </div>
               <div
@@ -1008,8 +1030,25 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden',
+          backgroundImage: profile.customBgUrl ? `url(${profile.customBgUrl})` : undefined,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          transition: 'background 0.35s ease',
         }}
       >
+        {/* 自定义背景柔和氛围蒙层 */}
+        {profile.customBgUrl && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(180deg, rgba(233,238,245,0.2) 0%, rgba(33,48,71,0.15) 100%)',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+
         {/* 背景轻拟物柔和穹顶高光 */}
         <div
           style={{
@@ -1017,7 +1056,9 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
             width: '280px',
             height: '280px',
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(233, 238, 245, 0) 70%)',
+            background: profile.customBgUrl
+              ? 'radial-gradient(circle, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 70%)'
+              : 'radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(233, 238, 245, 0) 70%)',
             pointerEvents: 'none',
           }}
         />
@@ -1145,6 +1186,34 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
           更换立绘
         </button>
 
+        {/* 左上悬浮：宝箱按钮（对齐图1，位于更换立绘下方，点击进入活动日志） */}
+        <button
+          onClick={() => setShowActivityModal(true)}
+          className="nm-btn"
+          style={{
+            position: 'absolute',
+            top: '48px',
+            left: '12px',
+            borderRadius: '16px',
+            padding: '4px 10px 4px 6px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            fontSize: '11px',
+            fontWeight: 800,
+            color: '#334257',
+            zIndex: 25,
+            border: '1px solid rgba(255, 255, 255, 0.9)',
+            background: 'linear-gradient(145deg, #FFFFFF, #E2E8F0)',
+            boxShadow: '2px 2px 6px rgba(166, 180, 200, 0.35), -2px -2px 6px rgba(255, 255, 255, 0.95)',
+          }}
+          title="活动日志"
+        >
+          <ChestIcon size={22} />
+          活动日志
+        </button>
+
         {/* 界面右侧：立绘更换图标下方，新增亲缘看板图标（小木屋形态，对齐图1） */}
         <button
           onClick={() => setShowRelationshipModal(true)}
@@ -1224,6 +1293,33 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
           title="美食手账"
         >
           <MealDiaryIcon size={28} />
+        </button>
+
+        {/* 界面右侧：美食手账下方，新增半生手账图标（图2手绘太阳花/小雏菊形态） */}
+        <button
+          onClick={() => setShowLifeModal(true)}
+          className="nm-btn"
+          style={{
+            position: 'absolute',
+            top: '168px',
+            right: '12px',
+            width: '42px',
+            height: '42px',
+            borderRadius: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 25,
+            padding: 0,
+            border: '2px solid #502428',
+            background: 'linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 100%)',
+            boxShadow: '0 3px 0 #D97706, 0 4px 8px rgba(217, 119, 6, 0.22)',
+            transition: 'transform 0.15s ease',
+          }}
+          title="半生手账"
+        >
+          <LifeDaisyIcon size={28} />
         </button>
 
         {/* 左下角：当前职业标牌 */}
@@ -1326,8 +1422,9 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
         <AchievementSheet
           onClose={() => setActiveSheet(null)}
           onRewardCoins={(coins) => {
-            setProfile((prev) => ({ ...prev, gold: prev.gold + coins }));
-            showToast(`金币 +${coins}`);
+            const exp = coins * 2;
+            setProfile((prev) => ({ ...prev, currentExp: prev.currentExp + exp }));
+            showToast(`经验 +${exp}`);
           }}
         />
       )}
@@ -1361,11 +1458,72 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
       {showAvatarModal && (
         <AvatarUploadModal
           currentUrl={profile.customAvatarUrl}
+          currentBgUrl={profile.customBgUrl}
           onSave={(url) => {
             setProfile((p) => ({ ...p, customAvatarUrl: url }));
             showToast('立绘已更新');
           }}
+          onSaveBg={async (bgUrl) => {
+            if (bgUrl) {
+              await saveCustomBackground(bgUrl);
+              setProfile((p) => ({ ...p, customBgUrl: bgUrl }));
+              showToast('舞台背景已更新并存入 IndexedDB');
+            } else {
+              await deleteCustomBackground();
+              setProfile((p) => ({ ...p, customBgUrl: null }));
+              showToast('已恢复默认背景');
+            }
+          }}
           onClose={() => setShowAvatarModal(false)}
+        />
+      )}
+
+      {/* ================= 活动日志看板弹窗（对齐图2，宝箱进入） ================= */}
+      {showActivityModal && (
+        <ActivityLogModal
+          onClose={() => setShowActivityModal(false)}
+          onToast={showToast}
+          onOpenSignIn={() => setShowSignInModal(true)}
+          onOpenChallenge={() => setShowChallengeModal(true)}
+        />
+      )}
+
+      {/* ================= 七日签到弹窗（100% 临摹图1） ================= */}
+      {showSignInModal && (
+        <DailySignInModal
+          profile={profile}
+          onUpdateProfile={setProfile}
+          onClose={() => setShowSignInModal(false)}
+          onToast={showToast}
+        />
+      )}
+
+      {/* ================= 极限挑战挂历弹窗（100% 临摹挂历卡纸原型） ================= */}
+      {showChallengeModal && (
+        <ExtremeChallengeModal
+          profile={profile}
+          onUpdateProfile={setProfile}
+          onClose={() => setShowChallengeModal(false)}
+          onToast={showToast}
+        />
+      )}
+
+      {/* ================= 昨日修行业报每日结算弹窗 ================= */}
+      {profile.pendingDailySettlement && (
+        <DailySettlementModal
+          snapshot={profile.pendingDailySettlement}
+          onClaim={() => {
+            const settlement = profile.pendingDailySettlement;
+            if (!settlement) return;
+            const updated = applyDailySettlement(profile, settlement);
+            setProfile(updated);
+            saveRPGProfile(updated);
+            showToast(
+              settlement.leveledUp
+                ? `🎉 恭喜升级至 Lv. ${settlement.newLevel}！属性上限已提升！`
+                : `✨ 昨日修行业报已结算，获得 +${settlement.totalExpEarned} EXP！`
+            );
+          }}
         />
       )}
 
@@ -1379,21 +1537,21 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
         <QuestStageSheet
           currentJobName={currentClass.title}
           onRewardCoins={(coins) => {
-            setProfile((p) => ({ ...p, gold: p.gold + coins }));
-            showToast(`金币 +${coins}`);
+            const exp = coins * 2;
+            setProfile((p) => ({ ...p, currentExp: p.currentExp + exp }));
+            showToast(`经验 +${exp}`);
           }}
           onRewardExp={(exp) => {
             setProfile((p) => {
-              const nextExp = p.currentExp + exp;
-              if (nextExp >= p.maxExp) {
-                return {
-                  ...p,
-                  level: p.level + 1,
-                  currentExp: nextExp - p.maxExp,
-                  maxExp: Math.round(p.maxExp * 1.5),
-                };
+              let curExp = p.currentExp + exp;
+              let curLevel = p.level;
+              let curMaxExp = getMaxExpForLevel(curLevel);
+              while (curExp >= curMaxExp) {
+                curExp -= curMaxExp;
+                curLevel += 1;
+                curMaxExp = getMaxExpForLevel(curLevel);
               }
-              return { ...p, currentExp: nextExp };
+              return { ...p, level: curLevel, currentExp: curExp, maxExp: curMaxExp };
             });
             showToast(`经验 +${exp}`);
           }}
@@ -1414,6 +1572,21 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
             setProfile((prev) => ({ ...prev, ...updated }));
           }}
           onClose={() => setShowDossierModal(false)}
+        />
+      )}
+
+      {/* ================= 9. 半生手账回忆录（点击右侧小雏菊唤起，对齐图1双孔票据卡片） ================= */}
+      {showLifeModal && (
+        <LifeJourneySheet onClose={() => setShowLifeModal(false)} />
+      )}
+
+      {/* ================= 10. 设定与金库猫咪弹窗 (点击金币/钻石唤起，精确对齐用户参考图) ================= */}
+      {showVaultModal && (
+        <SettingsVaultModal
+          profile={profile}
+          onUpdateProfile={(updater) => setProfile(updater)}
+          onClose={() => setShowVaultModal(false)}
+          showToast={showToast}
         />
       )}
     </div>

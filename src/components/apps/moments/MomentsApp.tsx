@@ -15,6 +15,7 @@ import {
   deleteMomentFromDB,
   loadBannerUrlFromDB,
   saveBannerUrlToDB,
+  rewardMomentPublishToRPG,
 } from '../../../core/moments/momentsStorage';
 import { MomentCard } from './components/MomentCard';
 import { PublishMomentSheet } from './components/PublishMomentSheet';
@@ -27,6 +28,8 @@ interface MomentsAppProps {
 export const MomentsApp: React.FC<MomentsAppProps> = ({ onBack }) => {
   // 分类 Tab：全部 (Character) vs 星标 (Collection)
   const [activeTab, setActiveTab] = useState<'all' | 'starred'>('all');
+  // 主题木标点击筛选状态 (null 表示不过滤木标)
+  const [selectedThemeFilter, setSelectedThemeFilter] = useState<string | null>(null);
 
   // 动态列表
   const [moments, setMoments] = useState<MomentItem[]>([]);
@@ -83,9 +86,15 @@ export const MomentsApp: React.FC<MomentsAppProps> = ({ onBack }) => {
   // 发布新动态
   const handlePublishMoment = async (newMoment: MomentItem) => {
     await saveMomentToDB(newMoment);
+    const reward = rewardMomentPublishToRPG(newMoment.attributeTag || 'SPI');
     setMoments((prev) => [newMoment, ...prev]);
     setShowPublishModal(false);
-    showToast('发布成功！+5000金币');
+    showToast(`发布成功！获得 ${reward.message}`);
+  };
+
+  // 点击卡片木标切换筛选
+  const handleSelectTheme = (theme: string) => {
+    setSelectedThemeFilter((prev) => (prev === theme ? null : theme));
   };
 
   // 保存背景
@@ -95,11 +104,17 @@ export const MomentsApp: React.FC<MomentsAppProps> = ({ onBack }) => {
     showToast('背景已保存');
   };
 
-  // 过滤当前列表
-  const displayedMoments =
+  // 过滤当前列表（星标 + 主题木标双重筛选）
+  let displayedMoments =
     activeTab === 'starred'
       ? moments.filter((m) => m.isStarred)
       : moments;
+
+  if (selectedThemeFilter) {
+    displayedMoments = displayedMoments.filter(
+      (m) => (m.themeTitle || '生活碎念') === selectedThemeFilter
+    );
+  }
 
   return (
     <div
@@ -383,6 +398,58 @@ export const MomentsApp: React.FC<MomentsAppProps> = ({ onBack }) => {
           boxSizing: 'border-box',
         }}
       >
+        {/* 当前主题木标筛选指示浮条 */}
+        {selectedThemeFilter && (
+          <div
+            style={{
+              padding: '6px 12px',
+              marginBottom: '12px',
+              borderRadius: '12px',
+              background: 'linear-gradient(180deg, #FDE68A 0%, #F59E0B 100%)',
+              border: '2px solid #502428',
+              boxShadow: '0 2.5px 0 #B45309',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              animation: 'fadeIn 0.15s ease-out',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '14px' }}>🪵</span>
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 900,
+                  color: '#502428',
+                  fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", sans-serif',
+                }}
+              >
+                木标筛选：{selectedThemeFilter} ({displayedMoments.length} 条)
+              </span>
+            </div>
+            <button
+              onClick={() => setSelectedThemeFilter(null)}
+              style={{
+                background: '#FFFFFF',
+                border: '1.5px solid #502428',
+                borderRadius: '8px',
+                padding: '2px 8px',
+                fontSize: '10.5px',
+                fontWeight: 900,
+                color: '#502428',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+                boxShadow: '0 1px 0 #502428',
+              }}
+            >
+              <span>清除</span>
+              <span>✕</span>
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div
             style={{
@@ -433,8 +500,30 @@ export const MomentsApp: React.FC<MomentsAppProps> = ({ onBack }) => {
                 fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", sans-serif',
               }}
             >
-              {activeTab === 'starred' ? '暂无星标碎碎念' : '快来写下第一条碎碎念吧～'}
+              {selectedThemeFilter
+                ? `木标「${selectedThemeFilter}」下暂无碎碎念`
+                : activeTab === 'starred'
+                ? '暂无星标碎碎念'
+                : '快来写下第一条碎碎念吧～'}
             </span>
+            {selectedThemeFilter && (
+              <button
+                onClick={() => setSelectedThemeFilter(null)}
+                style={{
+                  background: '#F59E0B',
+                  border: '1.5px solid #502428',
+                  borderRadius: '10px',
+                  padding: '4px 12px',
+                  color: '#502428',
+                  fontSize: '11px',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  boxShadow: '0 1.5px 0 #B45309',
+                }}
+              >
+                查看全部动态
+              </button>
+            )}
           </div>
         ) : (
           displayedMoments.map((moment) => (
@@ -444,6 +533,7 @@ export const MomentsApp: React.FC<MomentsAppProps> = ({ onBack }) => {
               onToggleStar={handleToggleStar}
               onDelete={handleDeleteMoment}
               onPreviewImage={(url) => setPreviewImageUrl(url)}
+              onSelectTheme={handleSelectTheme}
             />
           ))
         )}

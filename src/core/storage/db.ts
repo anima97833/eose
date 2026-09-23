@@ -143,6 +143,38 @@ export interface RPGDossierRecord {
   updatedAt: number;
 }
 
+export interface RPGLifeStoryRecord {
+  id: string;
+  title: string; // 主标题，如 "11岁 - 蓝天学校"
+  age: number; // 年龄数值，用于排序与阶段过滤
+  year?: string; // 自定义时间年份，如 "2015" 或 "1998年秋"
+  location?: string; // 地点
+  content: string; // 具体事项，如 "被罚站一天，中暑晕倒"
+  tag?: string; // 标签，如 "罚站中暑"、"初遇"、"高光"
+  moodTag?: string; // 心情/情感标签，如 "尴尬"、"感动"、"难忘"、"委屈"
+  imageData?: string; // 用户自定义上传的照片 Base64
+  badgeKey?: string; // 预设萌系插画标识 (如 'cat', 'school', 'bicycle', 'sun', 'medal', 'icecream', 'book', 'hospital')
+  stage?: 'childhood' | 'youth' | 'adult' | 'later'; // 人生阶段
+  ticketColor: 'yellow' | 'pink'; // 对应图1交替的暖黄与粉红卡片
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface RPGBackgroundImageRecord {
+  id: string; // e.g. 'stage_background'
+  dataUrl: string;
+  updatedAt: number;
+}
+
+export interface RPGActivityBannerRecord {
+  id: string; // 'signin_7d' | 'extreme_challenge' | 'activity_1' | 'activity_2'
+  title: string;
+  subtitle?: string;
+  themeColor?: string;
+  customBgUrl: string | null;
+  updatedAt: number;
+}
+
 export class NeumorphicPhoneDatabase extends Dexie {
   characters!: Table<CharacterProfile, string>;
   messages!: Table<ChatMessageItem, string>;
@@ -170,6 +202,9 @@ export class NeumorphicPhoneDatabase extends Dexie {
   storyword_novels!: Table<StoryNovel, string>;
   storyword_mistakes!: Table<StoryWordMistake, string>;
   storyword_sources!: Table<BookSourceRule, string>;
+  rpg_life_stories!: Table<RPGLifeStoryRecord, string>;
+  rpg_background_images!: Table<RPGBackgroundImageRecord, string>;
+  rpg_activity_banners!: Table<RPGActivityBannerRecord, string>;
 
   constructor() {
     super('NeumorphicAIDatabase');
@@ -467,6 +502,99 @@ export class NeumorphicPhoneDatabase extends Dexie {
       storyword_novels: 'id, title, author, sourceId, currentChapterIndex, updatedAt',
       storyword_mistakes: 'id, word, level, wrongCount, mastered, lastTestedAt',
       storyword_sources: 'id, name, isEnabled, isBuiltin',
+    });
+
+    this.version(19).stores({
+      characters: 'id, name, status',
+      messages: 'id, characterId, timestamp',
+      settings: 'key',
+      memory_books: 'id, title, characterName, createdAt, shelfTier',
+      pomodoro_sessions: 'id, taskId, category, mode, isCompleted, completedAt',
+      pomodoro_tasks: 'id, category, isCompleted, createdAt',
+      browser_history: 'id, url, visitedAt',
+      browser_bookmarks: 'id, title, url, createdAt',
+      browser_shortcuts: 'id, title, url, createdAt',
+      rpg_item_images: 'id, updatedAt',
+      rpg_skill_images: 'id, updatedAt',
+      rpg_attribute_images: 'id, updatedAt',
+      rpg_class_images: 'id, updatedAt',
+      rpg_meal_records: 'id, date, mealType, rating, updatedAt',
+      rpg_dossier: 'id, updatedAt',
+      moments_items: 'id, isStarred, createdAt',
+      moments_config: 'key',
+      memo_categories: 'id, order, createdAt',
+      memo_chapters: 'id, categoryId, updatedAt',
+      swf_games: 'id, title, createdAt, lastPlayedAt',
+      movies: 'id, title, status, year, rating, watchedDate, createdAt',
+      poems: 'id, title, author, dynasty, status, isFavorite, quizPassCount, createdAt',
+      books: 'id, isbn, title, author, status, physicalLocation, category, createdAt',
+      storyword_novels: 'id, title, author, sourceId, currentChapterIndex, updatedAt',
+      storyword_mistakes: 'id, word, level, wrongCount, mastered, lastTestedAt',
+      storyword_sources: 'id, name, isEnabled, isBuiltin',
+      rpg_life_stories: 'id, age, year, stage, createdAt, updatedAt',
+    });
+
+    this.version(20).stores({
+      characters: 'id, name, status',
+      messages: 'id, characterId, timestamp',
+      settings: 'key',
+      memory_books: 'id, title, characterName, createdAt, shelfTier',
+      pomodoro_sessions: 'id, taskId, category, mode, isCompleted, completedAt',
+      pomodoro_tasks: 'id, category, isCompleted, createdAt',
+      browser_history: 'id, url, visitedAt',
+      browser_bookmarks: 'id, title, url, createdAt',
+      browser_shortcuts: 'id, title, url, createdAt',
+      rpg_item_images: 'id, updatedAt',
+      rpg_skill_images: 'id, updatedAt',
+      rpg_attribute_images: 'id, updatedAt',
+      rpg_class_images: 'id, updatedAt',
+      rpg_meal_records: 'id, date, mealType, rating, updatedAt',
+      rpg_dossier: 'id, updatedAt',
+      moments_items: 'id, isStarred, createdAt',
+      moments_config: 'key',
+      memo_categories: 'id, order, createdAt',
+      memo_chapters: 'id, categoryId, updatedAt',
+      swf_games: 'id, title, createdAt, lastPlayedAt',
+      movies: 'id, title, status, year, rating, watchedDate, createdAt',
+      poems: 'id, title, author, dynasty, status, isFavorite, quizPassCount, createdAt',
+      books: 'id, isbn, title, author, status, physicalLocation, category, createdAt',
+      storyword_novels: 'id, title, author, sourceId, currentChapterIndex, updatedAt',
+      storyword_mistakes: 'id, word, level, wrongCount, mastered, lastTestedAt',
+      storyword_sources: 'id, name, isEnabled, isBuiltin',
+      rpg_life_stories: 'id, age, year, stage, createdAt, updatedAt',
+      rpg_background_images: 'id, updatedAt',
+    });
+
+    this.version(21).stores({
+      characters: 'id, name, status',
+      messages: 'id, characterId, timestamp',
+      settings: 'key',
+      memory_books: 'id, title, characterName, createdAt, shelfTier',
+      pomodoro_sessions: 'id, taskId, category, mode, isCompleted, completedAt',
+      pomodoro_tasks: 'id, category, isCompleted, createdAt',
+      browser_history: 'id, url, visitedAt',
+      browser_bookmarks: 'id, title, url, createdAt',
+      browser_shortcuts: 'id, title, url, createdAt',
+      rpg_item_images: 'id, updatedAt',
+      rpg_skill_images: 'id, updatedAt',
+      rpg_attribute_images: 'id, updatedAt',
+      rpg_class_images: 'id, updatedAt',
+      rpg_meal_records: 'id, date, mealType, rating, updatedAt',
+      rpg_dossier: 'id, updatedAt',
+      moments_items: 'id, isStarred, createdAt',
+      moments_config: 'key',
+      memo_categories: 'id, order, createdAt',
+      memo_chapters: 'id, categoryId, updatedAt',
+      swf_games: 'id, title, createdAt, lastPlayedAt',
+      movies: 'id, title, status, year, rating, watchedDate, createdAt',
+      poems: 'id, title, author, dynasty, status, isFavorite, quizPassCount, createdAt',
+      books: 'id, isbn, title, author, status, physicalLocation, category, createdAt',
+      storyword_novels: 'id, title, author, sourceId, currentChapterIndex, updatedAt',
+      storyword_mistakes: 'id, word, level, wrongCount, mastered, lastTestedAt',
+      storyword_sources: 'id, name, isEnabled, isBuiltin',
+      rpg_life_stories: 'id, age, year, stage, createdAt, updatedAt',
+      rpg_background_images: 'id, updatedAt',
+      rpg_activity_banners: 'id, updatedAt',
     });
   }
 }

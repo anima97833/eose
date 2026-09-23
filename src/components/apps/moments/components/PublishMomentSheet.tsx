@@ -1,27 +1,67 @@
-import React, { useState } from 'react';
-import { X, Plus, Image as ImageIcon, Trash2, Sparkles } from 'lucide-react';
-import { MomentItem } from '../../../../core/moments/momentsTypes';
+import React, { useState, useEffect } from 'react';
+import { X, Plus, Image as ImageIcon, Trash2, Sparkles, Check } from 'lucide-react';
+import { MomentItem, MomentAttributeTag } from '../../../../core/moments/momentsTypes';
+import {
+  PRESET_THEMES,
+  getCustomThemes,
+  saveCustomTheme,
+  deleteCustomTheme,
+  MOMENT_ATTR_INFO,
+} from '../../../../core/moments/momentsStorage';
 
 interface PublishMomentSheetProps {
   onPublish: (moment: MomentItem) => void;
   onClose: () => void;
 }
 
-const THEME_OPTIONS = [
-  '今日碎碎念',
-  '晨间随想',
-  '生活瞬间',
-  '灵感火花',
-  '深夜低语',
-];
-
 export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
   onPublish,
   onClose,
 }) => {
+  const [customThemes, setCustomThemes] = useState<string[]>([]);
   const [themeTitle, setThemeTitle] = useState('今日碎碎念');
+  const [selectedAttr, setSelectedAttr] = useState<MomentAttributeTag>('CHA');
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [customInput, setCustomInput] = useState('');
   const [content, setContent] = useState('');
   const [images, setImages] = useState<string[]>([]);
+
+  useEffect(() => {
+    setCustomThemes(getCustomThemes());
+  }, []);
+
+  // 根据选择的木标自动建议六维属性
+  const handleSelectTheme = (t: string) => {
+    setThemeTitle(t);
+    if (t.includes('晨') || t.includes('生活') || t.includes('运动')) {
+      setSelectedAttr('CON');
+    } else if (t.includes('灵感') || t.includes('思') || t.includes('学') || t.includes('书')) {
+      setSelectedAttr('INT');
+    } else if (t.includes('夜') || t.includes('冥想') || t.includes('随想')) {
+      setSelectedAttr('SPI');
+    } else if (t.includes('碎碎念') || t.includes('聊') || t.includes('聚')) {
+      setSelectedAttr('CHA');
+    }
+  };
+
+  const handleAddCustomTheme = () => {
+    const trimmed = customInput.trim();
+    if (!trimmed) return;
+    const updated = saveCustomTheme(trimmed);
+    setCustomThemes(updated);
+    setThemeTitle(trimmed);
+    setCustomInput('');
+    setIsAddingCustom(false);
+  };
+
+  const handleDeleteCustom = (e: React.MouseEvent, t: string) => {
+    e.stopPropagation();
+    const updated = deleteCustomTheme(t);
+    setCustomThemes(updated);
+    if (themeTitle === t) {
+      setThemeTitle('今日碎碎念');
+    }
+  };
 
   // 多图上传转 Base64，准备存入 IndexedDB
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,11 +101,13 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
     ).padStart(2, '0')}`;
 
     const newMoment: MomentItem = {
-      id: `moment_${Date.now()}`,
-      themeTitle,
+      id: `moment_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      themeTitle: themeTitle || '生活瞬间',
       content: content.trim(),
       images,
-      rewardCoins: 5000,
+      attributeTag: selectedAttr,
+      attributeGain: 2,
+      rewardCoins: 50,
       isStarred: false,
       createdAt: Date.now(),
       dateStr,
@@ -74,40 +116,41 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
     onPublish(newMoment);
   };
 
+  const allThemes = [...PRESET_THEMES, ...customThemes];
+  const activeAttrInfo = MOMENT_ATTR_INFO[selectedAttr] || MOMENT_ATTR_INFO.SPI;
+
   return (
     <div
       style={{
-        position: 'absolute',
+        position: 'fixed',
         inset: 0,
-        zIndex: 90,
-        background: 'rgba(25, 20, 20, 0.55)',
-        backdropFilter: 'blur(6px)',
+        backgroundColor: 'rgba(54, 46, 34, 0.65)',
+        backdropFilter: 'blur(4px)',
+        zIndex: 100,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '16px',
-        boxSizing: 'border-box',
         animation: 'fadeIn 0.2s ease-out',
       }}
-      onClick={onClose}
     >
-      {/* 弹层卡片 */}
+      {/* 弹窗卷轴本体 */}
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: '340px',
-          background: '#FFFDF7',
-          border: '3px solid #502428',
-          borderRadius: '24px',
-          boxShadow: '0 10px 28px rgba(80, 36, 40, 0.35)',
-          overflow: 'hidden',
+          maxWidth: '380px',
+          maxHeight: '90vh',
+          backgroundColor: '#FAF5EB',
+          border: '2.5px solid #502428',
+          borderRadius: '22px',
+          boxShadow: '0 8px 0 #502428',
           display: 'flex',
           flexDirection: 'column',
+          overflow: 'hidden',
           boxSizing: 'border-box',
         }}
       >
-        {/* 顶部木质标题栏 */}
+        {/* 顶部木板抬头 */}
         <div
           style={{
             background: 'linear-gradient(180deg, #F5BA38 0%, #D97706 100%)',
@@ -118,25 +161,29 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
             justifyContent: 'space-between',
           }}
         >
-          <span
-            style={{
-              fontSize: '15px',
-              fontWeight: 900,
-              color: '#FFFFFF',
-              fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", sans-serif',
-              textShadow: '1px 1px 0 #502428, -1px -1px 0 #502428, 1px -1px 0 #502428, -1px 1px 0 #502428',
-            }}
-          >
-            写碎碎念
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '16px' }}>🪵</span>
+            <span
+              style={{
+                fontSize: '15px',
+                fontWeight: 900,
+                color: '#FFFFFF',
+                textShadow: '1px 1px 0 #502428, -1px -1px 0 #502428, 1px -1px 0 #502428, -1px 1px 0 #502428',
+                fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", sans-serif',
+              }}
+            >
+              写一段生活碎碎念
+            </span>
+          </div>
+
           <button
             onClick={onClose}
             style={{
-              width: '24px',
-              height: '24px',
-              borderRadius: '50%',
-              background: '#FAF4E8',
+              background: '#FFFFFF',
               border: '2px solid #502428',
+              borderRadius: '50%',
+              width: '26px',
+              height: '26px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -149,26 +196,122 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
         </div>
 
         {/* 内容输入体 */}
-        <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {/* 主题标签选择器 */}
+        <div
+          style={{
+            padding: '12px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            overflowY: 'auto',
+          }}
+        >
+          {/* 主题木标选择器 */}
           <div>
             <div
               style={{
-                fontSize: '11px',
-                fontWeight: 900,
-                color: '#87470E',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 marginBottom: '5px',
               }}
             >
-              选择主题木标
+              <div style={{ fontSize: '11px', fontWeight: 900, color: '#87470E' }}>
+                选择或自定义主题木标
+              </div>
+              {!isAddingCustom && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCustom(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#D97706',
+                    fontSize: '10.5px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px',
+                    padding: '2px 4px',
+                  }}
+                >
+                  <Plus size={12} />
+                  <span>新建木标</span>
+                </button>
+              )}
             </div>
+
+            {/* 新建木标内联输入行 */}
+            {isAddingCustom && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  marginBottom: '8px',
+                  padding: '4px 6px',
+                  borderRadius: '8px',
+                  backgroundColor: '#FFFBEB',
+                  border: '1.5px dashed #D97706',
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="新木标名称(<=6字)"
+                  maxLength={6}
+                  value={customInput}
+                  onChange={(e) => setCustomInput(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid #502428',
+                    fontSize: '11px',
+                    outline: 'none',
+                    color: '#502428',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCustomTheme}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    backgroundColor: '#F59E0B',
+                    color: '#502428',
+                    border: '1.5px solid #502428',
+                    fontSize: '10.5px',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                  }}
+                >
+                  添加
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCustom(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#78350F',
+                    fontSize: '10.5px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  取消
+                </button>
+              </div>
+            )}
+
+            {/* 木标标签徽章列表 */}
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {THEME_OPTIONS.map((t) => {
+              {allThemes.map((t) => {
                 const isSelected = themeTitle === t;
+                const isCustom = customThemes.includes(t);
                 return (
-                  <button
+                  <div
                     key={t}
-                    onClick={() => setThemeTitle(t)}
+                    onClick={() => handleSelectTheme(t)}
                     style={{
                       padding: '3px 8px',
                       borderRadius: '8px',
@@ -180,9 +323,66 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
                       color: isSelected ? '#502428' : '#78350F',
                       boxShadow: isSelected ? '0 2px 0 #B45309' : '0 1.5px 0 #502428',
                       transition: 'all 0.1s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
                     }}
                   >
-                    {t}
+                    <span>{t}</span>
+                    {isCustom && (
+                      <span
+                        onClick={(e) => handleDeleteCustom(e, t)}
+                        title="删除自定义木标"
+                        style={{
+                          fontSize: '10px',
+                          color: '#EF4444',
+                          marginLeft: '2px',
+                          padding: '0 2px',
+                          fontWeight: 900,
+                        }}
+                      >
+                        ✕
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 六维心境成长赋能 (方向 B) */}
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 900, color: '#87470E', marginBottom: '5px' }}>
+              修行成长归属 (发布获得对应六维 +2)
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+              {(['SPI', 'CHA', 'INT', 'CON', 'DEX', 'STR'] as MomentAttributeTag[]).map((tagKey) => {
+                const info = MOMENT_ATTR_INFO[tagKey];
+                const isSel = selectedAttr === tagKey;
+                return (
+                  <button
+                    key={tagKey}
+                    type="button"
+                    onClick={() => setSelectedAttr(tagKey)}
+                    style={{
+                      padding: '4px 6px',
+                      borderRadius: '8px',
+                      border: isSel ? `2px solid ${info.color}` : '1.5px solid #D8C7A5',
+                      backgroundColor: isSel ? info.bg : '#FFFFFF',
+                      color: isSel ? info.color : '#78350F',
+                      fontSize: '11px',
+                      fontWeight: isSel ? 900 : 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '3px',
+                      boxShadow: isSel ? `0 1.5px 0 ${info.color}` : 'none',
+                    }}
+                  >
+                    <span>{info.icon}</span>
+                    <span>{info.name}</span>
+                    {isSel && <Check size={11} strokeWidth={3} />}
                   </button>
                 );
               })}
@@ -193,7 +393,7 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
           <div
             style={{
               width: '100%',
-              height: '96px',
+              height: '92px',
               background: '#FFFFFF',
               border: '2px solid #502428',
               borderRadius: '12px',
@@ -218,53 +418,49 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
                 fontWeight: 600,
                 color: '#451A03',
                 padding: 0,
-                fontFamily: 'inherit',
+                boxSizing: 'border-box',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               }}
             />
           </div>
 
-          {/* 图片上传区域 */}
+          {/* 图片预览与添加区域 */}
           <div>
-            <div
-              style={{
-                fontSize: '11px',
-                fontWeight: 900,
-                color: '#87470E',
-                marginBottom: '5px',
-                display: 'flex',
-                justifyContent: 'space-between',
-              }}
-            >
-              <span>生活照片（保存在本地）</span>
-              <span style={{ fontSize: '10px', color: '#9C7A5B' }}>{images.length}/6 张</span>
+            <div style={{ fontSize: '11px', fontWeight: 900, color: '#87470E', marginBottom: '5px' }}>
+              生活相片 (树桩展台相框)
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+              {/* 已选图片展示 */}
               {images.map((img, idx) => (
                 <div
                   key={idx}
                   style={{
                     position: 'relative',
-                    width: '54px',
-                    height: '54px',
+                    width: '56px',
+                    height: '56px',
                     borderRadius: '10px',
-                    border: '1.8px solid #502428',
+                    border: '2px solid #502428',
                     overflow: 'hidden',
+                    flexShrink: 0,
                   }}
                 >
-                  <img src={img} alt="预览" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img
+                    src={img}
+                    alt="preview"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
                   <button
                     onClick={() => handleRemoveImage(idx)}
                     style={{
                       position: 'absolute',
                       top: '2px',
                       right: '2px',
-                      width: '18px',
-                      height: '18px',
-                      borderRadius: '50%',
                       background: 'rgba(80, 36, 40, 0.85)',
                       border: 'none',
-                      color: '#FFFFFF',
+                      borderRadius: '50%',
+                      width: '16px',
+                      height: '16px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -272,43 +468,40 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
                       padding: 0,
                     }}
                   >
-                    <X size={11} />
+                    <X size={10} color="#FFFFFF" strokeWidth={3} />
                   </button>
                 </div>
               ))}
 
-              {images.length < 6 && (
-                <label
-                  style={{
-                    width: '54px',
-                    height: '54px',
-                    borderRadius: '10px',
-                    border: '1.8px dashed #87470E',
-                    background: '#FAF6EE',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: '#87470E',
-                    gap: '2px',
-                  }}
-                  title="上传图片"
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    style={{ display: 'none' }}
-                    onClick={(e) => {
-                      (e.target as HTMLInputElement).value = '';
-                    }}
-                    onChange={handleFileChange}
-                  />
-                  <Plus size={18} strokeWidth={2.5} />
-                  <span style={{ fontSize: '9px', fontWeight: 800 }}>传图</span>
-                </label>
-              )}
+              {/* 上传按钮 */}
+              <label
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '10px',
+                  border: '2px dashed #87470E',
+                  background: '#F5EFE6',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  boxSizing: 'border-box',
+                }}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                />
+                <ImageIcon size={18} color="#87470E" />
+                <span style={{ fontSize: '9px', fontWeight: 900, color: '#87470E', marginTop: '2px' }}>
+                  传照片
+                </span>
+              </label>
             </div>
           </div>
         </div>
@@ -316,10 +509,11 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
         {/* 底部按钮栏 */}
         <div
           style={{
-            padding: '8px 14px 14px',
+            padding: '10px 14px',
+            borderTop: '2px solid #E6DCCD',
             display: 'flex',
-            gap: '10px',
-            borderTop: '1px solid #F3EFE6',
+            gap: '8px',
+            backgroundColor: '#F3EFE6',
           }}
         >
           <button
@@ -328,10 +522,11 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
               flex: 1,
               height: '36px',
               borderRadius: '12px',
-              background: '#F3EFE6',
+              background: '#FFFFFF',
               border: '2px solid #502428',
+              boxShadow: '0 2px 0 #502428',
               fontSize: '12px',
-              fontWeight: 900,
+              fontWeight: 800,
               color: '#502428',
               cursor: 'pointer',
             }}
@@ -347,7 +542,7 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
               background: 'linear-gradient(180deg, #FDE047 0%, #F59E0B 100%)',
               border: '2px solid #502428',
               boxShadow: '0 2.5px 0 #B45309',
-              fontSize: '13px',
+              fontSize: '12.5px',
               fontWeight: 900,
               color: '#502428',
               display: 'flex',
@@ -358,7 +553,7 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
             }}
           >
             <Sparkles size={14} color="#87470E" />
-            <span>发布 (+5000)</span>
+            <span>发布 (+{activeAttrInfo.name} +2)</span>
           </button>
         </div>
       </div>

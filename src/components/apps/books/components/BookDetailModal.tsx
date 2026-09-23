@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, MapPin, Star, Trash2, Check, BookOpen, Clock, Plus } from 'lucide-react';
+import { X, MapPin, Star, Trash2, Check, BookOpen, Clock, Plus, Pencil, CheckCircle } from 'lucide-react';
 import { PhysicalBookRecord, ReadingStatus } from '../../../../core/books/bookTypes';
 import {
   getSavedPhysicalLocations,
@@ -25,6 +25,14 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   onSave,
   onDelete,
 }) => {
+  // 可编辑基本信息
+  const [title, setTitle] = useState<string>(book.title || '');
+  const [author, setAuthor] = useState<string>(book.author || '');
+  const [publisher, setPublisher] = useState<string>(book.publisher || '');
+  const [price, setPrice] = useState<string>(book.price || '¥39.00');
+  const [category, setCategory] = useState<string>(book.category || '藏书');
+  const [isEditingInfo, setIsEditingInfo] = useState<boolean>(false);
+
   const [currentPage, setCurrentPage] = useState<number>(book.currentPage || 0);
   const [pageCount, setPageCount] = useState<number>(book.pageCount || 280);
   const [status, setStatus] = useState<ReadingStatus>(book.status || 'unread');
@@ -79,8 +87,19 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   };
 
   const handleSaveAll = () => {
+    const cleanPrice = price.trim()
+      ? price.trim().startsWith('¥')
+        ? price.trim()
+        : `¥${price.trim()}`
+      : book.price || '¥39.00';
+
     const updated: PhysicalBookRecord = {
       ...book,
+      title: title.trim() || book.title,
+      author: author.trim() || book.author,
+      publisher: publisher.trim() || book.publisher,
+      price: cleanPrice,
+      category: category.trim() || book.category,
       currentPage,
       pageCount,
       status,
@@ -259,34 +278,188 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
             </div>
 
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: '1.16rem',
-                  fontWeight: 800,
-                  color: NM.textMain,
-                  lineHeight: 1.3,
-                }}
-              >
-                {book.title}
-              </h2>
-              {book.subtitle && (
-                <div style={{ fontSize: '0.78rem', color: NM.textSub, marginTop: 2 }}>
-                  {book.subtitle}
-                </div>
-              )}
+              {!isEditingInfo ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+                    <h2
+                      style={{
+                        margin: 0,
+                        fontSize: '1.16rem',
+                        fontWeight: 800,
+                        color: NM.textMain,
+                        lineHeight: 1.3,
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {title || book.title}
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingInfo(true)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        padding: '3px 7px',
+                        borderRadius: 8,
+                        border: NM.borderLight,
+                        backgroundColor: NM.cardBg,
+                        boxShadow: NM.convexXs,
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        color: NM.primary,
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                      title="修改书名、作者与定价"
+                    >
+                      <Pencil size={10} />
+                      <span>改名/改价</span>
+                    </button>
+                  </div>
 
-              <div style={{ fontSize: '0.84rem', color: NM.textSub, marginTop: 6, fontWeight: 600 }}>
-                {book.author} 著
-              </div>
+                  {book.subtitle && (
+                    <div style={{ fontSize: '0.78rem', color: NM.textSub, marginTop: 2 }}>
+                      {book.subtitle}
+                    </div>
+                  )}
 
-              <div style={{ fontSize: '0.78rem', color: NM.textMuted, marginTop: 2 }}>
-                {book.publisher} {book.pubDate ? `· ${book.pubDate}` : ''}
-              </div>
+                  <div style={{ fontSize: '0.84rem', color: NM.textSub, marginTop: 6, fontWeight: 600 }}>
+                    {author || book.author} 著
+                  </div>
 
-              {book.price && (
-                <div style={{ fontSize: '0.84rem', color: NM.primaryDark, marginTop: 4, fontWeight: 700 }}>
-                  定价：{book.price}
+                  <div style={{ fontSize: '0.78rem', color: NM.textMuted, marginTop: 2 }}>
+                    {publisher || book.publisher} {book.pubDate ? `· ${book.pubDate}` : ''}
+                  </div>
+
+                  <div style={{ fontSize: '0.84rem', color: NM.primaryDark, marginTop: 4, fontWeight: 700 }}>
+                    定价：{price || book.price || '¥39.00'}
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: NM.textSub, marginBottom: 2 }}>
+                      书名
+                    </label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="修改书名"
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '5px 8px',
+                        borderRadius: 8,
+                        border: NM.borderSoft,
+                        backgroundColor: NM.bgInset,
+                        boxShadow: NM.insetXs,
+                        fontSize: '0.86rem',
+                        fontWeight: 700,
+                        color: NM.textMain,
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: NM.textSub, marginBottom: 2 }}>
+                        作者
+                      </label>
+                      <input
+                        type="text"
+                        value={author}
+                        onChange={(e) => setAuthor(e.target.value)}
+                        placeholder="作者"
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '5px 8px',
+                          borderRadius: 8,
+                          border: NM.borderSoft,
+                          backgroundColor: NM.bgInset,
+                          boxShadow: NM.insetXs,
+                          fontSize: '0.78rem',
+                          color: NM.textMain,
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: NM.textSub, marginBottom: 2 }}>
+                        出版社
+                      </label>
+                      <input
+                        type="text"
+                        value={publisher}
+                        onChange={(e) => setPublisher(e.target.value)}
+                        placeholder="出版社"
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '5px 8px',
+                          borderRadius: 8,
+                          border: NM.borderSoft,
+                          backgroundColor: NM.bgInset,
+                          boxShadow: NM.insetXs,
+                          fontSize: '0.78rem',
+                          color: NM.textMain,
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 价格/定价编辑 */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: NM.textSub, marginBottom: 2 }}>
+                      定价 / 藏书估值
+                    </label>
+                    <input
+                      type="text"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      placeholder="如 ¥45.00 或 45"
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '5px 8px',
+                        borderRadius: 8,
+                        border: NM.borderSoft,
+                        backgroundColor: NM.bgInset,
+                        boxShadow: NM.insetXs,
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        color: NM.primaryDark,
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingInfo(false)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 8,
+                        backgroundColor: NM.primary,
+                        color: '#fff',
+                        border: 'none',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3,
+                      }}
+                    >
+                      <Check size={11} />
+                      <span>完成编辑</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

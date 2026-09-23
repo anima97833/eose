@@ -148,8 +148,57 @@ export async function markPoemPassed(id: string): Promise<void> {
 export async function markPoemLearning(id: string): Promise<void> {
   await db.poems.update(id, {
     status: 'learning',
+    passedExamModes: [],
     lastReviewedAt: new Date().toISOString(),
   });
+}
+
+/**
+ * 记录单项考核关卡（选字/默写/背诵）通过：
+ * 规则：三关必须任选通过两关才能正式认证为【已熟背】
+ */
+export async function recordPoemModePassed(
+  id: string,
+  passedMode: 'cloze' | 'dictation' | 'recitation'
+): Promise<{
+  poem: SavedPoemRecord;
+  isNewlyMastered: boolean;
+  totalPassedModes: number;
+}> {
+  const poem = await db.poems.get(id);
+  if (!poem) {
+    throw new Error('Poem not found');
+  }
+
+  const existingPassedModes = new Set(poem.passedExamModes || []);
+  existingPassedModes.add(passedMode);
+  const updatedModes = Array.from(existingPassedModes) as ('cloze' | 'dictation' | 'recitation')[];
+
+  const totalPassedModes = updatedModes.length;
+  // 三关通过两关才能算熟背
+  const isNewlyMastered = totalPassedModes >= 2 && poem.status !== 'mastered';
+  const now = new Date().toISOString();
+
+  const updates: Partial<SavedPoemRecord> = {
+    passedExamModes: updatedModes,
+    lastReviewedAt: now,
+  };
+
+  if (isNewlyMastered || (totalPassedModes >= 2 && poem.status === 'mastered')) {
+    updates.status = 'mastered';
+    updates.masteredAt = poem.masteredAt || now;
+    if (isNewlyMastered) {
+      updates.quizPassCount = (poem.quizPassCount || 0) + 1;
+    }
+  }
+
+  await db.poems.update(id, updates);
+  const updatedPoem = { ...poem, ...updates };
+  return {
+    poem: updatedPoem,
+    isNewlyMastered,
+    totalPassedModes,
+  };
 }
 
 /**
@@ -194,3 +243,58 @@ export function calculatePoetryStats(poems: SavedPoemRecord[]): PoetryStats {
     currentRank,
   };
 }
+
+import { loadRPGProfile, saveRPGProfile, computeAttributeMax } from '../rpg/rpgStorage';
+
+/**
+ * 成功熟背一首诗词时的 RPG 属性联动：
+ * 获得智力 INT +2、获得魅力 CHA +3，精神专注 (MP) 与精神属性 (SPI) -10 (最低扣至 0，不出现负数)
+ */
+export function rewardPoetryMasteryToRPG(): {
+  intGain: number;
+  chaGain: number;
+  spiCost: number;
+  mpCost: number;
+  message: string;
+} {
+  try {
+    const profile = loadRPGProfile();
+    const cap = computeAttributeMax(profile.level);
+
+    const curInt = profile.attributes?.INT?.value || 0;
+    const curCha = profile.attributes?.CHA?.value || 0;
+    const curSpi = profile.attributes?.SPI?.value || 0;
+    const curMp = typeof profile.mp === 'number' ? profile.mp : 100;
+
+    const nextInt = Math.min(cap, curInt + 2);
+    const nextCha = Math.min(cap, curCha + 3);
+    const nextSpi = Math.max(0, curSpi - 10);
+    const nextMp = Math.max(0, curMp - 10); // 精神专注精力槽扣减 10 点
+
+    const intGain = nextInt - curInt;
+    const chaGain = nextCha - curCha;
+    const spiCost = curSpi - nextSpi;
+    const mpCost = curMp - nextMp;
+
+    profile.mp = nextMp;
+    if (profile.attributes) {
+      if (profile.attributes.INT) profile.attributes.INT.value = nextInt;
+      if (profile.attributes.CHA) profile.attributes.CHA.value = nextCha;
+      if (profile.attributes.SPI) profile.attributes.SPI.value = nextSpi;
+    }
+
+    saveRPGProfile(profile);
+
+    return {
+      intGain,
+      chaGain,
+      spiCost,
+      mpCost,
+      message: `智力 +${intGain} · 魅力 +${chaGain} · 精神专注 -${mpCost}`,
+    };
+  } catch (err) {
+    console.warn('[PoetryStorage] RPG reward error:', err);
+    return { intGain: 2, chaGain: 3, spiCost: 10, mpCost: 10, message: '智力 +2 · 魅力 +3 · 精神专注 -10' };
+  }
+}
+

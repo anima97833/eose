@@ -1,9 +1,13 @@
+export type MomentAttributeTag = 'SPI' | 'CHA' | 'INT' | 'CON' | 'DEX' | 'STR';
+
 export interface MomentItem {
   id: string;
-  themeTitle: string; // 如：今日碎碎念、晨间随想 (<=5字)
+  themeTitle: string; // 如：今日碎碎念、晨间随想 (<=6字)
   content: string; // 碎碎念正文
   images: string[]; // 用户上传图片列表 Base64，保存在 IndexedDB
-  rewardCoins: number; // 如 5000 或 50
+  attributeTag?: MomentAttributeTag; // 绑定的六维属性 (SPI/CHA/INT/CON/DEX/STR)
+  attributeGain?: number; // 属性提升数值，默认 +2
+  rewardCoins?: number; // 伴生金币
   isStarred: boolean; // 是否加入星标 (Collection)
   createdAt: number;
   dateStr: string; // 如 2026.09.22

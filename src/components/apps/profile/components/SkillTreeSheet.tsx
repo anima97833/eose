@@ -47,9 +47,7 @@ export const SkillTreeSheet: React.FC<SkillTreeSheetProps> = ({
   // 新增表单状态
   const [newName, setNewName] = useState('');
   const [newBranch, setNewBranch] = useState<'INT' | 'STR' | 'DEX' | 'SPI' | 'CON' | 'CHA'>('INT');
-  const [newLevel, setNewLevel] = useState(1);
   const [newDesc, setNewDesc] = useState('');
-  const [newEffect, setNewEffect] = useState('');
   const [newImageData, setNewImageData] = useState<string | null>(null);
 
   // 文件上传引用
@@ -123,10 +121,10 @@ export const SkillTreeSheet: React.FC<SkillTreeSheetProps> = ({
       id,
       name: newName.trim().slice(0, 5), // <= 5 字
       branch: newBranch,
-      level: Math.max(1, Number(newLevel) || 1),
+      level: 1,
       unlocked: true,
       desc: newDesc.trim() || '日常专注积累习得',
-      effect: newEffect.trim().slice(0, 8) || '属性获得提升',
+      effect: `${BRANCH_CONFIG[newBranch]?.label || ''}+1`,
     };
 
     if (newImageData) {
@@ -138,9 +136,7 @@ export const SkillTreeSheet: React.FC<SkillTreeSheetProps> = ({
     showToast('添加成功');
     setNewName('');
     setNewDesc('');
-    setNewEffect('');
     setNewImageData(null);
-    setNewLevel(1);
     setIsAdding(false);
   };
 
@@ -466,41 +462,6 @@ export const SkillTreeSheet: React.FC<SkillTreeSheetProps> = ({
                     <option value="CON">体质</option>
                     <option value="CHA">魅力</option>
                   </select>
-                </div>
-
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <input
-                    type="text"
-                    placeholder="加成(如: 智力+3)"
-                    maxLength={8}
-                    value={newEffect}
-                    onChange={(e) => setNewEffect(e.target.value)}
-                    style={{
-                      flex: 1,
-                      padding: '6px 10px',
-                      borderRadius: '8px',
-                      border: '1.5px solid #1E5C50',
-                      fontSize: '12px',
-                      outline: 'none',
-                    }}
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    max={99}
-                    value={newLevel}
-                    onChange={(e) => setNewLevel(parseInt(e.target.value) || 1)}
-                    style={{
-                      width: '44px',
-                      padding: '6px 4px',
-                      textAlign: 'center',
-                      borderRadius: '8px',
-                      border: '1.5px solid #1E5C50',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      outline: 'none',
-                    }}
-                  />
                 </div>
               </div>
             </div>

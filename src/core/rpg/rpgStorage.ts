@@ -1,4 +1,5 @@
 import { RPGProfile, RPGClass } from './types';
+import { calculateDailySettlement, getMaxExpForLevel } from './dailySettlementEngine';
 
 const STORAGE_KEY = 'cloudfly_user_rpg_profile_v1';
 
@@ -50,14 +51,22 @@ export const DEFAULT_RPG_PROFILE: RPGProfile = {
   title: '初醒之人',
   level: 1,
   currentExp: 0,
-  maxExp: 100,
+  maxExp: getMaxExpForLevel(1),
   hp: 100,
   maxHp: 100,
   mp: 100,
   maxMp: 100,
   gold: 500,
   crystals: 50,
-  mood: 16,
+  mood: 100,
+  pendingDailySettlement: null,
+  dailyCost: 100,
+  savingGoalDays: 365,
+  savingGoalNote: '自由生活目标: 365天 🏖️',
+  isPrivacyHidden: false,
+  bgmEnabled: true,
+  sfxEnabled: true,
+  userId: '417914',
   zodiac: '双鱼座',
   mbti: 'INFP',
   gender: '保密',
@@ -75,60 +84,76 @@ export const DEFAULT_RPG_PROFILE: RPGProfile = {
   customAvatarUrl: null, // 无预设立绘，支持用户上传/URL
   dossierPhotoUrl: null, // 个人档案专属相片，与主界面全身立绘解耦
   customBgUrl: null,
+  signInState: {
+    currentRound: 1,
+    currentDayIndex: 1,
+    lastSignInDate: null,
+    diamondShards: 0,
+    claimedDays: [],
+  },
+  extremeChallenge: {
+    activeType: 'early_bird', // 默认选中早起挑战
+    projects: {
+      early_bird: { currentDayIndex: 1, lastCheckInDate: null, claimedDays: [], isCompleted: false },
+      early_sleep: { currentDayIndex: 1, lastCheckInDate: null, claimedDays: [], isCompleted: false },
+      workout: { currentDayIndex: 1, lastCheckInDate: null, claimedDays: [], isCompleted: false },
+      fruits: { currentDayIndex: 1, lastCheckInDate: null, claimedDays: [], isCompleted: false },
+    },
+  },
   attributes: {
     STR: {
       key: 'STR',
       name: '力量',
       shortName: 'STR',
-      value: 62,
+      value: 0,
       maxValue: 100,
       focus: '体能爆发',
-      level: 6,
+      level: 1,
     },
     DEX: {
       key: 'DEX',
       name: '敏捷',
       shortName: 'DEX',
-      value: 78,
+      value: 0,
       maxValue: 100,
       focus: '协调反应',
-      level: 7,
+      level: 1,
     },
     INT: {
       key: 'INT',
       name: '智力',
       shortName: 'INT',
-      value: 88,
+      value: 0,
       maxValue: 100,
       focus: '逻辑思维',
-      level: 9,
+      level: 1,
     },
     SPI: {
       key: 'SPI',
       name: '精神',
       shortName: 'SPI',
-      value: 70,
+      value: 0,
       maxValue: 100,
       focus: '专注定力',
-      level: 7,
+      level: 1,
     },
     CON: {
       key: 'CON',
       name: '体质',
       shortName: 'CON',
-      value: 58,
+      value: 0,
       maxValue: 100,
       focus: '健康免疫',
-      level: 5,
+      level: 1,
     },
     CHA: {
       key: 'CHA',
       name: '魅力',
       shortName: 'CHA',
-      value: 65,
+      value: 0,
       maxValue: 100,
       focus: '沟通表达',
-      level: 6,
+      level: 1,
     },
   },
   classes: RPG_CLASSES,
@@ -275,8 +300,37 @@ function randRange(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+/**
+ * 获取以北京时间 (Asia/Shanghai, UTC+8) 计算的当天日期字符串 (格式: YYYY-MM-DD)
+ */
+export function getBeijingDateString(date: Date = new Date()): string {
+  try {
+    const formatter = new Intl.DateTimeFormat('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const parts = formatter.formatToParts(date);
+    const year = parts.find((p) => p.type === 'year')?.value;
+    const month = parts.find((p) => p.type === 'month')?.value;
+    const day = parts.find((p) => p.type === 'day')?.value;
+    if (year && month && day) {
+      return `${year}-${month}-${day}`;
+    }
+  } catch (e) {
+    // 忽略异常，降级到手动时间戳换算
+  }
+  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+  const bj = new Date(utc + 8 * 3600000);
+  const y = bj.getFullYear();
+  const m = String(bj.getMonth() + 1).padStart(2, '0');
+  const d = String(bj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function loadRPGProfile(): RPGProfile {
-  const todayStr = new Date().toDateString();
+  const bjToday = getBeijingDateString();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -284,7 +338,7 @@ export function loadRPGProfile(): RPGProfile {
       const merged: RPGProfile = {
         ...DEFAULT_RPG_PROFILE,
         ...parsed,
-        mood: typeof parsed.mood === 'number' ? parsed.mood : 16,
+        mood: (typeof parsed.mood === 'number' && parsed.mood !== 16) ? parsed.mood : 100,
         zodiac: parsed.zodiac || DEFAULT_RPG_PROFILE.zodiac,
         mbti: parsed.mbti || DEFAULT_RPG_PROFILE.mbti,
         gender: parsed.gender || DEFAULT_RPG_PROFILE.gender,
@@ -294,21 +348,77 @@ export function loadRPGProfile(): RPGProfile {
         classes: parsed.classes && parsed.classes.length > 0 ? parsed.classes : RPG_CLASSES,
       };
 
-      // 修正历史遗留假数据，确保初始等级严格为 1
-      if (!merged.level || merged.level === 35 || merged.level === 12 || (merged.level > 1 && (!merged.currentExp || merged.currentExp === 0))) {
+      merged.maxExp = getMaxExpForLevel(merged.level || 1);
+      let needsSave = false;
+
+      // 修正历史遗留假数据与溢出超标经验：当等级异常或经验超过上限时，彻底重置为正规初始状态 (Lv.1, 0/100)
+      if (
+        !merged.level ||
+        merged.level === 35 ||
+        merged.level === 12 ||
+        merged.currentExp >= merged.maxExp ||
+        typeof merged.currentExp !== 'number' ||
+        merged.currentExp < 0
+      ) {
         merged.level = 1;
         merged.currentExp = 0;
-        merged.maxExp = 100;
+        merged.maxExp = getMaxExpForLevel(1);
+        needsSave = true;
       }
 
-      // 每日 100 初始机制：跨日重置体力与精力
-      if (merged.lastActiveDate !== todayStr) {
+      // 每日重置机制（北京时间）：跨日重置体力、专注度、心情为100，六维属性重置为0，由昨日修行业报隔天结算驱动等级升级
+      let hasDailyReset = false;
+      if (merged.lastActiveDate !== bjToday) {
+        // 安全快照评估：优先使用前一日的高水位快照，若无则使用当前 attributes 中的数值
+        const sourceAttrs = (merged.dailyHighWaterMark && merged.dailyHighWaterMark.dateStr === merged.lastActiveDate)
+          ? merged.dailyHighWaterMark.attributes
+          : merged.attributes;
+
+        let totalPreviousAttrs = 0;
+        const attrKeys: (keyof typeof merged.attributes)[] = ['STR', 'DEX', 'INT', 'SPI', 'CON', 'CHA'];
+        for (const k of attrKeys) {
+          const raw = sourceAttrs ? (sourceAttrs as any)[k] : 0;
+          const val = typeof raw === 'number' ? raw : (raw?.value || 0);
+          totalPreviousAttrs += val;
+        }
+
+        // 如果昨日/上次活跃有积攒六维，且目前没有尚未展示领取的修行业报，则生成修行业报
+        if (totalPreviousAttrs > 0 && !merged.pendingDailySettlement) {
+          merged.pendingDailySettlement = calculateDailySettlement(
+            sourceAttrs,
+            merged,
+            merged.lastActiveDate || '昨日'
+          );
+        }
+
         merged.hp = 100;
         merged.mp = 100;
-        merged.lastActiveDate = todayStr;
+        merged.mood = 100;
+
+        // 六维各项属性重置为 0
+        for (const k of attrKeys) {
+          if (merged.attributes && merged.attributes[k]) {
+            merged.attributes[k].value = 0;
+          }
+        }
+
+        // 初始化今日高水位安全快照
+        merged.dailyHighWaterMark = {
+          dateStr: bjToday,
+          attributes: { STR: 0, DEX: 0, INT: 0, SPI: 0, CON: 0, CHA: 0 },
+        };
+
+        merged.lastActiveDate = bjToday;
+        merged.lastMoodResetDate = bjToday;
+        hasDailyReset = true;
+      } else if (merged.lastMoodResetDate !== bjToday) {
+        // 今日尚未执行过心情初始化（旧数据迁移），立即重置为 100
+        merged.mood = 100;
+        merged.lastMoodResetDate = bjToday;
+        hasDailyReset = true;
       }
 
-      // 动态同步六维上限
+      // 动态同步六维上限（等级部分不用管，正常计算上限）
       const attrMax = computeAttributeMax(merged.level);
       for (const k of Object.keys(merged.attributes) as (keyof typeof merged.attributes)[]) {
         merged.attributes[k].maxValue = attrMax;
@@ -317,18 +427,50 @@ export function loadRPGProfile(): RPGProfile {
         }
       }
 
+      // 若发生跨日重置或异常数据修复，立刻持久化到存储中
+      if (hasDailyReset || needsSave) {
+        saveRPGProfile(merged);
+      }
+
       return merged;
     }
   } catch (err) {
     console.warn('Failed to load RPG profile, using default', err);
   }
 
-  const initial = { ...DEFAULT_RPG_PROFILE, lastActiveDate: todayStr, hp: 100, mp: 100 };
+  const initial = { ...DEFAULT_RPG_PROFILE, lastActiveDate: bjToday, hp: 100, mp: 100, mood: 100 };
+  const attrKeys: (keyof typeof initial.attributes)[] = ['STR', 'DEX', 'INT', 'SPI', 'CON', 'CHA'];
+  for (const k of attrKeys) {
+    if (initial.attributes && initial.attributes[k]) {
+      initial.attributes[k].value = 0;
+    }
+  }
+  saveRPGProfile(initial);
   return initial;
+}
+
+export function recordDailyHighWaterMark(
+  profile: RPGProfile,
+  dateStr: string = getBeijingDateString()
+): void {
+  if (!profile.dailyHighWaterMark || profile.dailyHighWaterMark.dateStr !== dateStr) {
+    profile.dailyHighWaterMark = {
+      dateStr,
+      attributes: { STR: 0, DEX: 0, INT: 0, SPI: 0, CON: 0, CHA: 0 },
+    };
+  }
+  for (const k of ['STR', 'DEX', 'INT', 'SPI', 'CON', 'CHA'] as const) {
+    const curVal = profile.attributes?.[k]?.value || 0;
+    profile.dailyHighWaterMark.attributes[k] = Math.max(
+      profile.dailyHighWaterMark.attributes[k] || 0,
+      curVal
+    );
+  }
 }
 
 export function saveRPGProfile(profile: RPGProfile): void {
   try {
+    recordDailyHighWaterMark(profile);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
   } catch (err) {
     console.warn('Failed to save RPG profile', err);
@@ -384,33 +526,18 @@ export function settlePomodoroFocus(
   const hpCost = randRange(hpMin, hpMax);
   const mpCost = randRange(mpMin, mpMax);
   const attrGain = randRange(attrMin, attrMax);
-  const expGain = randRange(expMin, expMax);
+  const expGain = 0; // 白天专注不再当场获得角色升级经验与跨级（100% 由次日清晨六维结算驱动）
   const goldGain = randRange(goldMin, goldMax);
 
   // 2. 扣减体力与精力 (下限 0)
   profile.hp = Math.max(0, profile.hp - hpCost);
   profile.mp = Math.max(0, profile.mp - mpCost);
 
-  // 3. 增加金币
-  profile.gold += goldGain;
+  // 3. 经验与升级判定保持为 false
+  const leveledUp = false;
 
-  // 4. 经验与升级判定
-  let leveledUp = false;
-  profile.currentExp += expGain;
-  while (profile.currentExp >= profile.maxExp) {
-    profile.currentExp -= profile.maxExp;
-    profile.level += 1;
-    profile.maxExp = Math.round(profile.maxExp * 1.2);
-    leveledUp = true;
-  }
-
-  // 5. 动态属性上限随等级提高
+  // 4. 确定目标六维并加点
   const currentAttrCap = computeAttributeMax(profile.level);
-  for (const k of Object.keys(profile.attributes) as (keyof typeof profile.attributes)[]) {
-    profile.attributes[k].maxValue = currentAttrCap;
-  }
-
-  // 6. 确定目标六维并加点
   const actualAttrKey = targetAttr || (profile.attributes.INT ? 'INT' : 'STR');
   if (profile.attributes[actualAttrKey]) {
     profile.attributes[actualAttrKey].value = Math.min(
@@ -419,7 +546,7 @@ export function settlePomodoroFocus(
     );
   }
 
-  // 7. 净化“拖延状态”Debuff
+  // 5. 净化“拖延状态”Debuff
   let clearedDebuff = false;
   profile.debuffs = profile.debuffs.map((d) => {
     if (d.id === 'deb_procrast' && d.active) {

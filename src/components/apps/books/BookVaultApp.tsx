@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Search, BookOpen, MapPin, Scan, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Search, BookOpen, MapPin, Scan, CheckCircle2, BookPlus } from 'lucide-react';
 import { PhysicalBookRecord, ReadingStatus, BookShelfStats } from '../../../core/books/bookTypes';
 import {
   loadAllBooks,
@@ -16,6 +16,7 @@ import { BookShelfCard } from './components/BookShelfCard';
 import { ContinuousScannerModal } from './components/ContinuousScannerModal';
 import { BookDetailModal } from './components/BookDetailModal';
 import { LocationManagerModal } from './components/LocationManagerModal';
+import { ManualBookModal } from './components/ManualBookModal';
 import { Settings } from 'lucide-react';
 
 interface BookVaultAppProps {
@@ -35,6 +36,7 @@ export const BookVaultApp: React.FC<BookVaultAppProps> = ({ onBack }) => {
 
   // 模态框控制
   const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
+  const [isManualAddOpen, setIsManualAddOpen] = useState<boolean>(false);
   const [isLocationManagerOpen, setIsLocationManagerOpen] = useState<boolean>(false);
   const [locationsVersion, setLocationsVersion] = useState<number>(0);
   const [selectedBook, setSelectedBook] = useState<PhysicalBookRecord | null>(null);
@@ -220,31 +222,59 @@ export const BookVaultApp: React.FC<BookVaultAppProps> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* 顶部连续扫码入口按键（温润琥珀轻拟物凸键） */}
-        <button
-          type="button"
-          onClick={() => setIsScannerOpen(true)}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            padding: '7px 14px',
-            borderRadius: 14,
-            border: '1px solid rgba(255, 255, 255, 0.65)',
-            background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-            color: '#FFFFFF',
-            fontSize: '0.82rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '3px 4px 10px rgba(217, 119, 6, 0.35), -2px -2px 6px rgba(255, 255, 255, 0.8)',
-            transition: 'transform 0.15s ease',
-          }}
-          onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.95)')}
-          onMouseUp={(e) => (e.currentTarget.style.transform = 'none')}
-        >
-          <Scan size={15} strokeWidth={2.4} />
-          <span>扫码录书</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* 手动录书按键（纯图标轻拟物圆键） */}
+          <button
+            type="button"
+            onClick={() => setIsManualAddOpen(true)}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              border: NM.borderLight,
+              backgroundColor: NM.cardBg,
+              color: NM.primary,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: NM.convexSm,
+              transition: 'transform 0.15s ease',
+              padding: 0,
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.95)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform = 'none')}
+            title="手动录书"
+          >
+            <BookPlus size={18} strokeWidth={2.4} />
+          </button>
+
+          {/* 连续扫码入口按键（纯图标温润琥珀轻拟物圆键） */}
+          <button
+            type="button"
+            onClick={() => setIsScannerOpen(true)}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              border: '1px solid rgba(255, 255, 255, 0.65)',
+              background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '3px 4px 10px rgba(217, 119, 6, 0.35), -2px -2px 6px rgba(255, 255, 255, 0.8)',
+              transition: 'transform 0.15s ease',
+              padding: 0,
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.95)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform = 'none')}
+            title="扫码录书"
+          >
+            <Scan size={18} strokeWidth={2.4} />
+          </button>
+        </div>
       </div>
 
       {/* 顶部藏书与估值总览卡片（轻拟物外凸大面板） */}
@@ -639,6 +669,7 @@ export const BookVaultApp: React.FC<BookVaultAppProps> = ({ onBack }) => {
         <ContinuousScannerModal
           onClose={() => setIsScannerOpen(false)}
           onBookScanned={handleBookScanned}
+          onOpenManualAdd={() => setIsManualAddOpen(true)}
         />
       )}
 
@@ -652,6 +683,13 @@ export const BookVaultApp: React.FC<BookVaultAppProps> = ({ onBack }) => {
           onOpenLocationManager={() => setIsLocationManagerOpen(true)}
         />
       )}
+
+      {/* 手动录入书籍模态框 */}
+      <ManualBookModal
+        isOpen={isManualAddOpen}
+        onClose={() => setIsManualAddOpen(false)}
+        onBookAdded={handleBookScanned}
+      />
 
       {/* 物理书架位置增删改模态框 */}
       {isLocationManagerOpen && (
