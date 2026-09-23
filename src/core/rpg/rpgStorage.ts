@@ -1,5 +1,8 @@
 import { RPGProfile, RPGClass } from './types';
 import { calculateDailySettlement, getMaxExpForLevel } from './dailySettlementEngine';
+import { saveCustomAvatar } from './avatarImageStorage';
+import { saveCustomBackground } from './backgroundImageStorage';
+import { saveDossierToDB } from './dossierStorage';
 
 const STORAGE_KEY = 'cloudfly_user_rpg_profile_v1';
 
@@ -335,16 +338,53 @@ export function loadRPGProfile(): RPGProfile {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      // 检查历史遗留：若曾在 localStorage 中保存过立绘或背景，自动迁移至 IndexedDB 并从 localStorage 移除
+      if (parsed.customAvatarUrl) {
+        saveCustomAvatar(parsed.customAvatarUrl).catch((err) => {
+          console.error('[IndexedDB] 自动迁移历史立绘失败:', err);
+        });
+        parsed.customAvatarUrl = null;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        } catch {
+          // ignore
+        }
+      }
+      if (parsed.customBgUrl) {
+        saveCustomBackground(parsed.customBgUrl).catch((err) => {
+          console.error('[IndexedDB] 自动迁移历史背景失败:', err);
+        });
+        parsed.customBgUrl = null;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        } catch {
+          // ignore
+        }
+      }
+      if (parsed.dossierPhotoUrl) {
+        saveDossierToDB({ photoUrl: parsed.dossierPhotoUrl }).catch((err) => {
+          console.error('[IndexedDB] 自动迁移历史档案照片失败:', err);
+        });
+        parsed.dossierPhotoUrl = null;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        } catch {
+          // ignore
+        }
+      }
+
       const merged: RPGProfile = {
         ...DEFAULT_RPG_PROFILE,
         ...parsed,
+        customAvatarUrl: null, // 绝对不存入 localStorage，由 IndexedDB 异步独占管理
+        customBgUrl: null,     // 舞台背景图同样由 IndexedDB 异步独占管理
+        dossierPhotoUrl: null, // 档案相片由 IndexedDB (rpg_dossier) 异步独占管理
+        albumPhotos: [],       // 相册同样由 IndexedDB (rpg_dossier) 独占管理
         mood: (typeof parsed.mood === 'number' && parsed.mood !== 16) ? parsed.mood : 100,
         zodiac: parsed.zodiac || DEFAULT_RPG_PROFILE.zodiac,
         mbti: parsed.mbti || DEFAULT_RPG_PROFILE.mbti,
         gender: parsed.gender || DEFAULT_RPG_PROFILE.gender,
-        dossierPhotoUrl: parsed.dossierPhotoUrl || null,
         storyPages: parsed.storyPages && parsed.storyPages.length > 0 ? parsed.storyPages : DEFAULT_RPG_PROFILE.storyPages,
-        albumPhotos: parsed.albumPhotos || [],
         classes: parsed.classes && parsed.classes.length > 0 ? parsed.classes : RPG_CLASSES,
       };
 
@@ -471,7 +511,18 @@ export function recordDailyHighWaterMark(
 export function saveRPGProfile(profile: RPGProfile): void {
   try {
     recordDailyHighWaterMark(profile);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    // 强制剥离立绘、背景、档案相片与相册图片，确保绝对不存入 localStorage，彻底消除移动端 5MB 配额溢出风险
+    const { customAvatarUrl, customBgUrl, dossierPhotoUrl, albumPhotos, ...toSave } = profile;
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...toSave,
+        customAvatarUrl: null,
+        customBgUrl: null,
+        dossierPhotoUrl: null,
+        albumPhotos: [],
+      })
+    );
   } catch (err) {
     console.warn('Failed to save RPG profile', err);
   }

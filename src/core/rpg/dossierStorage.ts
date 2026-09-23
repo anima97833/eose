@@ -87,9 +87,17 @@ export async function saveDossierToDB(
     updatedAt: Date.now(),
   };
 
-  // 1. 优先写本地降级缓存（确保同步响应与容灾）
+  // 1. 本地降级缓存（确保同步响应与容灾，剥离超大 Base64 避免溢出）
   try {
-    localStorage.setItem(FALLBACK_KEY, JSON.stringify(updated));
+    const { photoUrl, albumPhotos, ...safeFallback } = updated;
+    localStorage.setItem(
+      FALLBACK_KEY,
+      JSON.stringify({
+        ...safeFallback,
+        photoUrl: photoUrl && !photoUrl.startsWith('data:') ? photoUrl : null,
+        albumPhotos: (albumPhotos || []).filter((p) => !p.startsWith('data:')),
+      })
+    );
   } catch (e) {
     console.warn('[Storage] 写入降级缓存失败:', e);
   }

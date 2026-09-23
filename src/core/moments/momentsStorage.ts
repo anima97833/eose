@@ -191,10 +191,11 @@ export async function loadMomentsFromDB(): Promise<MomentItem[]> {
  * 保存或新增单条动态
  */
 export async function saveMomentToDB(item: MomentItem): Promise<void> {
-  // 1. 降级缓存更新
+  // 1. 降级缓存更新（脱敏大图，防止超出 localStorage 5MB 配额）
   try {
     const current = await loadMomentsFromDB();
-    const nextList = [item, ...current.filter((m) => m.id !== item.id)];
+    const safeItem: MomentItem = { ...item, images: [] };
+    const nextList = [safeItem, ...current.filter((m) => m.id !== item.id).map((m) => ({ ...m, images: [] }))];
     localStorage.setItem(MOMENTS_FALLBACK_KEY, JSON.stringify(nextList));
   } catch (e) {
     console.warn('[Storage] 写入动态降级缓存失败:', e);
@@ -297,8 +298,9 @@ export async function loadBannerUrlFromDB(): Promise<string | null> {
  * 保存朋友圈自定义背景图
  */
 export async function saveBannerUrlToDB(url: string | null): Promise<void> {
+  // 降级缓存：若为超长 base64，不写入 localStorage，避免配额溢出；仅外部链接写入
   try {
-    if (url) {
+    if (url && !url.startsWith('data:')) {
       localStorage.setItem(BANNER_FALLBACK_KEY, url);
     } else {
       localStorage.removeItem(BANNER_FALLBACK_KEY);

@@ -43,6 +43,11 @@ import {
   saveCustomBackground,
   deleteCustomBackground,
 } from '../../../core/rpg/backgroundImageStorage';
+import {
+  getCustomAvatar,
+  saveCustomAvatar,
+  deleteCustomAvatar,
+} from '../../../core/rpg/avatarImageStorage';
 import { ChestIcon } from './components/ChestIcon';
 import { ActivityLogModal } from './components/ActivityLogModal';
 import { DailySignInModal } from './components/DailySignInModal';
@@ -508,10 +513,15 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
     if (profile.lastMoodResetDate !== today || profile.mood !== 100) {
       setProfile((prev) => ({ ...prev, mood: 100, lastMoodResetDate: today }));
     }
-    // 从 IndexedDB 异步加载舞台自定义背景
+    // 从 IndexedDB 异步加载舞台自定义背景与立绘
     getCustomBackground().then((bg) => {
       if (bg) {
         setProfile((prev) => ({ ...prev, customBgUrl: bg }));
+      }
+    });
+    getCustomAvatar().then((avatar) => {
+      if (avatar) {
+        setProfile((prev) => ({ ...prev, customAvatarUrl: avatar }));
       }
     });
   }, []);
@@ -520,7 +530,11 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
   useEffect(() => {
     const handleCheckDayChange = () => {
       const refreshed = loadRPGProfile();
-      setProfile(refreshed);
+      setProfile((prev) => ({
+        ...refreshed,
+        customAvatarUrl: prev.customAvatarUrl,
+        customBgUrl: prev.customBgUrl,
+      }));
     };
     window.addEventListener('focus', handleCheckDayChange);
     document.addEventListener('visibilitychange', handleCheckDayChange);
@@ -1459,9 +1473,16 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
         <AvatarUploadModal
           currentUrl={profile.customAvatarUrl}
           currentBgUrl={profile.customBgUrl}
-          onSave={(url) => {
-            setProfile((p) => ({ ...p, customAvatarUrl: url }));
-            showToast('立绘已更新');
+          onSave={async (url) => {
+            if (url) {
+              await saveCustomAvatar(url);
+              setProfile((p) => ({ ...p, customAvatarUrl: url }));
+              showToast('立绘已更新并存入 IndexedDB');
+            } else {
+              await deleteCustomAvatar();
+              setProfile((p) => ({ ...p, customAvatarUrl: null }));
+              showToast('已恢复预设立绘');
+            }
           }}
           onSaveBg={async (bgUrl) => {
             if (bgUrl) {

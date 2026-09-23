@@ -4,7 +4,7 @@ import { X, Upload, Link, Check, RefreshCw, Image as ImageIcon, Sparkles } from 
 interface AvatarUploadModalProps {
   currentUrl: string | null;
   currentBgUrl?: string | null;
-  onSave: (url: string | null) => void;
+  onSave: (url: string | null) => void | Promise<void>;
   onSaveBg?: (url: string | null) => void | Promise<void>;
   onClose: () => void;
   defaultTab?: 'avatar' | 'background';
@@ -19,6 +19,7 @@ export const AvatarUploadModal: React.FC<AvatarUploadModalProps> = ({
   defaultTab = 'avatar',
 }) => {
   const [activeTab, setActiveTab] = useState<'avatar' | 'background'>(defaultTab);
+  const [isSaving, setIsSaving] = useState(false);
 
   // 立绘状态
   const [avatarInput, setAvatarInput] = useState(currentUrl || '');
@@ -54,18 +55,26 @@ export const AvatarUploadModal: React.FC<AvatarUploadModalProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleConfirm = () => {
-    // 保存立绘
-    const finalAvatar = avatarPreview || (avatarInput.trim() ? avatarInput.trim() : null);
-    onSave(finalAvatar);
+  const handleConfirm = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      // 保存立绘（存入 IndexedDB）
+      const finalAvatar = avatarPreview || (avatarInput.trim() ? avatarInput.trim() : null);
+      await onSave(finalAvatar);
 
-    // 保存背景（存入 IndexedDB）
-    if (onSaveBg) {
-      const finalBg = bgPreview || (bgInput.trim() ? bgInput.trim() : null);
-      onSaveBg(finalBg);
+      // 保存背景（存入 IndexedDB）
+      if (onSaveBg) {
+        const finalBg = bgPreview || (bgInput.trim() ? bgInput.trim() : null);
+        await onSaveBg(finalBg);
+      }
+
+      onClose();
+    } catch (err) {
+      console.error('Failed to save avatar or background:', err);
+    } finally {
+      setIsSaving(false);
     }
-
-    onClose();
   };
 
   return (
