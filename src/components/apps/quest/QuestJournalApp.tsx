@@ -280,66 +280,8 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
           </span>
         </div>
 
-        {/* 右侧动作区：脑洞彩蛋入口 + 多元宇宙传送枪 + 发布新任务按钮 */}
+        {/* 右侧动作区：收录自定义任务按钮 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <button
-            type="button"
-            onClick={() => {
-              triggerEasterEgg('FACT_QUIZ');
-              setShowFactQuizModal(true);
-            }}
-            className="nm-rebound-btn nm-btn-circle"
-            style={{ width: '36px', height: '36px', color: '#F59E0B' }}
-            title="脑洞小测验 (摇晃手机/静止10秒/轻叩3次唤醒)"
-          >
-            <span style={{ fontSize: '15px' }}>💡</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              triggerEasterEgg('MULTIVERSE_PORTAL');
-              setShowMultiverseModal(true);
-            }}
-            className="nm-rebound-btn nm-btn-circle"
-            style={{ width: '36px', height: '36px', color: '#10B981' }}
-            title="多元宇宙传送门 (完成任务随机跃迁，亦可手动开启)"
-          >
-            <span style={{ fontSize: '15px' }}>🛸</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              triggerEasterEgg('DISNEY_WISH');
-              setShowDisneyWishModal(true);
-            }}
-            className="nm-rebound-btn nm-btn-circle"
-            style={{
-              width: '36px',
-              height: '36px',
-              color: '#EC4899',
-              position: 'relative',
-            }}
-            title="童话星愿签 · 温暖治愈寄语 (夜晚打卡完成全天手账自动降落)"
-          >
-            <span style={{ fontSize: '15px' }}>💌</span>
-            {mainTotal > 0 && mainDone === mainTotal && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: '2px',
-                  right: '2px',
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  backgroundColor: '#F59E0B',
-                  boxShadow: '0 0 6px #F59E0B',
-                }}
-              />
-            )}
-          </button>
-
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
