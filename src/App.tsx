@@ -22,6 +22,7 @@ import { CourseKanbanApp } from './components/apps/kanban/CourseKanbanApp';
 import { SecurityApp } from './components/apps/security/SecurityApp';
 import { CompassApp } from './components/apps/compass/CompassApp';
 import { QuestJournalApp } from './components/apps/quest/QuestJournalApp';
+import { RadioApp } from './components/apps/radio/RadioApp';
 import { getCustomAppById } from './core/sdk/customAppRegistry';
 import { initIdleMasterDetector, checkLateNightActivity } from './core/quest/easterEggEngine';
 
@@ -117,6 +118,8 @@ export const App: React.FC = () => {
             <SecurityApp onBack={() => setActiveApp(null)} />
           ) : activeApp === 'compass' ? (
             <CompassApp onBack={() => setActiveApp(null)} />
+          ) : activeApp === 'radio' ? (
+            <RadioApp onBack={() => setActiveApp(null)} />
           ) : isCustomApp ? (
             <CustomAppRunner
               appId={activeApp!}
