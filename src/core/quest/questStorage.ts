@@ -226,6 +226,21 @@ export const DEFAULT_PRESET_QUESTS: QuestItem[] = [
     targetProgress: 1,
     status: 'in_progress',
   },
+  {
+    id: 'egg_fact_quiz',
+    category: 'easter_egg',
+    title: '【真的假的？冷知识脑洞】',
+    desc: '参与一次冷知识辨真测验，揭开世界反直觉的奇妙一面。',
+    easterEggClue: '静止发呆 10 秒、摇晃小手机或轻叩书签 3 次，开启科学与脑洞的裂缝…',
+    easterEggCode: 'FACT_QUIZ',
+    icon: '💡',
+    tag: '📚 智力',
+    statKey: 'INT',
+    statGain: { fixed: 8 },
+    currentProgress: 0,
+    targetProgress: 1,
+    status: 'in_progress',
+  },
 ];
 
 /**

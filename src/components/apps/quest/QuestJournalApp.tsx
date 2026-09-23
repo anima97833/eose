@@ -8,11 +8,13 @@ import {
   deleteCustomQuest,
   loadQuestPalette,
   saveQuestPalette,
+  triggerEasterEgg,
 } from '../../../core/quest/questStorage';
 import { fetchColormindPalette, rgbToHex } from '../../../core/theme/colormindService';
 import { QuestCard } from './components/QuestCard';
 import { CreateQuestModal } from './components/CreateQuestModal';
 import { FloatingStatToast } from './components/FloatingStatToast';
+import { FactQuizModal } from './components/FactQuizModal';
 
 interface QuestJournalAppProps {
   onBack: () => void;
@@ -23,12 +25,14 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
   const [quests, setQuests] = useState<QuestItem[]>(loadQuestJournal);
   const [activeTab, setActiveTab] = useState<QuestCategory>('main');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showFactQuizModal, setShowFactQuizModal] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [floatingStat, setFloatingStat] = useState<AwardedStatResult | null>(null);
   const [palette, setPalette] = useState<string[]>(loadQuestPalette);
   const [isColoring, setIsColoring] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
 
-  // 监听任务更新与彩蛋解锁全局事件
+  // 1. 监听任务更新与彩蛋解锁全局事件
   useEffect(() => {
     const handleQuestsUpdated = (e: any) => {
       if (e.detail) setQuests(e.detail);
@@ -49,6 +53,76 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
     };
   }, []);
 
+  // 2. 触发机制 A：静止沉思 10 秒自动开启冷知识脑洞彩蛋
+  useEffect(() => {
+    let idleTimer: any;
+    const resetIdle = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        triggerEasterEgg('FACT_QUIZ');
+        setShowFactQuizModal(true);
+      }, 10000);
+    };
+
+    window.addEventListener('mousemove', resetIdle);
+    window.addEventListener('touchstart', resetIdle);
+    window.addEventListener('keydown', resetIdle);
+    resetIdle();
+
+    return () => {
+      clearTimeout(idleTimer);
+      window.removeEventListener('mousemove', resetIdle);
+      window.removeEventListener('touchstart', resetIdle);
+      window.removeEventListener('keydown', resetIdle);
+    };
+  }, []);
+
+  // 3. 触发机制 B：摇晃手机触发
+  useEffect(() => {
+    let lastX = 0, lastY = 0, lastZ = 0, lastTime = 0;
+    const handleMotion = (e: DeviceMotionEvent) => {
+      const current = e.accelerationIncludingGravity;
+      if (!current) return;
+      const now = Date.now();
+      if (now - lastTime > 150) {
+        const diffTime = now - lastTime;
+        lastTime = now;
+        const speed =
+          Math.abs((current.x || 0) + (current.y || 0) + (current.z || 0) - lastX - lastY - lastZ) /
+          diffTime * 10000;
+        if (speed > 1200) {
+          triggerEasterEgg('FACT_QUIZ');
+          setShowFactQuizModal(true);
+        }
+        lastX = current.x || 0;
+        lastY = current.y || 0;
+        lastZ = current.z || 0;
+      }
+    };
+
+    if (typeof window !== 'undefined' && 'DeviceMotionEvent' in window) {
+      window.addEventListener('devicemotion', handleMotion);
+    }
+    return () => {
+      if (typeof window !== 'undefined' && 'DeviceMotionEvent' in window) {
+        window.removeEventListener('devicemotion', handleMotion);
+      }
+    };
+  }, []);
+
+  // 4. 触发机制 C：连续轻叩顶部标题/书签 3 次
+  const handleTitleTap = () => {
+    const next = tapCount + 1;
+    if (next >= 3) {
+      setTapCount(0);
+      triggerEasterEgg('FACT_QUIZ');
+      setShowFactQuizModal(true);
+    } else {
+      setTapCount(next);
+      setTimeout(() => setTapCount(0), 1200);
+    }
+  };
+
   const showToast = (text: string) => {
     setToastMsg(text);
     setTimeout(() => setToastMsg(null), 2500);
@@ -56,6 +130,10 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
 
   // 打卡完成（静默联动六维，触发上空飘字，不在面板上显示多余数值）
   const handleDone = (questId: string) => {
+    if (questId === 'egg_fact_quiz') {
+      setShowFactQuizModal(true);
+      return;
+    }
     const { items: updated, awardedStat } = markQuestDone(questId);
     setQuests(updated);
     if (awardedStat) {
@@ -153,7 +231,11 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
           <ArrowLeft size={18} strokeWidth={2.4} />
         </button>
 
-        <div style={{ textAlign: 'center' }}>
+        <div
+          onClick={handleTitleTap}
+          style={{ textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}
+          title="连续轻触 3 次唤醒暗号彩蛋"
+        >
           <h2 style={{ fontSize: '15px', fontWeight: 900, color: 'var(--nm-text-main, #334257)', margin: 0 }}>
             日常手账
           </h2>
@@ -162,16 +244,31 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
           </span>
         </div>
 
-        {/* 右侧发布新任务按钮 */}
-        <button
-          type="button"
-          onClick={() => setShowCreateModal(true)}
-          className="nm-rebound-btn nm-btn-circle"
-          style={{ width: '38px', height: '38px', color: 'var(--nm-primary, #5096C6)' }}
-          title="收录自定义任务"
-        >
-          <Plus size={20} strokeWidth={2.6} />
-        </button>
+        {/* 右侧动作区：脑洞彩蛋入口 + 发布新任务按钮 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button
+            type="button"
+            onClick={() => {
+              triggerEasterEgg('FACT_QUIZ');
+              setShowFactQuizModal(true);
+            }}
+            className="nm-rebound-btn nm-btn-circle"
+            style={{ width: '38px', height: '38px', color: '#F59E0B' }}
+            title="脑洞小测验 (摇晃手机/静止10秒/轻叩3次唤醒)"
+          >
+            <span style={{ fontSize: '16px' }}>💡</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            className="nm-rebound-btn nm-btn-circle"
+            style={{ width: '38px', height: '38px', color: 'var(--nm-primary, #5096C6)' }}
+            title="收录自定义任务"
+          >
+            <Plus size={20} strokeWidth={2.6} />
+          </button>
+        </div>
       </div>
 
       {/* 达成率与 Colormind 换色控制条 */}
@@ -469,6 +566,21 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
           initialCategory={activeTab}
           onSave={handleCreateQuest}
           onClose={() => setShowCreateModal(false)}
+        />
+      )}
+
+      {/* 冷知识“真的假的？”脑洞小测验弹窗 */}
+      {showFactQuizModal && (
+        <FactQuizModal
+          palette={palette}
+          onAwardStat={(stat) => {
+            setFloatingStat(stat);
+            setTimeout(() => setFloatingStat(null), 1900);
+            // 自动标记彩蛋完成
+            const res = markQuestDone('egg_fact_quiz');
+            setQuests(res.items);
+          }}
+          onClose={() => setShowFactQuizModal(false)}
         />
       )}
     </div>
