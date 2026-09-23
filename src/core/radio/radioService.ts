@@ -1,25 +1,80 @@
 // 真声流媒体电台服务
-// 聚合 SomaFM 高保真纯音乐流、优质在线广播电台与 Radio Browser API
+// 聚合 国内官方广播、华语流行电台、SomaFM 高保真流、Radio Browser 全球开源 API
 
 export interface RadioStation {
   id: string;
   name: string;
   frequency: string; // 模拟 FM 频率，如 "FM 97.4"
   freqMhz: number;   // 频率数值，用于在调谐刻度盘上精准定位游标（87.5 ~ 108.0）
-  category: 'pop' | 'chill' | 'lofi' | 'jazz' | 'classic';
+  category: 'cpop' | 'cnr' | 'chill' | 'lofi' | 'jazz' | 'classic' | 'online';
   categoryLabel: string;
   streamUrl: string;
   backupStreamUrl?: string;
   description: string;
   coverUrl?: string;
   bitrate?: string;
+  isOnlineSearch?: boolean;
 }
 
 /**
- * 精选高可靠 100% 稳定直链电台池（HTTPS、免 Key、24小时稳定开播、无需任何跨域代理）
+ * 精选高可靠直链电台池（覆盖国内央广、华语流行、复古蒸汽波与治愈慢调）
  */
 export const PRESET_STATIONS: RadioStation[] = [
-  // 1. 经典蒸汽波与复古调频 (Nightwave Plaza 直连，国内访问极佳)
+  // 1. 国内官方与华语精选
+  {
+    id: 'cnr_voice_china',
+    name: 'CNR-1 中国之声 · 国家广播',
+    frequency: 'FM 106.1',
+    freqMhz: 106.1,
+    category: 'cnr',
+    categoryLabel: '国家广播',
+    streamUrl: 'http://ngcdn001.cnr.cn/live/zgzs/index.m3u8',
+    backupStreamUrl: 'https://lhttp.qtfm.cn/live/15318317/64k.mp3',
+    description: '中央人民广播电台旗舰频率，全天候权威综合新闻资讯与声音画卷。',
+    coverUrl: 'http://pic.qtfm.cn/2017/0413/20170413034613.jpeg',
+    bitrate: '128 kbps HLS',
+  },
+  {
+    id: 'big_b_cpop',
+    name: 'Big B Radio · 华语流行 C-POP',
+    frequency: 'FM 97.4',
+    freqMhz: 97.4,
+    category: 'cpop',
+    categoryLabel: '华语流行',
+    streamUrl: 'https://antares.dribbcast.com/proxy/cpop?mp=/s',
+    backupStreamUrl: 'https://cn.bigbigmix.com/audio/stream',
+    description: '24小时不间断华语流行热歌、经典港台金曲与两岸独立创作精选。',
+    coverUrl: 'https://antares.dribbcast.com/cpop.jpg',
+    bitrate: '128 kbps AAC',
+  },
+  {
+    id: 'big_big_mix',
+    name: 'BIG BIG MIX · 乐享精选歌单',
+    frequency: 'FM 101.7',
+    freqMhz: 101.7,
+    category: 'cpop',
+    categoryLabel: '乐享流行',
+    streamUrl: 'https://cn.bigbigmix.com/audio/stream',
+    backupStreamUrl: 'https://antares.dribbcast.com/proxy/cpop?mp=/s',
+    description: '精选城市白领与青年听众热歌单，旋律轻快温暖，全天陪伴。',
+    coverUrl: 'https://cn.bigbigmix.com/favicon.ico',
+    bitrate: '128 kbps MP3',
+  },
+  {
+    id: 'cnr_economic',
+    name: 'CNR-2 经济之声 · 财富生活',
+    frequency: 'FM 96.6',
+    freqMhz: 96.6,
+    category: 'cnr',
+    categoryLabel: '经济资讯',
+    streamUrl: 'http://ngcdn002.cnr.cn/live/jjzs/index.m3u8',
+    backupStreamUrl: 'http://ngcdn001.cnr.cn/live/zgzs/index.m3u8',
+    description: '聆听财富声音，品味财经智慧与品质生活慢调。',
+    coverUrl: 'http://pic.qtfm.cn/2017/0413/20170413034613.jpeg',
+    bitrate: '128 kbps HLS',
+  },
+
+  // 2. 蒸汽波与复古调频
   {
     id: 'plaza_one',
     name: 'Nightwave Plaza · 蒸汽波漫游',
@@ -34,7 +89,7 @@ export const PRESET_STATIONS: RadioStation[] = [
     bitrate: '128 kbps MP3',
   },
 
-  // 2. 治愈慢摇与氛围（SomaFM 官方超清直链，免 Referer 保护）
+  // 3. 治愈慢摇与深空氛围
   {
     id: 'groove_salad',
     name: 'Groove Salad · 慢摇治愈',
@@ -75,14 +130,14 @@ export const PRESET_STATIONS: RadioStation[] = [
     bitrate: '128 kbps MP3',
   },
 
-  // 2. 爵士调频与复古情调
+  // 4. 复古爵士与公路民谣
   {
     id: 'secret_agent',
-    name: 'Secret Agent · 复古特工爵士',
+    name: 'Secret Agent · 特工爵士',
     frequency: 'FM 98.7',
     freqMhz: 98.7,
     category: 'jazz',
-    categoryLabel: '复古爵士',
+    categoryLabel: '特工爵士',
     streamUrl: 'https://ice1.somafm.com/secretagent-128-mp3',
     backupStreamUrl: 'https://ice2.somafm.com/secretagent-128-mp3',
     description: '致敬 007 与 60 年代黄金谍战调频，优雅灵动的复古冲浪爵士。',
@@ -90,93 +145,22 @@ export const PRESET_STATIONS: RadioStation[] = [
     bitrate: '128 kbps MP3',
   },
   {
-    id: 'illinois_street',
-    name: 'Illinois Lounge · 经典午后沙龙',
-    frequency: 'FM 100.5',
-    freqMhz: 100.5,
-    category: 'jazz',
-    categoryLabel: '沙龙慢调',
-    streamUrl: 'https://ice1.somafm.com/illstreet-128-mp3',
-    backupStreamUrl: 'https://ice2.somafm.com/illstreet-128-mp3',
-    description: '经典微醺 Lounge 与鸡尾酒沙龙爵士，重温 1950 年代留声唱片。',
-    coverUrl: 'https://api.somafm.com/logos/256/illstreet256.png',
-    bitrate: '128 kbps MP3',
-  },
-
-  // 3. 流行微风与都市电台
-  {
-    id: 'indie_pop_rocks',
-    name: 'Indie Pop Rocks · 独立流行小调',
-    frequency: 'FM 103.2',
-    freqMhz: 103.2,
-    category: 'pop',
-    categoryLabel: '流行微风',
-    streamUrl: 'https://ice1.somafm.com/indiepop-128-mp3',
-    backupStreamUrl: 'https://ice2.somafm.com/indiepop-128-mp3',
-    description: '新鲜明亮的经典独立流行小品，洋溢着青春微风与吉他扫弦。',
-    coverUrl: 'https://api.somafm.com/logos/256/indiepop256.png',
-    bitrate: '128 kbps MP3',
-  },
-  {
-    id: 'pop_tron',
-    name: 'PopTron · 电幻流行脉搏',
-    frequency: 'FM 106.8',
-    freqMhz: 106.8,
-    category: 'pop',
-    categoryLabel: '电幻流行',
-    streamUrl: 'https://ice1.somafm.com/poptron-128-mp3',
-    backupStreamUrl: 'https://ice2.somafm.com/poptron-128-mp3',
-    description: '节奏分明、充满未来感的轻快电幻流行律动。',
-    coverUrl: 'https://api.somafm.com/logos/256/poptron256.png',
-    bitrate: '128 kbps MP3',
-  },
-
-  // 4. Lo-Fi 温暖和弦与蒸汽波
-  {
     id: 'boot_liquor',
-    name: 'Boot Liquor · 温暖民谣公路',
-    frequency: 'FM 96.1',
-    freqMhz: 96.1,
+    name: 'Boot Liquor · 温暖公路民谣',
+    frequency: 'FM 89.6',
+    freqMhz: 89.6,
     category: 'lofi',
-    categoryLabel: '温暖公路',
+    categoryLabel: '温暖民谣',
     streamUrl: 'https://ice1.somafm.com/bootliquor-128-mp3',
     backupStreamUrl: 'https://ice2.somafm.com/bootliquor-128-mp3',
     description: '悠扬温暖的木吉他与美式公路民谣，穿透黄昏与旷野的思绪。',
     coverUrl: 'https://api.somafm.com/logos/256/bootliquor256.png',
     bitrate: '128 kbps MP3',
   },
-  {
-    id: 'drone_zone',
-    name: 'Drone Zone · 迷幻低鸣空间',
-    frequency: 'FM 89.9',
-    freqMhz: 89.9,
-    category: 'lofi',
-    categoryLabel: '太空和弦',
-    streamUrl: 'https://ice1.somafm.com/dronezone-128-mp3',
-    backupStreamUrl: 'https://ice2.somafm.com/dronezone-128-mp3',
-    description: '持续低缓的声景和弦，极度适合编写代码与安静阅读。',
-    coverUrl: 'https://api.somafm.com/logos/256/dronezone256.png',
-    bitrate: '128 kbps MP3',
-  },
-
-  // 5. 古典流声与电影原声
-  {
-    id: 'sf_soundtracks',
-    name: 'Cinemart · 经典电影原声',
-    frequency: 'FM 105.4',
-    freqMhz: 105.4,
-    category: 'classic',
-    categoryLabel: '光影交响',
-    streamUrl: 'https://ice1.somafm.com/sf1033-128-mp3',
-    backupStreamUrl: 'https://ice2.somafm.com/sf1033-128-mp3',
-    description: '好莱坞与经典艺术电影配乐大师杰作，大气磅礴的光影盛宴。',
-    coverUrl: 'https://api.somafm.com/logos/256/sf1033256.png',
-    bitrate: '128 kbps MP3',
-  },
 ];
 
 /**
- * 获取所有电台
+ * 获取所有预设电台
  */
 export function getAllStations(): RadioStation[] {
   return PRESET_STATIONS;
@@ -185,10 +169,10 @@ export function getAllStations(): RadioStation[] {
 /**
  * 根据频率查找电台（支持误差 ±0.6 MHz 自动捕捉吸附）
  */
-export function findStationByFrequency(freqMhz: number): RadioStation | null {
+export function findStationByFrequency(freqMhz: number, stationList = PRESET_STATIONS): RadioStation | null {
   let closest: RadioStation | null = null;
   let minDiff = 0.6; // 捕捉阈值
-  for (const st of PRESET_STATIONS) {
+  for (const st of stationList) {
     const diff = Math.abs(st.freqMhz - freqMhz);
     if (diff < minDiff) {
       minDiff = diff;
@@ -196,4 +180,75 @@ export function findStationByFrequency(freqMhz: number): RadioStation | null {
     }
   }
   return closest;
+}
+
+/**
+ * Radio Browser API: 在线拉取国内中文电台（按投票热度排行）
+ */
+export async function fetchRadioBrowserChinaStations(limit = 20): Promise<RadioStation[]> {
+  try {
+    const res = await fetch(
+      `https://de1.api.radio-browser.info/json/stations/bycountry/China?order=votes&reverse=true&limit=${limit}`,
+      { headers: { 'User-Agent': 'CloudflyRadioApp/1.0' } }
+    );
+    if (!res.ok) throw new Error('Network error');
+    const data = await res.json();
+    return data
+      .filter((s: any) => s.url_resolved && s.name.trim())
+      .map((s: any, idx: number) => {
+        const freqMhz = +(88.0 + (idx % 20) * 1.0).toFixed(1);
+        return {
+          id: `rb_${s.stationuuid || idx}`,
+          name: s.name.trim(),
+          frequency: `FM ${freqMhz}`,
+          freqMhz,
+          category: 'online' as const,
+          categoryLabel: s.tags?.split(',')[0] || '在线电台',
+          streamUrl: s.url_resolved,
+          description: s.state ? `来自 ${s.state} · 格式 ${s.codec || 'MP3'}` : `在线广播电台 · ${s.codec || 'MP3'}`,
+          coverUrl: s.favicon || undefined,
+          bitrate: s.bitrate ? `${s.bitrate} kbps` : undefined,
+          isOnlineSearch: true,
+        };
+      });
+  } catch (err) {
+    console.warn('Failed to fetch from Radio Browser:', err);
+    return [];
+  }
+}
+
+/**
+ * Radio Browser API: 在线搜索全球/国内任意关键词电台
+ */
+export async function searchRadioBrowser(keyword: string, limit = 15): Promise<RadioStation[]> {
+  if (!keyword.trim()) return [];
+  try {
+    const res = await fetch(
+      `https://de1.api.radio-browser.info/json/stations/byname/${encodeURIComponent(keyword)}?limit=${limit}`,
+      { headers: { 'User-Agent': 'CloudflyRadioApp/1.0' } }
+    );
+    if (!res.ok) throw new Error('Search failed');
+    const data = await res.json();
+    return data
+      .filter((s: any) => s.url_resolved && s.name.trim())
+      .map((s: any, idx: number) => {
+        const freqMhz = +(88.5 + (idx % 19) * 1.0).toFixed(1);
+        return {
+          id: `rb_search_${s.stationuuid || idx}`,
+          name: s.name.trim(),
+          frequency: `FM ${freqMhz}`,
+          freqMhz,
+          category: 'online' as const,
+          categoryLabel: s.country || '搜索电台',
+          streamUrl: s.url_resolved,
+          description: `${s.country || '全球'} · ${s.codec || 'MP3'} ${s.bitrate ? s.bitrate + 'k' : ''}`,
+          coverUrl: s.favicon || undefined,
+          bitrate: s.bitrate ? `${s.bitrate} kbps` : undefined,
+          isOnlineSearch: true,
+        };
+      });
+  } catch (err) {
+    console.warn('Search Radio Browser error:', err);
+    return [];
+  }
 }

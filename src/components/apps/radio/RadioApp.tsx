@@ -8,9 +8,9 @@ import {
   Palette,
   Timer,
   Radio as RadioIcon,
-  Sparkles,
-  RotateCcw,
+  Globe2,
 } from 'lucide-react';
+import Hls from 'hls.js';
 import {
   RadioStation,
   PRESET_STATIONS,
@@ -28,6 +28,7 @@ import { fetchColormindPalette, rgbToHex } from '../../../core/theme/colormindSe
 import { FrequencyDial } from './components/FrequencyDial';
 import { TuningKnob } from './components/TuningKnob';
 import { SpeakerGrill } from './components/SpeakerGrill';
+import { RadioSourceDrawer } from './components/RadioSourceDrawer';
 
 interface RadioAppProps {
   onBack: () => void;
@@ -35,6 +36,7 @@ interface RadioAppProps {
 
 export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
   // 电台与音频状态
+  const [stationList, setStationList] = useState<RadioStation[]>(PRESET_STATIONS);
   const [currentStation, setCurrentStation] = useState<RadioStation>(() => {
     const lastId = loadLastStationId();
     return PRESET_STATIONS.find((s) => s.id === lastId) || PRESET_STATIONS[0];
@@ -45,6 +47,9 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [volume, setVolume] = useState<number>(loadRadioVolume);
   const [isMuted, setIsMuted] = useState(false);
+
+  // 换源抽屉
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // 旋钮旋转角度
   const [knobAngle, setKnobAngle] = useState(45);
@@ -57,15 +62,15 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
   const [palette, setPalette] = useState<string[]>(loadRadioPalette);
   const [isColoring, setIsColoring] = useState(false);
 
-  // 实际 audio 元素引用
+  // 实际 audio 与 HLS 实例引用
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
 
-  // 1. 初始化 Audio 元素
+  // 1. 初始化 Audio 元素与事件监听
   useEffect(() => {
     const audio = new Audio();
     audio.preload = 'none';
     audio.volume = volume;
-    // 关键：阻止发送 Referer 头，防止触发防盗链 403
     try {
       (audio as any).referrerPolicy = 'no-referrer';
     } catch {}
@@ -79,35 +84,25 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
       setErrorMsg(null);
     };
     const handlePause = () => setIsPlaying(false);
-    const handleError = () => {
-      setIsLoading(false);
-      setIsPlaying(false);
-      // 尝试备用流
-      if (currentStation.backupStreamUrl && audio.src !== currentStation.backupStreamUrl) {
-        audio.src = currentStation.backupStreamUrl;
-        audio.load();
-        audio.play().catch(() => setErrorMsg('该电台源暂不可用，轻拨换一台吧'));
-      } else {
-        setErrorMsg('该电台源暂不可用，轻拨换一台吧');
-      }
-    };
 
     audio.addEventListener('waiting', handleWaiting);
     audio.addEventListener('canplay', handleCanPlay);
     audio.addEventListener('playing', handlePlaying);
     audio.addEventListener('pause', handlePause);
-    audio.addEventListener('error', handleError);
 
     return () => {
       audio.pause();
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
       audio.removeEventListener('waiting', handleWaiting);
       audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('playing', handlePlaying);
       audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('error', handleError);
       audio.src = '';
     };
-  }, [currentStation]);
+  }, []);
 
   // 2. 音量与静音同步
   useEffect(() => {
@@ -117,29 +112,72 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
     saveRadioVolume(volume);
   }, [volume, isMuted]);
 
-  // 3. 切换电台
+  // 3. 通用播放核心函数（支持 HLS .m3u8 与原生 MP3 / AAC）
+  const playStreamUrl = (url: string, backupUrl?: string) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    setIsLoading(true);
+    setErrorMsg(null);
+
+    const onPlayFail = () => {
+      if (backupUrl && audio.src !== backupUrl) {
+        console.warn('Primary stream failed, attempting backup stream:', backupUrl);
+        playStreamUrl(backupUrl);
+      } else {
+        setIsLoading(false);
+        setIsPlaying(false);
+        setErrorMsg('电台网络连接微弱，请点击换源或拨动旋钮换台');
+      }
+    };
+
+    if (url.includes('.m3u8')) {
+      if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+        audio.src = url;
+        audio.load();
+        audio.play().then(() => setIsPlaying(true)).catch(onPlayFail);
+      } else if (Hls.isSupported()) {
+        const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+        hls.loadSource(url);
+        hls.attachMedia(audio);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          audio.play().then(() => setIsPlaying(true)).catch(onPlayFail);
+        });
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (data.fatal) {
+            hls.destroy();
+            hlsRef.current = null;
+            onPlayFail();
+          }
+        });
+        hlsRef.current = hls;
+      } else {
+        audio.src = url;
+        audio.load();
+        audio.play().then(() => setIsPlaying(true)).catch(onPlayFail);
+      }
+    } else {
+      audio.src = url;
+      audio.load();
+      audio.play().then(() => setIsPlaying(true)).catch(onPlayFail);
+    }
+  };
+
+  // 4. 切换电台
   const playStation = (station: RadioStation) => {
+    // 若不在列表中，自动追加
+    if (!stationList.some((s) => s.id === station.id)) {
+      setStationList((prev) => [station, ...prev]);
+    }
     setCurrentStation(station);
     setCurrentFreq(station.freqMhz);
     saveLastStationId(station.id);
-    setErrorMsg(null);
-
-    if (audioRef.current) {
-      audioRef.current.src = station.streamUrl;
-      audioRef.current.load();
-      setIsLoading(true);
-      audioRef.current
-        .play()
-        .then(() => {
-          setIsPlaying(true);
-          setErrorMsg(null);
-        })
-        .catch((err) => {
-          console.warn('Play error:', err);
-          setIsLoading(false);
-          setIsPlaying(false);
-        });
-    }
+    playStreamUrl(station.streamUrl, station.backupStreamUrl);
   };
 
   // 播放 / 暂停切换
@@ -149,47 +187,30 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      if (!audioRef.current.src || !audioRef.current.src.includes(currentStation.streamUrl)) {
-        audioRef.current.src = currentStation.streamUrl;
-      }
-      audioRef.current.load();
-      setIsLoading(true);
-      setErrorMsg(null);
-      audioRef.current
-        .play()
-        .then(() => {
-          setIsPlaying(true);
-          setErrorMsg(null);
-        })
-        .catch((err) => {
-          console.warn('Toggle play error:', err);
-          setIsLoading(false);
-          setIsPlaying(false);
-          setErrorMsg('轻触播放失败，请检查网络或重试');
-        });
+      playStreamUrl(currentStation.streamUrl, currentStation.backupStreamUrl);
     }
   };
 
-  // 4. 旋钮步进切换上一个/下一个电台
+  // 5. 旋钮步进切换上一个/下一个电台
   const handleRotateStep = (delta: number) => {
     setKnobAngle((prev) => (prev + delta * 30) % 360);
-    const currentIndex = PRESET_STATIONS.findIndex((s) => s.id === currentStation.id);
+    const currentIndex = stationList.findIndex((s) => s.id === currentStation.id);
     let nextIndex = currentIndex + delta;
-    if (nextIndex < 0) nextIndex = PRESET_STATIONS.length - 1;
-    if (nextIndex >= PRESET_STATIONS.length) nextIndex = 0;
-    playStation(PRESET_STATIONS[nextIndex]);
+    if (nextIndex < 0) nextIndex = stationList.length - 1;
+    if (nextIndex >= stationList.length) nextIndex = 0;
+    playStation(stationList[nextIndex]);
   };
 
-  // 5. 点击刻度盘调频
+  // 6. 点击刻度盘调频
   const handleDialFreqChange = (newFreq: number) => {
     setCurrentFreq(newFreq);
-    const matched = findStationByFrequency(newFreq);
+    const matched = findStationByFrequency(newFreq, stationList);
     if (matched && matched.id !== currentStation.id) {
       playStation(matched);
     }
   };
 
-  // 6. Colormind 自由配色换肤
+  // 7. Colormind 自由配色换肤
   const handleRandomizePalette = async () => {
     if (isColoring) return;
     setIsColoring(true);
@@ -201,12 +222,11 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
         saveRadioPalette(hexes);
       }
     } catch {
-      // 优雅柔和复古色轮换
       const fallbacks = [
-        ['#F4F6F9', '#E1E8F0', '#4A6B82', '#1E293B', '#D97706'], // 经典复古蓝金
-        ['#F7FBF9', '#E6F4ED', '#2E7D32', '#143818', '#059669'], // 墨绿经典唱机
-        ['#FFFBEB', '#FEF3C7', '#B45309', '#451A03', '#F59E0B'], // 暖木琥珀收音机
-        ['#FBF7FB', '#F5E6F5', '#7E22CE', '#3B0764', '#EC4899'], // 霓虹蒸汽波
+        ['#F4F6F9', '#E1E8F0', '#4A6B82', '#1E293B', '#D97706'],
+        ['#F7FBF9', '#E6F4ED', '#2E7D32', '#143818', '#059669'],
+        ['#FFFBEB', '#FEF3C7', '#B45309', '#451A03', '#F59E0B'],
+        ['#FBF7FB', '#F5E6F5', '#7E22CE', '#3B0764', '#EC4899'],
       ];
       const next = fallbacks[Math.floor(Math.random() * fallbacks.length)];
       setPalette(next);
@@ -216,7 +236,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
     }
   };
 
-  // 7. 定时助眠倒计时
+  // 8. 定时助眠倒计时
   useEffect(() => {
     if (!sleepTimerMinutes) {
       setSleepTimeRemaining(null);
@@ -302,12 +322,27 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
             <RadioIcon size={15} style={{ color: primaryAccent }} />
           </h2>
           <span style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--nm-text-sub, #7D8CA3)' }}>
-            Vintage Frequency FM · 24H Live
+            FM Tuner · Radio Browser & Live
           </span>
         </div>
 
-        {/* 右侧动作区：Colormind 换色 + 定时睡眠 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        {/* 右侧动作区：换源 + Colormind 换色 + 定时睡眠 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          {/* 换源 / 在线电台库 */}
+          <button
+            type="button"
+            onClick={() => setIsDrawerOpen(true)}
+            className="nm-rebound-btn nm-btn-circle"
+            style={{
+              width: '36px',
+              height: '36px',
+              color: primaryAccent,
+            }}
+            title="电台换源与全球电台库 (Radio Browser API)"
+          >
+            <Globe2 size={16} strokeWidth={2.4} />
+          </button>
+
           {/* 定时睡眠 */}
           <button
             type="button"
@@ -393,7 +428,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
             onFreqChange={handleDialFreqChange}
             accentColor={primaryAccent}
             glowColor={glowAccent}
-            isLockedStation={Boolean(findStationByFrequency(currentFreq))}
+            isLockedStation={Boolean(findStationByFrequency(currentFreq, stationList))}
           />
 
           {/* 2. 当前电台信息液晶状态铭牌 */}
@@ -433,6 +468,22 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
                 >
                   {currentStation.categoryLabel}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setIsDrawerOpen(true)}
+                  style={{
+                    fontSize: '9px',
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    backgroundColor: `${primaryAccent}40`,
+                    color: '#BAE6FD',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                  }}
+                >
+                  换源
+                </button>
               </div>
               <div
                 style={{
@@ -567,7 +618,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* 【预设电台卡槽列表】：可快速点播 */}
+        {/* 【当前可用电台卡槽列表】 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div
             style={{
@@ -585,9 +636,26 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
                 letterSpacing: '0.08em',
               }}
             >
-              PRESET STATIONS · 预设频道 ({PRESET_STATIONS.length})
+              CHANNELS · 电台列表 ({stationList.length})
             </span>
-            <span style={{ fontSize: '10px', color: '#94A3B8' }}>即点即听</span>
+            <button
+              type="button"
+              onClick={() => setIsDrawerOpen(true)}
+              style={{
+                fontSize: '11px',
+                color: primaryAccent,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px',
+              }}
+            >
+              <Globe2 size={12} />
+              <span>更换更多电台源</span>
+            </button>
           </div>
 
           <div
@@ -597,7 +665,7 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
               gap: '8px',
             }}
           >
-            {PRESET_STATIONS.map((station, index) => {
+            {stationList.map((station, index) => {
               const isSelected = station.id === currentStation.id;
               return (
                 <div
@@ -681,6 +749,15 @@ export const RadioApp: React.FC<RadioAppProps> = ({ onBack }) => {
           </div>
         </div>
       </div>
+
+      {/* 电台换源与全球电台库抽屉 */}
+      <RadioSourceDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        currentStationId={currentStation.id}
+        onSelectStation={playStation}
+        accentColor={primaryAccent}
+      />
     </div>
   );
 };
