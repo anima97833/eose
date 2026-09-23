@@ -15,6 +15,7 @@ import { QuestCard } from './components/QuestCard';
 import { CreateQuestModal } from './components/CreateQuestModal';
 import { FloatingStatToast } from './components/FloatingStatToast';
 import { FactQuizModal } from './components/FactQuizModal';
+import { MultiverseAgentModal } from './components/MultiverseAgentModal';
 
 interface QuestJournalAppProps {
   onBack: () => void;
@@ -26,6 +27,7 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
   const [activeTab, setActiveTab] = useState<QuestCategory>('main');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFactQuizModal, setShowFactQuizModal] = useState(false);
+  const [showMultiverseModal, setShowMultiverseModal] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [floatingStat, setFloatingStat] = useState<AwardedStatResult | null>(null);
   const [palette, setPalette] = useState<string[]>(loadQuestPalette);
@@ -134,11 +136,28 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
       setShowFactQuizModal(true);
       return;
     }
+    if (questId === 'egg_multiverse_agent') {
+      setShowMultiverseModal(true);
+      return;
+    }
+
     const { items: updated, awardedStat } = markQuestDone(questId);
     setQuests(updated);
     if (awardedStat) {
       setFloatingStat(awardedStat);
       setTimeout(() => setFloatingStat(null), 1900);
+    }
+
+    // 随机完成一项主线或者支线任务后触发传送门跃迁 (45% 几率惊喜触发)
+    const targetQuest = quests.find((q) => q.id === questId);
+    if (targetQuest && (targetQuest.category === 'main' || targetQuest.category === 'side')) {
+      const luckyRoll = Math.random() < 0.45;
+      if (luckyRoll) {
+        setTimeout(() => {
+          triggerEasterEgg('MULTIVERSE_PORTAL');
+          setShowMultiverseModal(true);
+        }, 750);
+      }
     }
   };
 
@@ -244,8 +263,8 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
           </span>
         </div>
 
-        {/* 右侧动作区：脑洞彩蛋入口 + 发布新任务按钮 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        {/* 右侧动作区：脑洞彩蛋入口 + 多元宇宙传送枪 + 发布新任务按钮 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <button
             type="button"
             onClick={() => {
@@ -253,20 +272,33 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
               setShowFactQuizModal(true);
             }}
             className="nm-rebound-btn nm-btn-circle"
-            style={{ width: '38px', height: '38px', color: '#F59E0B' }}
+            style={{ width: '36px', height: '36px', color: '#F59E0B' }}
             title="脑洞小测验 (摇晃手机/静止10秒/轻叩3次唤醒)"
           >
-            <span style={{ fontSize: '16px' }}>💡</span>
+            <span style={{ fontSize: '15px' }}>💡</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerEasterEgg('MULTIVERSE_PORTAL');
+              setShowMultiverseModal(true);
+            }}
+            className="nm-rebound-btn nm-btn-circle"
+            style={{ width: '36px', height: '36px', color: '#10B981' }}
+            title="多元宇宙传送门 (完成任务随机跃迁，亦可手动开启)"
+          >
+            <span style={{ fontSize: '15px' }}>🛸</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
             className="nm-rebound-btn nm-btn-circle"
-            style={{ width: '38px', height: '38px', color: 'var(--nm-primary, #5096C6)' }}
+            style={{ width: '36px', height: '36px', color: 'var(--nm-primary, #5096C6)' }}
             title="收录自定义任务"
           >
-            <Plus size={20} strokeWidth={2.6} />
+            <Plus size={18} strokeWidth={2.6} />
           </button>
         </div>
       </div>
@@ -581,6 +613,21 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
             setQuests(res.items);
           }}
           onClose={() => setShowFactQuizModal(false)}
+        />
+      )}
+
+      {/* 瑞克和莫蒂多元宇宙特工证件卡弹窗 */}
+      {showMultiverseModal && (
+        <MultiverseAgentModal
+          palette={palette}
+          onAwardStat={(stat) => {
+            setFloatingStat(stat);
+            setTimeout(() => setFloatingStat(null), 1900);
+            // 自动标记彩蛋完成
+            const res = markQuestDone('egg_multiverse_agent');
+            setQuests(res.items);
+          }}
+          onClose={() => setShowMultiverseModal(false)}
         />
       )}
     </div>

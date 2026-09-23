@@ -241,6 +241,21 @@ export const DEFAULT_PRESET_QUESTS: QuestItem[] = [
     targetProgress: 1,
     status: 'in_progress',
   },
+  {
+    id: 'egg_multiverse_agent',
+    category: 'easter_egg',
+    title: '【多元宇宙特工证件】',
+    desc: '在打卡日常时偶遇传送枪时空裂缝，邂逅平行维度的住民。',
+    easterEggClue: '完成任意主线或支线任务时，传送门可能不期而遇地裂开…',
+    easterEggCode: 'MULTIVERSE_PORTAL',
+    icon: '🛸',
+    tag: '🏹 敏捷',
+    statKey: 'DEX',
+    statGain: { fixed: 8 },
+    currentProgress: 0,
+    targetProgress: 1,
+    status: 'in_progress',
+  },
 ];
 
 /**
