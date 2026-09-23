@@ -118,7 +118,7 @@ export const DISNEY_WISH_CARDS: DisneyWishCard[] = [
     movie: '《小飞象》Dumbo',
     quoteCn: '那些让你感到与众不同、甚至让你跌倒的事情，终将成为托举你飞翔的翅膀。',
     quoteEn: 'The very things that held you down are gonna carry you up, and up, and up!',
-    avatarUrl: 'https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?auto=format&fit=crop&w=700&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=700&q=80',
     themeColor: '#6366F1',
     gradient: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)',
     healingTag: '独特光芒',

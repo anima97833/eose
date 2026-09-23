@@ -41,7 +41,9 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
         backgroundColor: 'rgba(7, 13, 27, 0.82)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        padding: '16px',
+        padding: '36px 20px',
+        overflowY: 'auto',
+        boxSizing: 'border-box',
         animation: 'starryFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
       onClick={onClose}
@@ -113,27 +115,28 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
         />
       </div>
 
-      {/* 选项 A：星夜飘落 · 纯美治愈晚安信笺 */}
+      {/* 选项 A：星夜飘落 · 纯美治愈晚安信笺 (移动端精致比例小信片) */}
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           position: 'relative',
-          width: '100%',
-          maxWidth: '430px',
+          width: '90%',
+          maxWidth: '320px',
+          maxHeight: 'min(88vh, 520px)',
           background: 'linear-gradient(175deg, #FFFFFF 0%, #F8FAFD 55%, #F1F5F9 100%)',
-          borderRadius: '30px',
+          borderRadius: '24px',
           boxShadow:
-            '0 28px 65px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.85) inset, 0 0 35px rgba(186, 230, 253, 0.3)',
-          padding: '24px 22px 22px',
+            '0 24px 50px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.85) inset, 0 0 30px rgba(186, 230, 253, 0.25)',
+          padding: '16px 16px 14px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           textAlign: 'center',
           boxSizing: 'border-box',
-          transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+          transition: 'all 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
           opacity: isFlipping ? 0.35 : 1,
-          transform: isFlipping ? 'scale(0.96) translateY(8px)' : 'scale(1) translateY(0)',
-          animation: 'cardGlideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+          transform: isFlipping ? 'scale(0.96) translateY(6px)' : 'scale(1) translateY(0)',
+          animation: 'cardGlideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
         {/* 顶部轻奢火漆星光印章 */}
@@ -141,32 +144,32 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '7px',
-            padding: '5px 14px',
+            gap: '6px',
+            padding: '4px 12px',
             borderRadius: '999px',
-            background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.9) 0%, rgba(253, 230, 138, 0.9) 100%)',
-            boxShadow: '0 3px 10px rgba(217, 119, 6, 0.18), 0 1px 0 rgba(255, 255, 255, 0.8) inset',
+            background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.95) 0%, rgba(253, 230, 138, 0.95) 100%)',
+            boxShadow: '0 2px 8px rgba(217, 119, 6, 0.16), 0 1px 0 rgba(255, 255, 255, 0.8) inset',
             border: '1px solid rgba(245, 158, 11, 0.35)',
-            marginBottom: '16px',
+            marginBottom: '12px',
           }}
         >
-          <span style={{ fontSize: '13px' }}>✨</span>
+          <span style={{ fontSize: '11px' }}>✨</span>
           <span
             style={{
-              fontSize: '12px',
+              fontSize: '11px',
               fontWeight: 700,
               color: '#92400E',
-              letterSpacing: '0.08em',
+              letterSpacing: '0.06em',
             }}
           >
             童话星愿签 · 晚安寄语
           </span>
           <span
             style={{
-              fontSize: '10px',
-              padding: '1px 6px',
+              fontSize: '9.5px',
+              padding: '1px 5px',
               borderRadius: '999px',
-              backgroundColor: 'rgba(255, 255, 255, 0.75)',
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
               color: '#B45309',
               fontWeight: 600,
             }}
@@ -175,18 +178,19 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
           </span>
         </div>
 
-        {/* 角色立绘展示窗 */}
+        {/* 角色立绘展示窗 (紧凑高度 120px) */}
         <div
           style={{
             position: 'relative',
             width: '100%',
-            height: '190px',
-            borderRadius: '20px',
+            height: '120px',
+            borderRadius: '16px',
             overflow: 'hidden',
-            boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12), 0 1px 0 rgba(255, 255, 255, 0.9) inset',
+            boxShadow: '0 6px 18px rgba(15, 23, 42, 0.12), 0 1px 0 rgba(255, 255, 255, 0.9) inset',
             border: '2px solid #FFFFFF',
-            marginBottom: '18px',
+            marginBottom: '12px',
             backgroundColor: '#F1F5F9',
+            flexShrink: 0,
           }}
         >
           <img
@@ -196,7 +200,7 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              objectPosition: 'center 20%',
+              objectPosition: 'center 25%',
               transition: 'transform 0.5s ease',
             }}
           />
@@ -205,7 +209,7 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'linear-gradient(to top, rgba(15, 23, 42, 0.6) 0%, rgba(15, 23, 42, 0) 55%)',
+              background: 'linear-gradient(to top, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0) 60%)',
             }}
           />
 
@@ -213,45 +217,45 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
           <div
             style={{
               position: 'absolute',
-              bottom: '12px',
-              left: '14px',
-              right: '14px',
+              bottom: '8px',
+              left: '10px',
+              right: '10px',
               display: 'flex',
               alignItems: 'flex-end',
               justifyContent: 'space-between',
               color: '#FFFFFF',
-              textShadow: '0 2px 6px rgba(0, 0, 0, 0.5)',
+              textShadow: '0 2px 6px rgba(0, 0, 0, 0.6)',
             }}
           >
             <div style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '0.03em', lineHeight: 1.2 }}>
                 {currentWish.character}
                 <span
                   style={{
-                    fontSize: '12px',
+                    fontSize: '11px',
                     fontWeight: 500,
-                    marginLeft: '6px',
+                    marginLeft: '5px',
                     opacity: 0.85,
                   }}
                 >
                   {currentWish.characterEn}
                 </span>
               </div>
-              <div style={{ fontSize: '11px', opacity: 0.9, marginTop: '1px' }}>
+              <div style={{ fontSize: '10px', opacity: 0.9, marginTop: '1px' }}>
                 {currentWish.movie}
               </div>
             </div>
             <div
               style={{
-                width: '32px',
-                height: '32px',
+                width: '26px',
+                height: '26px',
                 borderRadius: '50%',
-                backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                backdropFilter: 'blur(6px)',
+                backgroundColor: 'rgba(255, 255, 255, 0.28)',
+                backdropFilter: 'blur(5px)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '16px',
+                fontSize: '13px',
                 border: '1px solid rgba(255, 255, 255, 0.4)',
               }}
             >
@@ -260,26 +264,27 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
           </div>
         </div>
 
-        {/* 寄语文本框（中英双语，优雅字体排印，纯净心灵抚慰，绝不加六维属性） */}
+        {/* 寄语文本框（紧凑精致，大字舒缓，双语治愈） */}
         <div
           style={{
             width: '100%',
-            padding: '16px 14px',
-            borderRadius: '18px',
+            padding: '10px 12px 10px',
+            borderRadius: '15px',
             backgroundColor: '#FFFFFF',
-            boxShadow: '0 4px 18px rgba(148, 163, 184, 0.12), 0 1px 3px rgba(0, 0, 0, 0.04)',
+            boxShadow: '0 3px 12px rgba(148, 163, 184, 0.1), 0 1px 2px rgba(0, 0, 0, 0.03)',
             border: '1px solid #EEF2F6',
-            marginBottom: '20px',
+            marginBottom: '14px',
             position: 'relative',
+            boxSizing: 'border-box',
           }}
         >
           {/* 装饰引号 */}
           <span
             style={{
               position: 'absolute',
-              top: '6px',
-              left: '12px',
-              fontSize: '26px',
+              top: '4px',
+              left: '8px',
+              fontSize: '20px',
               lineHeight: 1,
               color: '#CBD5E1',
               fontFamily: 'Georgia, serif',
@@ -290,9 +295,9 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
 
           <p
             style={{
-              margin: '8px 8px 10px',
-              fontSize: '15px',
-              lineHeight: 1.68,
+              margin: '4px 6px 6px',
+              fontSize: '13px',
+              lineHeight: 1.55,
               fontWeight: 600,
               color: '#1E293B',
               letterSpacing: '0.02em',
@@ -304,9 +309,9 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
 
           <p
             style={{
-              margin: '0 8px 4px',
-              fontSize: '11px',
-              lineHeight: 1.5,
+              margin: '0 6px 2px',
+              fontSize: '10px',
+              lineHeight: 1.35,
               color: '#94A3B8',
               fontStyle: 'italic',
             }}
@@ -317,9 +322,9 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
           <span
             style={{
               position: 'absolute',
-              bottom: '4px',
-              right: '12px',
-              fontSize: '26px',
+              bottom: '2px',
+              right: '8px',
+              fontSize: '20px',
               lineHeight: 1,
               color: '#CBD5E1',
               fontFamily: 'Georgia, serif',
@@ -334,7 +339,7 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
+            gap: '8px',
             width: '100%',
           }}
         >
@@ -344,20 +349,20 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
             title="换一张星愿信笺"
             style={{
               flex: 1,
-              padding: '12px 14px',
-              borderRadius: '16px',
+              padding: '9px 10px',
+              borderRadius: '13px',
               border: '1px solid #E2E8F0',
               backgroundColor: '#F8FAFC',
               color: '#475569',
-              fontSize: '13px',
+              fontSize: '12px',
               fontWeight: 600,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
+              gap: '4px',
               transition: 'all 0.2s ease',
-              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+              boxShadow: '0 1px 4px rgba(0, 0, 0, 0.03)',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#F1F5F9';
@@ -366,7 +371,7 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
               e.currentTarget.style.backgroundColor = '#F8FAFC';
             }}
           >
-            <span>🌠</span>
+            <span style={{ fontSize: '12px' }}>🌠</span>
             <span>换一签</span>
           </button>
 
@@ -375,34 +380,34 @@ export const DisneyWishModal: React.FC<DisneyWishModalProps> = ({ isOpen, onClos
             onClick={onClose}
             style={{
               flex: 2,
-              padding: '12px 16px',
-              borderRadius: '16px',
+              padding: '9px 12px',
+              borderRadius: '13px',
               border: 'none',
               background: 'linear-gradient(135deg, #38BDF8 0%, #2563EB 100%)',
               color: '#FFFFFF',
-              fontSize: '14px',
+              fontSize: '12.5px',
               fontWeight: 700,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '7px',
-              boxShadow: '0 8px 20px -4px rgba(37, 99, 235, 0.42), 0 1px 0 rgba(255, 255, 255, 0.3) inset',
+              gap: '5px',
+              boxShadow: '0 6px 16px -3px rgba(37, 99, 235, 0.4), 0 1px 0 rgba(255, 255, 255, 0.3) inset',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-1px)';
               e.currentTarget.style.boxShadow =
-                '0 10px 24px -4px rgba(37, 99, 235, 0.52), 0 1px 0 rgba(255, 255, 255, 0.3) inset';
+                '0 8px 18px -3px rgba(37, 99, 235, 0.5), 0 1px 0 rgba(255, 255, 255, 0.3) inset';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
               e.currentTarget.style.boxShadow =
-                '0 8px 20px -4px rgba(37, 99, 235, 0.42), 0 1px 0 rgba(255, 255, 255, 0.3) inset';
+                '0 6px 16px -3px rgba(37, 99, 235, 0.4), 0 1px 0 rgba(255, 255, 255, 0.3) inset';
             }}
           >
             <span>晚安 · 收下今日星愿</span>
-            <span style={{ fontSize: '15px' }}>✨</span>
+            <span style={{ fontSize: '13px' }}>✨</span>
           </button>
         </div>
       </div>
