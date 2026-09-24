@@ -267,7 +267,7 @@ export const StoryClozeCard: React.FC<StoryClozeCardProps> = ({
             </div>
             {result.reward && (
               <span style={{ fontSize: '12px', fontWeight: 700, color: NM.emerald }}>
-                +{result.reward.expGain} EXP · +{result.reward.attrGain} {result.reward.attrKey}
+                +{result.reward.attrGain} {result.reward.attrName || (result.reward.attrKey === 'INT' ? '智力' : '精神')}
               </span>
             )}
           </div>

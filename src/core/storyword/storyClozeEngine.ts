@@ -88,12 +88,9 @@ export function generateClozeChallengesForChapter(
 export interface ClozeAnswerResult {
   isCorrect: boolean;
   reward?: {
-    expGain: number;
-    goldGain: number;
     attrKey: string;
     attrGain: number;
-    leveledUp: boolean;
-    newLevel?: number;
+    attrName: string;
   };
 }
 
@@ -110,25 +107,15 @@ export async function submitClozeAnswer(
   challenge.isCorrect = isCorrect;
 
   if (isCorrect) {
-    // 正确：激发“爽点爆发”，结算 RPG 角色智力/精神属性提升与金币、经验
+    // 正确：严格遵循规则仅加 +2 智力/精神属性，不加经验/金币，等级提升完全依靠六维属性换算
     try {
       const profile = loadRPGProfile();
-      const expGain = 15;
-      const goldGain = 10;
-      const attrGain = 1;
-      const attrKey = profile.currentClassId === 'scholar' || profile.currentClassId === 'mage' ? 'INT' : 'SPI';
+      const attrGain = 2;
+      const isIntel = profile.currentClassId === 'scholar' || profile.currentClassId === 'mage';
+      const attrKey: 'INT' | 'SPI' = isIntel ? 'INT' : 'SPI';
+      const attrName = isIntel ? '智力' : '精神';
 
-      profile.currentExp += (expGain + goldGain);
-
-      let leveledUp = false;
-      while (profile.currentExp >= profile.maxExp) {
-        profile.currentExp -= profile.maxExp;
-        profile.level += 1;
-        profile.maxExp = Math.round(profile.maxExp * 1.2);
-        leveledUp = true;
-      }
-
-      if (profile.attributes[attrKey]) {
+      if (profile.attributes && profile.attributes[attrKey]) {
         profile.attributes[attrKey].value = Math.min(
           profile.attributes[attrKey].maxValue,
           profile.attributes[attrKey].value + attrGain
@@ -140,12 +127,9 @@ export async function submitClozeAnswer(
       return {
         isCorrect: true,
         reward: {
-          expGain,
-          goldGain,
           attrKey,
           attrGain,
-          leveledUp,
-          newLevel: profile.level,
+          attrName,
         },
       };
     } catch (err) {
