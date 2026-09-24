@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   Send,
   Trash2,
-  Settings,
   Sparkles,
   Bot,
   User,
@@ -301,12 +300,8 @@ ${factsContext}
           <ArrowLeft size={18} />
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Sparkles size={16} color="#38bdf8" />
-          <span style={{ fontSize: '14px', fontWeight: 800, letterSpacing: '0.5px' }}>
-            星空学伴
-          </span>
-        </div>
+        {/* 标题字已按需求移除，保持星空纯净视野 */}
+        <div style={{ flex: 1 }} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {messages.length > 0 && (
@@ -328,28 +323,6 @@ ${factsContext}
               }}
             >
               <Trash2 size={15} />
-            </button>
-          )}
-
-          {onOpenSettings && (
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              title="配置 API 密钥"
-              style={{
-                border: 'none',
-                background: 'rgba(255,255,255,0.08)',
-                color: hasApiKey ? '#94a3b8' : '#f59e0b',
-                width: '30px',
-                height: '30px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <Settings size={15} />
             </button>
           )}
         </div>
