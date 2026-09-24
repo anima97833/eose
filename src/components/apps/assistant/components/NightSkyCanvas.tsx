@@ -13,6 +13,9 @@ import {
   Camera,
   User,
   Image as ImageIcon,
+  Film,
+  Gift,
+  Compass,
 } from 'lucide-react';
 import { ALL_STAR_APPS } from '../../../../core/assistant/appContextAggregator';
 import { StarAppMeta } from '../../../../core/assistant/assistantTypes';
@@ -35,12 +38,14 @@ export const NightSkyCanvas: React.FC<NightSkyCanvasProps> = ({
   onOpenCharacterPicker,
   isCompactMode,
 }) => {
-  // 查找已选中的星星元数据，用于星座连线
-  const selectedStars = ALL_STAR_APPS.filter((s) => selectedStarIds.includes(s.id));
+  // 查找已选中的星星元数据，按天球横坐标排序后连接成自然星座星轨
+  const selectedStars = ALL_STAR_APPS
+    .filter((s) => selectedStarIds.includes(s.id))
+    .sort((a, b) => a.x - b.x);
 
   // 图标渲染辅助
   const renderStarIcon = (iconName: string, color: string) => {
-    const size = isCompactMode ? 12 : 14;
+    const size = isCompactMode ? 11 : 13;
     switch (iconName) {
       case 'BookOpen': return <BookOpen size={size} color={color} />;
       case 'ScrollText': return <ScrollText size={size} color={color} />;
@@ -52,8 +57,21 @@ export const NightSkyCanvas: React.FC<NightSkyCanvasProps> = ({
       case 'HelpCircle': return <HelpCircle size={size} color={color} />;
       case 'GitBranch': return <GitBranch size={size} color={color} />;
       case 'Sparkles': return <Sparkles size={size} color={color} />;
+      case 'Camera': return <Camera size={size} color={color} />;
+      case 'User': return <User size={size} color={color} />;
+      case 'Image': return <ImageIcon size={size} color={color} />;
+      case 'Film': return <Film size={size} color={color} />;
+      case 'Gift': return <Gift size={size} color={color} />;
+      case 'Compass': return <Compass size={size} color={color} />;
       default: return <Sparkles size={size} color={color} />;
     }
+  };
+
+  // 计算星宿在不同视野模式下的自适应天球坐标 (开启防重叠与密度平滑)
+  const getStarY = (starY: number) => {
+    if (!isCompactMode) return starY;
+    // 紧凑模式：将 14%~58% 映射至 12%~54% 舒适紧凑高度，彻底避开底部草坡与角色
+    return 12 + ((starY - 14) / 44) * 40;
   };
 
   return (
@@ -214,9 +232,9 @@ export const NightSkyCanvas: React.FC<NightSkyCanvasProps> = ({
               <line
                 key={`constellation_${star.id}_${nextStar.id}`}
                 x1={`${star.x}%`}
-                y1={`${isCompactMode ? star.y * 1.1 : star.y}%`}
+                y1={`${getStarY(star.y)}%`}
                 x2={`${nextStar.x}%`}
-                y2={`${isCompactMode ? nextStar.y * 1.1 : nextStar.y}%`}
+                y2={`${getStarY(nextStar.y)}%`}
                 stroke="url(#constellationGradient)"
                 strokeWidth="1.8"
                 strokeDasharray="4 3"
@@ -232,7 +250,7 @@ export const NightSkyCanvas: React.FC<NightSkyCanvasProps> = ({
       {/* 4. 繁星星宿节点（各应用微光漂浮） */}
       {ALL_STAR_APPS.map((star: StarAppMeta, index: number) => {
         const isSelected = selectedStarIds.includes(star.id);
-        const topPos = isCompactMode ? star.y * 1.1 : star.y;
+        const topPos = getStarY(star.y);
 
         return (
           <div

@@ -7,43 +7,26 @@ import { loadMistakeWords } from '../storyword/storyWordStorage';
 import { db } from '../storage/db';
 import { getInsightHistoryList } from '../files/insightHistoryService';
 import { getAllPosters } from '../poster/posterStorage';
+import { loadMomentsFromDB } from '../moments/momentsStorage';
+import { loadWishes } from '../../components/apps/gachapon/core/gachaStorage';
+import { loadAllMovies, calculateCinemaStats } from '../cinema/cinemaStorage';
+import { loadCheckInSpots, getExplorationStats } from '../compass/compassStorage';
+import { loadRPGProfile } from '../rpg/rpgStorage';
 
+/**
+ * 星空全星宿矩阵 (15 颗核心轻拟物应用星星)
+ * 采用银河三星团错落分布算法：左翼灵感学识、中央生活羁绊、右翼光影探索
+ */
 export const ALL_STAR_APPS: StarAppMeta[] = [
+  // === 左翼星宿群【学识·灵感·沉思】 ===
   {
     id: 'course_kanban',
     name: '技能树',
     iconName: 'BookOpen',
     themeColor: '#38bdf8',
     glowColor: 'rgba(56, 189, 248, 0.65)',
-    x: 18,
-    y: 18,
-  },
-  {
-    id: 'diary',
-    name: '任务手账',
-    iconName: 'ScrollText',
-    themeColor: '#34d399',
-    glowColor: 'rgba(52, 211, 153, 0.65)',
-    x: 48,
-    y: 14,
-  },
-  {
-    id: 'books',
-    name: '书藏',
-    iconName: 'BookMarked',
-    themeColor: '#c084fc',
-    glowColor: 'rgba(192, 132, 252, 0.65)',
-    x: 78,
-    y: 20,
-  },
-  {
-    id: 'poetry',
-    name: '诗阁',
-    iconName: 'Feather',
-    themeColor: '#f472b6',
-    glowColor: 'rgba(244, 114, 182, 0.65)',
-    x: 28,
-    y: 35,
+    x: 14,
+    y: 16,
   },
   {
     id: 'storyword',
@@ -51,17 +34,17 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
     iconName: 'Zap',
     themeColor: '#facc15',
     glowColor: 'rgba(250, 204, 21, 0.65)',
-    x: 65,
-    y: 32,
+    x: 32,
+    y: 18,
   },
   {
-    id: 'pomodoro',
-    name: '心流结界',
-    iconName: 'Clock',
-    themeColor: '#fb923c',
-    glowColor: 'rgba(251, 146, 60, 0.65)',
-    x: 84,
-    y: 44,
+    id: 'poetry',
+    name: '诗阁',
+    iconName: 'Feather',
+    themeColor: '#f472b6',
+    glowColor: 'rgba(244, 114, 182, 0.65)',
+    x: 16,
+    y: 36,
   },
   {
     id: 'memo',
@@ -69,8 +52,8 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
     iconName: 'Save',
     themeColor: '#4ade80',
     glowColor: 'rgba(74, 222, 128, 0.65)',
-    x: 15,
-    y: 48,
+    x: 30,
+    y: 38,
   },
   {
     id: 'mood_fortune',
@@ -78,8 +61,46 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
     iconName: 'HelpCircle',
     themeColor: '#fb7185',
     glowColor: 'rgba(251, 113, 133, 0.65)',
-    x: 42,
-    y: 46,
+    x: 18,
+    y: 56,
+  },
+
+  // === 中央星宿群【生活·羁绊·心愿】 ===
+  {
+    id: 'diary',
+    name: '任务手账',
+    iconName: 'ScrollText',
+    themeColor: '#34d399',
+    glowColor: 'rgba(52, 211, 153, 0.65)',
+    x: 50,
+    y: 14,
+  },
+  {
+    id: 'moments',
+    name: '动态',
+    iconName: 'Image',
+    themeColor: '#f43f5e',
+    glowColor: 'rgba(244, 63, 94, 0.65)',
+    x: 48,
+    y: 32,
+  },
+  {
+    id: 'profile',
+    name: '我的',
+    iconName: 'User',
+    themeColor: '#fbbf24',
+    glowColor: 'rgba(251, 191, 36, 0.65)',
+    x: 62,
+    y: 28,
+  },
+  {
+    id: 'gachapon',
+    name: '扭蛋机',
+    iconName: 'Gift',
+    themeColor: '#ec4899',
+    glowColor: 'rgba(236, 72, 153, 0.65)',
+    x: 40,
+    y: 52,
   },
   {
     id: 'files',
@@ -87,17 +108,55 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
     iconName: 'GitBranch',
     themeColor: '#22d3ee',
     glowColor: 'rgba(34, 211, 238, 0.65)',
-    x: 60,
-    y: 52,
+    x: 58,
+    y: 54,
+  },
+
+  // === 右翼星宿群【放映·探险·专注】 ===
+  {
+    id: 'books',
+    name: '书藏',
+    iconName: 'BookMarked',
+    themeColor: '#c084fc',
+    glowColor: 'rgba(192, 132, 252, 0.65)',
+    x: 74,
+    y: 18,
+  },
+  {
+    id: 'compass',
+    name: '时空指南',
+    iconName: 'Compass',
+    themeColor: '#06b6d4',
+    glowColor: 'rgba(6, 182, 212, 0.65)',
+    x: 88,
+    y: 20,
+  },
+  {
+    id: 'pomodoro',
+    name: '心流结界',
+    iconName: 'Clock',
+    themeColor: '#fb923c',
+    glowColor: 'rgba(251, 146, 60, 0.65)',
+    x: 76,
+    y: 36,
+  },
+  {
+    id: 'cinema',
+    name: '放映室',
+    iconName: 'Film',
+    themeColor: '#8b5cf6',
+    glowColor: 'rgba(139, 92, 246, 0.65)',
+    x: 88,
+    y: 42,
   },
   {
     id: 'camera',
-    name: '时光海报',
+    name: '时光相册',
     iconName: 'Sparkles',
     themeColor: '#a78bfa',
     glowColor: 'rgba(167, 139, 250, 0.65)',
-    x: 35,
-    y: 58,
+    x: 76,
+    y: 56,
   },
 ];
 
@@ -295,6 +354,102 @@ export async function aggregateSelectedStarsFacts(selectedStarIds: string[]): Pr
               timestamp: p.createdAt,
             });
           }
+          break;
+        }
+
+        // ================= 新增 5 大核心萃取器 =================
+        case 'moments': {
+          const moments = await loadMomentsFromDB();
+          for (const m of moments.slice(0, quotaPerApp)) {
+            allFacts.push({
+              sourceAppId: 'moments',
+              sourceAppName: '朋友圈动态',
+              category: m.themeTitle || '日常碎碎念',
+              title: m.themeTitle || '生活瞬间',
+              detail: `【${m.dateStr || '近期'}】“${m.content}”（获得属性：${m.attributeTag || 'SPI'} +${m.attributeGain || 2}，金币：+${m.rewardCoins || 50}，${m.isStarred ? '已珍藏' : '日常'}）`,
+              timestamp: m.createdAt,
+            });
+          }
+          break;
+        }
+
+        case 'gachapon': {
+          const wishes = loadWishes();
+          for (const w of wishes.slice(0, quotaPerApp)) {
+            const isCompleted = w.status === 'completed' || !!w.completedAt;
+            const statusLabel = isCompleted ? '已达成愿望' : '待办心愿纸条';
+            allFacts.push({
+              sourceAppId: 'gachapon',
+              sourceAppName: '心愿扭蛋机',
+              category: statusLabel,
+              title: w.content,
+              detail: `【${statusLabel}】状态：${w.status}。胶囊色调：${w.colorKey}，心愿标识：${w.icon || '✨'}`,
+              timestamp: w.completedAt || w.createdAt,
+            });
+          }
+          break;
+        }
+
+        case 'cinema': {
+          const movies = await loadAllMovies();
+          const stats = calculateCinemaStats(movies);
+
+          allFacts.push({
+            sourceAppId: 'cinema',
+            sourceAppName: '时光放映室',
+            category: '观影总览',
+            title: '个人影院大盘',
+            detail: `已看影片 ${stats.totalWatched} 部，累计观影时长 ${stats.totalHours} 小时，个人综合均分 ${stats.avgRating} 星，待看心愿单 ${stats.totalWishlist} 部。`,
+          });
+
+          for (const m of movies.slice(0, quotaPerApp - 1)) {
+            const statusText = m.status === 'watched' ? '已观影' : '待看愿望';
+            allFacts.push({
+              sourceAppId: 'cinema',
+              sourceAppName: '时光放映室',
+              category: statusText,
+              title: m.title,
+              detail: `原名/年份：${m.originalTitle || m.title} (${m.year || '经典'})，个人评分：${m.rating ? m.rating + '分' : '未评'}，观后感：${m.comment || '暂无影评'}，观影时间：${m.watchedDate || '近期'}`,
+              timestamp: m.watchedDate ? new Date(m.watchedDate).getTime() : m.createdAt,
+            });
+          }
+          break;
+        }
+
+        case 'compass': {
+          const spots = loadCheckInSpots();
+          const stats = getExplorationStats();
+
+          allFacts.push({
+            sourceAppId: 'compass',
+            sourceAppName: '时空指南',
+            category: '探险足迹',
+            title: '城市迷雾漫步',
+            detail: `累计打卡专属据点 ${stats.totalSpotsCount || spots.length} 处（秘密基地 ${stats.secretBasesCount || 0} 处），驱散迷雾解锁区域 ${stats.unlockedAreasCount || 0} 块，徒步漫步探索总里程约 ${stats.totalDistanceMeters || 0} 米。`,
+          });
+
+          for (const s of spots.slice(0, quotaPerApp - 1)) {
+            allFacts.push({
+              sourceAppId: 'compass',
+              sourceAppName: '时空指南',
+              category: '打卡据点',
+              title: s.name,
+              detail: `位于：${s.address || '未知位置'}，据点等级：Lv.${s.level}【${s.levelTitle || '秘密据点'}】，已打卡 ${s.checkInCount} 次。探险笔记：${s.note || '暂无笔记'}`,
+              timestamp: s.lastCheckInAt || s.createdAt,
+            });
+          }
+          break;
+        }
+
+        case 'profile': {
+          const profile = loadRPGProfile();
+          allFacts.push({
+            sourceAppId: 'profile',
+            sourceAppName: '我的·角色档案',
+            category: '身份与属性',
+            title: `${profile.name} · ${profile.title} (Lv.${profile.level})`,
+            detail: `当前经验：${profile.currentExp}/${profile.maxExp}，生命值：${profile.hp}/${profile.maxHp}，法力值：${profile.mp}/${profile.maxMp}，拥有金币：${profile.gold || 0} 枚，今日心情值：${profile.mood ?? 100} 分。六维战力：精神(SPI) ${profile.attributes?.SPI?.value || 0}，魅力(CHA) ${profile.attributes?.CHA?.value || 0}，智力(INT) ${profile.attributes?.INT?.value || 0}，体质(CON) ${profile.attributes?.CON?.value || 0}，敏捷(DEX) ${profile.attributes?.DEX?.value || 0}，力量(STR) ${profile.attributes?.STR?.value || 0}。`,
+          });
           break;
         }
       }
