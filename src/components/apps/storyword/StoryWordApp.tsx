@@ -127,6 +127,19 @@ export const StoryWordApp: React.FC<StoryWordAppProps> = ({ onBack }) => {
     if (settings && settings.targetLevel) {
       setTargetLevel(settings.targetLevel);
     }
+
+    // 检查是否有来自灵动岛错词突袭的唤醒指令
+    const checkMistakeOpen = () => {
+      if (sessionStorage.getItem('cloudfly_storyword_open_mistakes') === 'true') {
+        sessionStorage.removeItem('cloudfly_storyword_open_mistakes');
+        setIsMistakeModalOpen(true);
+      }
+    };
+    checkMistakeOpen();
+    window.addEventListener('cloudfly_open_storyword_mistakes', checkMistakeOpen);
+    return () => {
+      window.removeEventListener('cloudfly_open_storyword_mistakes', checkMistakeOpen);
+    };
   }, []);
 
   const handleSelectLevel = (lvl: VocabLevel) => {

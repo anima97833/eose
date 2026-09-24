@@ -38,11 +38,34 @@ export const PoetryApp: React.FC<PoetryAppProps> = ({ onBack }) => {
     setTimeout(() => setToastMsg(null), 1800);
   };
 
-  // 首次挂载加载诗词
+  // 首次挂载加载诗词，并响应来自灵动岛的指定诗词直达
   useEffect(() => {
     loadAllSavedPoems().then((data) => {
       setPoems(data);
+      const targetPoemId = sessionStorage.getItem('cloudfly_poetry_selected_id');
+      if (targetPoemId) {
+        sessionStorage.removeItem('cloudfly_poetry_selected_id');
+        const found = data.find((p) => p.id === targetPoemId);
+        if (found) {
+          setDetailPoem(found);
+        }
+      }
     });
+
+    const handleOpenDetail = (e: any) => {
+      const poemId = e.detail?.poemId;
+      if (poemId) {
+        setPoems((curr) => {
+          const found = curr.find((p) => p.id === poemId);
+          if (found) setDetailPoem(found);
+          return curr;
+        });
+      }
+    };
+    window.addEventListener('cloudfly_open_poetry_detail', handleOpenDetail);
+    return () => {
+      window.removeEventListener('cloudfly_open_poetry_detail', handleOpenDetail);
+    };
   }, []);
 
   const stats: PoetryStats = useMemo(() => calculatePoetryStats(poems), [poems]);

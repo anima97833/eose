@@ -76,7 +76,30 @@ export const BookVaultApp: React.FC<BookVaultAppProps> = ({ onBack }) => {
   useEffect(() => {
     loadAllBooks().then((data) => {
       setBooks(data);
+      const targetBookId = sessionStorage.getItem('cloudfly_books_selected_id');
+      if (targetBookId) {
+        sessionStorage.removeItem('cloudfly_books_selected_id');
+        const found = data.find((b) => b.id === targetBookId);
+        if (found) {
+          setSelectedBook(found);
+        }
+      }
     });
+
+    const handleOpenDetail = (e: any) => {
+      const bookId = e.detail?.bookId;
+      if (bookId) {
+        setBooks((curr) => {
+          const found = curr.find((b) => b.id === bookId);
+          if (found) setSelectedBook(found);
+          return curr;
+        });
+      }
+    };
+    window.addEventListener('cloudfly_open_book_detail', handleOpenDetail);
+    return () => {
+      window.removeEventListener('cloudfly_open_book_detail', handleOpenDetail);
+    };
   }, []);
 
   const stats: BookShelfStats = useMemo(() => calculateBookShelfStats(books), [books]);

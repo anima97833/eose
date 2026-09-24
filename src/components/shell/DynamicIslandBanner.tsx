@@ -6,7 +6,9 @@ import {
   Save, 
   ArrowRight, 
   X,
-  Sparkles
+  Sparkles,
+  Feather,
+  Zap,
 } from 'lucide-react';
 import { NudgeNotification } from '../../core/nudge/nudgeTypes';
 import { 
@@ -78,6 +80,25 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
   const handleAction = () => {
     if (!activeNudge) return;
     const target = activeNudge.targetAppId;
+
+    // 爽文背词错词突袭：暂存标记，打开应用后直开错词阁
+    if (target === 'storyword' && activeNudge.source === 'word') {
+      sessionStorage.setItem('cloudfly_storyword_open_mistakes', 'true');
+      window.dispatchEvent(new CustomEvent('cloudfly_open_storyword_mistakes'));
+    }
+
+    // 诗阁：暂存选中的诗词 ID，打开应用后直开诗歌赏析/考核
+    if (target === 'poetry' && activeNudge.poemId) {
+      sessionStorage.setItem('cloudfly_poetry_selected_id', activeNudge.poemId);
+      window.dispatchEvent(new CustomEvent('cloudfly_open_poetry_detail', { detail: { poemId: activeNudge.poemId } }));
+    }
+
+    // 书藏：暂存选中的书籍 ID，打开应用后直开书籍详情
+    if (target === 'books' && activeNudge.bookId) {
+      sessionStorage.setItem('cloudfly_books_selected_id', activeNudge.bookId);
+      window.dispatchEvent(new CustomEvent('cloudfly_open_book_detail', { detail: { bookId: activeNudge.bookId } }));
+    }
+
     setIsExpanded(false);
     setTimeout(() => {
       setActiveNudge(null);
@@ -104,6 +125,12 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
         return <Clock size={16} color="#f59e0b" />;
       case 'save':
         return <Save size={16} color="#10b981" />;
+      case 'poetry':
+        return <Feather size={16} color="#ec4899" />;
+      case 'book':
+        return <BookOpen size={16} color="#a855f7" />;
+      case 'word':
+        return <Zap size={16} color="#eab308" />;
       default:
         return <Globe size={16} color="#a855f7" />;
     }
@@ -298,7 +325,7 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
                   handleAction();
                 }}
               >
-                <span>前往</span>
+                <span>{activeNudge?.actionLabel || '前往'}</span>
                 <ArrowRight size={11} />
               </button>
             </div>
