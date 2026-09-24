@@ -359,18 +359,6 @@ export const DEFAULT_STORE_CATALOG: AppStoreItem[] = [
     isInstalled: false,
     isSystem: false,
   },
-  {
-    id: 'character_studio',
-    name: '角色工坊',
-    version: '1.0.0',
-    category: 'ai',
-    categoryLabel: '创作',
-    iconName: 'Sparkles',
-    description: 'SillyTavern 风格角色工坊：编辑与创建角色卡、正则表达式替换流水线、HTML 排版美化与实时沙盒。',
-    features: ['角色卡自由创建', 'SillyTavern 正则表达式流水线', '富文本 HTML 美化', '真机沙盒实时演练', '酒馆卡 JSON 导入导出'],
-    isInstalled: true,
-    isSystem: false,
-  },
 ];
 
 export function listStoreCatalog(): AppStoreItem[] {
@@ -378,11 +366,15 @@ export function listStoreCatalog(): AppStoreItem[] {
   try {
     const raw = localStorage.getItem(STORE_STORAGE_KEY);
     if (raw) {
-      const parsed: AppStoreItem[] = JSON.parse(raw);
+      let parsed: AppStoreItem[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // 彻底清除已废弃下架的角色工坊 (character_studio)
+        const initialCount = parsed.length;
+        parsed = parsed.filter((item) => item.id !== 'character_studio');
+        let hasNew = parsed.length !== initialCount;
+
         // 自动合并系统新上架的默认应用
         const existingIds = new Set(parsed.map((item) => item.id));
-        let hasNew = false;
         for (const defaultItem of DEFAULT_STORE_CATALOG) {
           if (!existingIds.has(defaultItem.id)) {
             parsed.push(defaultItem);

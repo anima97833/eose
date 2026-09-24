@@ -59,7 +59,6 @@ export function getAppIcon(appId: string, size = 24): React.ReactNode {
     case 'memo': return <FileText size={size} strokeWidth={2.2} />;
     case 'browser': return <Globe size={size} strokeWidth={2.2} />;
     case 'memories': return <Hourglass size={size} strokeWidth={2.2} />;
-    case 'character_studio': return <Palette size={size} strokeWidth={2.2} />;
     case 'cinema':
     case 'movie': return <Clapperboard size={size} strokeWidth={2.2} />;
     case 'poetry':
@@ -114,7 +113,6 @@ export function getAppTitle(appId: string): string {
     case 'memo': return '便签';
     case 'browser': return '网络探索';
     case 'memories': return '过往';
-    case 'character_studio': return '角色工坊';
     case 'cinema':
     case 'movie': return '放映室';
     case 'poetry':
