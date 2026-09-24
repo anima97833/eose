@@ -132,7 +132,10 @@ export function loadDesktopLayout(): DesktopLayout {
         page2: pages[1] || [],
       };
 
-      saveDesktopLayout(cleanLayout);
+      const newJson = JSON.stringify(cleanLayout);
+      if (newJson !== raw) {
+        saveDesktopLayout(cleanLayout, false);
+      }
       return cleanLayout;
     }
   } catch (err) {
@@ -140,17 +143,19 @@ export function loadDesktopLayout(): DesktopLayout {
   }
 
   const defaultLayout = buildDefault();
-  saveDesktopLayout(defaultLayout);
+  saveDesktopLayout(defaultLayout, false);
   return defaultLayout;
 }
 
-export function saveDesktopLayout(layout: DesktopLayout): void {
+export function saveDesktopLayout(layout: DesktopLayout, notify: boolean = true): void {
   if (typeof window === 'undefined') return;
   try {
     layout.page1 = layout.pages[0] || [];
     layout.page2 = layout.pages[1] || [];
     localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout));
-    window.dispatchEvent(new CustomEvent('aiphone_layout_updated'));
+    if (notify) {
+      window.dispatchEvent(new CustomEvent('aiphone_layout_updated'));
+    }
   } catch {
     // ignore
   }

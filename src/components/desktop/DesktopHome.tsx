@@ -91,6 +91,13 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
   // 总滑屏数 = 1 (负一屏) + 主屏幕页面数 (layout.pages)
   const totalSlides = 1 + Math.max(1, layout.pages.length);
 
+  // 确保页面数量变动时，当前页码合法
+  useEffect(() => {
+    if (currentPage >= totalSlides) {
+      setCurrentPage(Math.max(0, totalSlides - 1));
+    }
+  }, [totalSlides, currentPage]);
+
   // ================= 边缘自动切页检测 =================
   const checkEdgeAutoFlip = useCallback(
     (clientX: number) => {
