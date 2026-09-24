@@ -5,6 +5,7 @@ import {
   StoryWordMistake,
   StoryWordUserSettings,
   VocabLevel,
+  CustomLexicon,
 } from './storyWordTypes';
 
 // 预设高品质开箱即读爽文（覆盖霸总商战、修仙逆袭、赛博无限流）
@@ -243,16 +244,89 @@ export async function recordMistakeWord(
   }
 }
 
-export async function markWordMastered(wordId: string, mastered: boolean): Promise<void> {
+import { loadRPGProfile, saveRPGProfile, computeAttributeMax } from '../rpg/rpgStorage';
+
+const MISTAKE_REWARD_KEY = 'storyword_mistake_mastered_reward_tier';
+
+export interface MistakeMasteryRewardResult {
+  rewarded: boolean;
+  gainedInt: number;
+  totalMastered: number;
+  milestoneReached?: number;
+  message: string;
+}
+
+/**
+ * 错词掌握联动：每掌握 10 个单词增加 2 点角色智力 (INT)
+ */
+export async function checkAndRewardMistakeMastery(): Promise<MistakeMasteryRewardResult> {
+  try {
+    const allMistakes = await db.storyword_mistakes.toArray();
+    const totalMastered = allMistakes.filter(m => m.mastered).length;
+
+    // 当前达到的 10 词档位
+    const currentTier = Math.floor(totalMastered / 10);
+    // 上次已发放奖励的最高档位
+    const lastRewardedTier = parseInt(localStorage.getItem(MISTAKE_REWARD_KEY) || '0', 10);
+
+    if (currentTier > lastRewardedTier) {
+      const tiersToReward = currentTier - lastRewardedTier;
+      const intToGain = tiersToReward * 2;
+
+      const profile = loadRPGProfile();
+      const cap = computeAttributeMax(profile.level);
+      const curInt = profile.attributes?.INT?.value || 0;
+      const nextInt = Math.min(cap, curInt + intToGain);
+
+      if (profile.attributes?.INT) {
+        profile.attributes.INT.value = nextInt;
+      }
+      saveRPGProfile(profile);
+      localStorage.setItem(MISTAKE_REWARD_KEY, String(currentTier));
+
+      return {
+        rewarded: true,
+        gainedInt: intToGain,
+        totalMastered,
+        milestoneReached: currentTier * 10,
+        message: `🎉 错词突破！累计掌握 ${currentTier * 10} 词，角色智力 (INT) +${intToGain}！`,
+      };
+    }
+
+    return {
+      rewarded: false,
+      gainedInt: 0,
+      totalMastered,
+      message: `已掌握 ${totalMastered} 词（距离下阶段智力+2 还差 ${10 - (totalMastered % 10)} 词）`,
+    };
+  } catch (err) {
+    console.warn('[StoryWordStorage] 错词智力奖励结算异常:', err);
+    return {
+      rewarded: false,
+      gainedInt: 0,
+      totalMastered: 0,
+      message: '',
+    };
+  }
+}
+
+export async function markWordMastered(
+  wordId: string,
+  mastered: boolean
+): Promise<MistakeMasteryRewardResult | null> {
   try {
     const item = await db.storyword_mistakes.get(wordId);
     if (item) {
       item.mastered = mastered;
       await db.storyword_mistakes.put(item);
     }
+    if (mastered) {
+      return await checkAndRewardMistakeMastery();
+    }
   } catch (err) {
     console.warn('[StoryWordStorage] 标记掌握失败:', err);
   }
+  return null;
 }
 
 // 4. 用户设置
@@ -319,6 +393,17 @@ export async function resetDefaultBookSources(): Promise<BookSourceRule[]> {
   return DEFAULT_BOOK_SOURCES;
 }
 
+export async function resetPresetNovels(): Promise<StoryNovel[]> {
+  try {
+    for (const novel of PRESET_NOVELS) {
+      await db.storyword_novels.put(novel);
+    }
+  } catch (e) {
+    console.warn('Reset preset novels error', e);
+  }
+  return await loadAllStoryNovels();
+}
+
 export async function addMistakeWord(word: { word: string; phonetic: string; translation: string; level: VocabLevel }, snippet: string): Promise<void> {
   await recordMistakeWord(word.word, word.phonetic, word.translation, word.level, snippet);
 }
@@ -331,4 +416,39 @@ export function saveUserSettings(settings: Partial<StoryWordUserSettings>): void
   const curr = loadStoryWordSettings();
   saveStoryWordSettings({ ...curr, ...settings });
 }
+
+// 4. 自定义私人词库管理
+export async function loadAllCustomLexicons(): Promise<CustomLexicon[]> {
+  try {
+    const list = await db.storyword_custom_lexicons.toArray();
+    return list.sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch (err) {
+    console.error('[StoryWordStorage] 加载私人词库失败:', err);
+    return [];
+  }
+}
+
+export async function saveCustomLexicon(lexicon: CustomLexicon): Promise<void> {
+  lexicon.updatedAt = Date.now();
+  if (!lexicon.createdAt) {
+    lexicon.createdAt = Date.now();
+  }
+  lexicon.wordCount = lexicon.words.length;
+  await db.storyword_custom_lexicons.put(lexicon);
+}
+
+export async function deleteCustomLexicon(id: string): Promise<void> {
+  await db.storyword_custom_lexicons.delete(id);
+}
+
+export async function getCustomLexiconById(id: string): Promise<CustomLexicon | null> {
+  try {
+    const res = await db.storyword_custom_lexicons.get(id);
+    return res || null;
+  } catch {
+    return null;
+  }
+}
+
+export const getAllCustomLexicons = loadAllCustomLexicons;
 

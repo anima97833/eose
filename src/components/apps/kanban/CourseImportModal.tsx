@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { Course, CourseAttributeTag } from '../../../core/kanban/courseKanbanTypes';
 import {
   parseBilibiliCourse,
+  parseXiaohongshuCourse,
   parsePanDirectoryText,
   createCustomCourse,
   formatDuration,
 } from '../../../core/kanban/courseParserEngine';
 import { saveCourse, ATTR_TAG_INFO } from '../../../core/kanban/courseKanbanStorage';
 import { NM } from '../storyword/storyWordNeumorphism';
-import { X, Sparkles, Tv, Folder, Plus, Check } from 'lucide-react';
+import { X, Sparkles, Tv, Folder, Plus, Check, BookmarkCheck, ExternalLink } from 'lucide-react';
 
 interface CourseImportModalProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
   onClose,
   onCourseAdded,
 }) => {
-  const [activeTab, setActiveTab] = useState<'bilibili' | 'pan' | 'custom'>('bilibili');
+  const [activeTab, setActiveTab] = useState<'bilibili' | 'xiaohongshu' | 'pan' | 'custom'>('bilibili');
   const [selectedAttrTag, setSelectedAttrTag] = useState<CourseAttributeTag>('INT');
 
   // B站导入表单
@@ -30,6 +31,13 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
   const [biliParsedCourse, setBiliParsedCourse] = useState<Course | null>(null);
   const [biliParsedTitle, setBiliParsedTitle] = useState('');
   const [biliParsedAuthor, setBiliParsedAuthor] = useState('');
+
+  // 小红书导入表单
+  const [xhsInput, setXhsInput] = useState('');
+  const [isParsingXhs, setIsParsingXhs] = useState(false);
+  const [xhsParsedCourse, setXhsParsedCourse] = useState<Course | null>(null);
+  const [xhsParsedTitle, setXhsParsedTitle] = useState('');
+  const [xhsParsedAuthor, setXhsParsedAuthor] = useState('');
 
   // 网盘导入表单
   const [panTitle, setPanTitle] = useState('');
@@ -77,6 +85,44 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
       ...biliParsedCourse,
       title: biliParsedTitle.trim() || biliParsedCourse.title,
       author: biliParsedAuthor.trim() || biliParsedCourse.author,
+      attributeTag: selectedAttrTag,
+    };
+    saveCourse(finalCourse);
+    onCourseAdded(finalCourse);
+    showToast('已入看板');
+    onClose();
+  };
+
+  // 执行小红书解析
+  const handleParseXhs = async () => {
+    if (!xhsInput.trim()) {
+      showToast('请输入小红书链接或分享内容');
+      return;
+    }
+    setIsParsingXhs(true);
+    try {
+      const course = await parseXiaohongshuCourse(xhsInput.trim());
+      setXhsParsedCourse(course);
+      setXhsParsedTitle(course.title);
+      setXhsParsedAuthor(course.author);
+      if (course.attributeTag) {
+        setSelectedAttrTag(course.attributeTag);
+      }
+      showToast('小红书笔记解析成功');
+    } catch (err: any) {
+      console.warn(err);
+      showToast(err.message || '解析失败，已采用智能兜底');
+    } finally {
+      setIsParsingXhs(false);
+    }
+  };
+
+  const handleConfirmXhs = () => {
+    if (!xhsParsedCourse) return;
+    const finalCourse: Course = {
+      ...xhsParsedCourse,
+      title: xhsParsedTitle.trim() || xhsParsedCourse.title,
+      author: xhsParsedAuthor.trim() || xhsParsedCourse.author,
       attributeTag: selectedAttrTag,
     };
     saveCourse(finalCourse);
@@ -226,9 +272,10 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
           }}
         >
           {[
-            { id: 'bilibili', label: 'B站解析', icon: Tv },
-            { id: 'pan', label: '网盘目录', icon: Folder },
-            { id: 'custom', label: '自主规划', icon: Plus },
+            { id: 'bilibili', label: 'B站解析', icon: Tv, activeColor: '#FB7299' },
+            { id: 'xiaohongshu', label: '小红书', icon: BookmarkCheck, activeColor: '#FF2442' },
+            { id: 'pan', label: '网盘目录', icon: Folder, activeColor: '#06A7FF' },
+            { id: 'custom', label: '自主规划', icon: Plus, activeColor: NM.gold },
           ].map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -241,7 +288,7 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '5px',
+                  gap: '4px',
                   padding: '8px 0',
                   borderRadius: '10px',
                   fontSize: '11px',
@@ -249,7 +296,7 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
                   border: 'none',
                   cursor: 'pointer',
                   backgroundColor: isActive ? NM.cardBg : 'transparent',
-                  color: isActive ? NM.gold : NM.textSub,
+                  color: isActive ? tab.activeColor : NM.textSub,
                   boxShadow: isActive ? NM.convexXs : 'none',
                 }}
               >
@@ -589,6 +636,376 @@ export const CourseImportModal: React.FC<CourseImportModalProps> = ({
                       fontSize: '12px',
                       fontWeight: 700,
                       boxShadow: NM.convexSm,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    加入看板待学库
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: 小红书导入 */}
+          {activeTab === 'xiaohongshu' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  backgroundColor: '#FFF1F2',
+                  fontSize: '11px',
+                  color: '#9F1239',
+                  lineHeight: '1.6',
+                  border: '1px solid rgba(244, 63, 94, 0.15)',
+                  boxShadow: NM.insetXs,
+                }}
+              >
+                📕 <b>小红书干货智能拆解</b>：在小红书 App 点击“分享 → 复制链接”，将包含短链（<code>xhslink.com</code>）或口令的文本粘贴在下方。系统将自动抓取博主、封面并智能切分为结构化打卡章节！
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: NM.textSub,
+                    marginBottom: '6px',
+                  }}
+                >
+                  小红书分享链接 / 笔记口令
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    placeholder="如: 78 7天搞定穿搭公式 http://xhslink.com/... 或网页链接"
+                    value={xhsInput}
+                    onChange={e => setXhsInput(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      border: NM.borderSoft,
+                      backgroundColor: NM.bgInset,
+                      boxShadow: NM.insetSm,
+                      fontSize: '12px',
+                      color: NM.textMain,
+                      outline: 'none',
+                    }}
+                  />
+                  <button
+                    onClick={handleParseXhs}
+                    disabled={isParsingXhs}
+                    style={{
+                      padding: '0 16px',
+                      borderRadius: '10px',
+                      backgroundColor: '#FF2442',
+                      boxShadow: NM.convexSm,
+                      border: 'none',
+                      color: '#fff',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: isParsingXhs ? 'wait' : 'pointer',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {isParsingXhs ? '解析中' : '解析'}
+                  </button>
+                </div>
+              </div>
+
+              {/* 快捷示例 */}
+              {!xhsParsedCourse && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px', color: NM.textMuted }}>
+                  <span>点击试一试示例:</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    <button
+                      onClick={() => setXhsInput('【7天搞定高级感穿搭】每日一个变美万能公式 http://xhslink.com/a/fashion7d 复制本条信息打开【小红书】App查看精彩内容！')}
+                      style={{
+                        background: 'none',
+                        border: NM.borderSoft,
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        color: '#E11D48',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        backgroundColor: NM.bgInset,
+                      }}
+                    >
+                      ✨ 高级感穿搭(魅力CHA)
+                    </button>
+                    <button
+                      onClick={() => setXhsInput('【10分钟改善体态】普拉提天鹅颈与直角肩打卡 http://xhslink.com/a/pilates10m 复制本条信息打开【小红书】App查看精彩内容！')}
+                      style={{
+                        background: 'none',
+                        border: NM.borderSoft,
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        color: '#059669',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        backgroundColor: NM.bgInset,
+                      }}
+                    >
+                      🛡️ 普拉提体态(体质CON)
+                    </button>
+                    <button
+                      onClick={() => setXhsInput('【小白零基础】30天掌握Python数据分析实战 http://xhslink.com/a/python30d 复制本条信息打开【小红书】App查看精彩内容！')}
+                      style={{
+                        background: 'none',
+                        border: NM.borderSoft,
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        color: '#2563EB',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        backgroundColor: NM.bgInset,
+                      }}
+                    >
+                      🧪 Python学习(智力INT)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 解析成功预览 */}
+              {xhsParsedCourse && (
+                <div
+                  style={{
+                    padding: '14px',
+                    borderRadius: '14px',
+                    backgroundColor: NM.cardBg,
+                    boxShadow: NM.convexSm,
+                    border: '1px solid rgba(255, 36, 66, 0.2)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                  }}
+                >
+                  {/* 笔记封面预览 */}
+                  {xhsParsedCourse.coverUrl ? (
+                    <div
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        height: '120px',
+                        borderRadius: '10px',
+                        overflow: 'hidden',
+                        boxShadow: NM.insetSm,
+                      }}
+                    >
+                      <img
+                        src={xhsParsedCourse.coverUrl}
+                        alt="笔记封面"
+                        referrerPolicy="no-referrer"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: '6px',
+                          right: '8px',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: '#FF2442',
+                          color: '#fff',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                        }}
+                      >
+                        小红书笔记 · 共 {xhsParsedCourse.totalChapters} 讲
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        backgroundColor: '#FFF1F2',
+                        color: '#E11D48',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <span>📕 小红书精选笔记</span>
+                      <span>共 {xhsParsedCourse.totalChapters} 讲打卡节点</span>
+                    </div>
+                  )}
+
+                  {/* 笔记标题（可微调） */}
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: NM.textSub,
+                        marginBottom: '4px',
+                      }}
+                    >
+                      课程/目标名称 (可微调)
+                    </label>
+                    <input
+                      type="text"
+                      value={xhsParsedTitle}
+                      onChange={e => setXhsParsedTitle(e.target.value)}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: NM.borderSoft,
+                        backgroundColor: NM.bgInset,
+                        boxShadow: NM.insetXs,
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color: NM.textMain,
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  {/* 博主/讲师 与 原笔记链接 */}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label
+                        style={{
+                          display: 'block',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: NM.textSub,
+                          marginBottom: '4px',
+                        }}
+                      >
+                        博主 / 讲师
+                      </label>
+                      <input
+                        type="text"
+                        value={xhsParsedAuthor}
+                        onChange={e => setXhsParsedAuthor(e.target.value)}
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '7px 10px',
+                          borderRadius: '8px',
+                          border: NM.borderSoft,
+                          backgroundColor: NM.bgInset,
+                          boxShadow: NM.insetXs,
+                          fontSize: '11px',
+                          color: NM.textMain,
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    {xhsParsedCourse.sourceUrl && (
+                      <div style={{ flex: 1 }}>
+                        <label
+                          style={{
+                            display: 'block',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: NM.textSub,
+                            marginBottom: '4px',
+                          }}
+                        >
+                          原笔记回溯
+                        </label>
+                        <a
+                          href={xhsParsedCourse.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            padding: '7px 10px',
+                            borderRadius: '8px',
+                            backgroundColor: NM.bgLighter,
+                            color: '#FF2442',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            textDecoration: 'none',
+                          }}
+                        >
+                          <ExternalLink size={12} />
+                          <span>在小红书打开</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 章节打卡清单预览 */}
+                  <div>
+                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: NM.textSub, marginBottom: '4px' }}>
+                      智能拆解打卡节点 (共 {xhsParsedCourse.totalChapters} 讲)
+                    </span>
+                    <div
+                      style={{
+                        maxHeight: '120px',
+                        overflowY: 'auto',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        backgroundColor: NM.bgInset,
+                        boxShadow: NM.insetXs,
+                        fontSize: '11px',
+                        color: NM.textSub,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '5px',
+                      }}
+                    >
+                      {xhsParsedCourse.chapters.map((c, i) => (
+                        <div
+                          key={c.id || i}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <span
+                            style={{
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              flex: 1,
+                            }}
+                          >
+                            {c.title}
+                          </span>
+                          <span style={{ fontSize: '10px', color: NM.textMuted, flexShrink: 0 }}>
+                            {formatDuration(c.durationSeconds)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 六维分类属性选择 */}
+                  {renderAttrSelector()}
+
+                  <button
+                    onClick={handleConfirmXhs}
+                    style={{
+                      marginTop: '4px',
+                      padding: '10px 0',
+                      borderRadius: '10px',
+                      backgroundColor: '#FF2442',
+                      color: '#fff',
+                      border: 'none',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      boxShadow: '0 4px 12px rgba(255, 36, 66, 0.3)',
                       cursor: 'pointer',
                     }}
                   >

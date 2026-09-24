@@ -24,21 +24,49 @@ import {
   RotateCcw,
   Sparkles,
   Check,
+  Search,
+  Loader2,
+  X,
+  UploadCloud,
+  FileUp,
 } from 'lucide-react';
+import {
+  searchFromImportedSources,
+  addSearchedNovelToShelf,
+  SearchNovelResult,
+} from '../../../../core/storyword/novelSearchEngine';
+import { VocabLevel } from '../../../../core/storyword/storyWordTypes';
+import { parseUploadedEbook } from '../../../../core/storyword/ebookParser';
 
 interface BookSourceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onNovelAdded: (novel: StoryNovel) => void;
+  targetLevel?: VocabLevel;
 }
 
 export const BookSourceModal: React.FC<BookSourceModalProps> = ({
   isOpen,
   onClose,
   onNovelAdded,
+  targetLevel = 'cet4',
 }) => {
-  const [activeTab, setActiveTab] = useState<'url' | 'txt' | 'rules'>('url');
+  const [activeTab, setActiveTab] = useState<'search' | 'url' | 'txt' | 'rules'>('search');
   const [sources, setSources] = useState<BookSourceRule[]>([]);
+
+  // 纯书源搜索表单
+  const [modalSearchQuery, setModalSearchQuery] = useState('');
+  const [isModalSearching, setIsModalSearching] = useState(false);
+  const [modalSearchResults, setModalSearchResults] = useState<SearchNovelResult[]>([]);
+  const [modalSearchError, setModalSearchError] = useState<string | null>(null);
+  const [hasModalSearched, setHasModalSearched] = useState(false);
+  const [addingNovelId, setAddingNovelId] = useState<string | null>(null);
+
+  // 本地电子书文件上传 (.txt, .epub, .mobi) 状态
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [uploadStatusMsg, setUploadStatusMsg] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // URL 抓取表单
   const [targetUrl, setTargetUrl] = useState('');
@@ -74,7 +102,36 @@ export const BookSourceModal: React.FC<BookSourceModalProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  // 纯书源全网检索小说
+  const handleModalSearch = async () => {
+    if (!modalSearchQuery.trim()) return;
+    setIsModalSearching(true);
+    setModalSearchError(null);
+    setHasModalSearched(true);
+    try {
+      const { results, error } = await searchFromImportedSources(modalSearchQuery);
+      setModalSearchResults(results);
+      if (error) setModalSearchError(error);
+    } catch (e: any) {
+      setModalSearchError(e.message || '搜索失败');
+    } finally {
+      setIsModalSearching(false);
+    }
+  };
+
+  // 加入书架
+  const handleAddSearchedToShelf = async (item: SearchNovelResult) => {
+    setAddingNovelId(item.id);
+    try {
+      const novel = await addSearchedNovelToShelf(item, targetLevel);
+      onNovelAdded(novel);
+      showToast('已加入书架');
+    } catch (e: any) {
+      showToast(e.message || '加入失败');
+    } finally {
+      setAddingNovelId(null);
+    }
+  };
 
   // 执行 URL 爬取小说
   const handleCrawlUrl = async () => {
@@ -111,6 +168,49 @@ export const BookSourceModal: React.FC<BookSourceModalProps> = ({
       showToast('抓取失败');
     } finally {
       setIsCrawling(false);
+    }
+  };
+
+  // 处理电子书文件上传 (.txt, .epub, .mobi) 并保存至 IndexedDB
+  const handleProcessFile = async (file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!['txt', 'epub', 'mobi'].includes(ext || '')) {
+      showToast('仅支持 .txt / .epub / .mobi 格式电子书');
+      return;
+    }
+
+    setIsUploadingFile(true);
+    setUploadStatusMsg(`正在解析 ${file.name}...`);
+    try {
+      const novel = await parseUploadedEbook(file, targetLevel);
+      setUploadStatusMsg('正在保存至本地 IndexedDB...');
+      await saveStoryNovel(novel);
+      onNovelAdded(novel);
+      showToast(`已成功导入《${novel.title}》（共${novel.chapters.length}章）`);
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || '电子书解析失败');
+    } finally {
+      setIsUploadingFile(false);
+      setUploadStatusMsg(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleProcessFile(file);
+    }
+  };
+
+  const handleDropFile = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleProcessFile(file);
     }
   };
 
@@ -187,6 +287,8 @@ export const BookSourceModal: React.FC<BookSourceModalProps> = ({
     showToast('已删除');
   };
 
+  if (!isOpen) return null;
+
   return (
     <div
       style={{
@@ -228,7 +330,7 @@ export const BookSourceModal: React.FC<BookSourceModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Globe size={18} color={NM.amber} />
             <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: NM.textMain }}>
-              书源与抓取中心
+              书源与搜书
             </h3>
           </div>
           <button
@@ -256,8 +358,9 @@ export const BookSourceModal: React.FC<BookSourceModalProps> = ({
           }}
         >
           {[
+            { id: 'search', label: '搜书', icon: Search },
             { id: 'url', label: '网页爬取', icon: Globe },
-            { id: 'txt', label: '导入文本', icon: FileText },
+            { id: 'txt', label: '导入电子书', icon: FileUp },
             { id: 'rules', label: '规则库', icon: BookMarked },
           ].map(tab => {
             const Icon = tab.icon;
@@ -292,6 +395,196 @@ export const BookSourceModal: React.FC<BookSourceModalProps> = ({
 
         {/* 选项卡内容 */}
         <div style={{ padding: '18px 20px', flex: 1, overflowY: 'auto' }}>
+
+          {/* TAB 0: 纯书源搜书 */}
+          {activeTab === 'search' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div
+                  style={{
+                    flex: 1,
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Search
+                    size={14}
+                    color={NM.textMuted}
+                    style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }}
+                  />
+                  <input
+                    type="text"
+                    value={modalSearchQuery}
+                    onChange={e => setModalSearchQuery(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleModalSearch()}
+                    placeholder="搜索书名或作者..."
+                    style={{
+                      width: '100%',
+                      height: '38px',
+                      paddingLeft: '34px',
+                      paddingRight: modalSearchQuery ? '30px' : '12px',
+                      borderRadius: '10px',
+                      backgroundColor: NM.cardBg,
+                      boxShadow: NM.insetSm,
+                      border: NM.borderLight,
+                      color: NM.textMain,
+                      fontSize: '13px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {modalSearchQuery && (
+                    <button
+                      onClick={() => {
+                        setModalSearchQuery('');
+                        setModalSearchResults([]);
+                        setHasModalSearched(false);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        background: 'none',
+                        border: 'none',
+                        color: NM.textMuted,
+                        cursor: 'pointer',
+                        padding: '2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={handleModalSearch}
+                  disabled={isModalSearching}
+                  style={{
+                    height: '38px',
+                    padding: '0 16px',
+                    borderRadius: '10px',
+                    backgroundColor: NM.cardBg,
+                    boxShadow: NM.convexXs,
+                    border: NM.borderLight,
+                    color: NM.amber,
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    flexShrink: 0,
+                  }}
+                >
+                  {isModalSearching ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <span>搜索</span>
+                  )}
+                </button>
+              </div>
+
+              {/* 实时书源检索结果 */}
+              {hasModalSearched && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    backgroundColor: NM.cardBg,
+                    padding: '12px',
+                    borderRadius: '12px',
+                    boxShadow: NM.insetXs,
+                    border: NM.borderLight,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span style={{ fontSize: '12px', fontWeight: 800, color: NM.textSub }}>
+                      搜索结果 ({modalSearchResults.length})
+                    </span>
+                  </div>
+
+                  {modalSearchError ? (
+                    <div style={{ fontSize: '12px', color: NM.rose, padding: '6px 0' }}>
+                      {modalSearchError}
+                    </div>
+                  ) : modalSearchResults.length === 0 ? (
+                    <div style={{ fontSize: '12px', color: NM.textMuted, padding: '6px 0' }}>
+                      未从当前书源中检索到结果
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        maxHeight: '260px',
+                        overflowY: 'auto',
+                      }}
+                    >
+                      {modalSearchResults.map(item => (
+                        <div
+                          key={item.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 10px',
+                            backgroundColor: NM.cardBg,
+                            borderRadius: '8px',
+                            boxShadow: NM.convexXs,
+                            border: NM.borderLight,
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
+                            <div
+                              style={{
+                                fontSize: '13px',
+                                fontWeight: 800,
+                                color: NM.textMain,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {item.title}
+                            </div>
+                            <div style={{ fontSize: '11px', color: NM.textMuted }}>
+                              {item.author} · {item.sourceName}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleAddSearchedToShelf(item)}
+                            disabled={addingNovelId === item.id}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              backgroundColor: NM.amber,
+                              color: '#fff',
+                              border: 'none',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {addingNovelId === item.id ? '加入中...' : '+ 书架'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* TAB 1: 网页爬取 */}
           {activeTab === 'url' && (
@@ -400,9 +693,119 @@ export const BookSourceModal: React.FC<BookSourceModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: 文本导入 */}
+          {/* TAB 2: 电子书文件导入 (TXT / EPUB / MOBI) */}
           {activeTab === 'txt' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* 文件上传触发卡片 */}
+              <div
+                onDragOver={e => {
+                  e.preventDefault();
+                  setIsDraggingOver(true);
+                }}
+                onDragLeave={() => setIsDraggingOver(false)}
+                onDrop={handleDropFile}
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  padding: '20px 16px',
+                  borderRadius: '14px',
+                  backgroundColor: isDraggingOver ? NM.bgInset : NM.cardBg,
+                  boxShadow: isDraggingOver ? NM.insetXs : NM.convexSm,
+                  border: isDraggingOver ? `1.5px dashed ${NM.amber}` : NM.borderLight,
+                  cursor: isUploadingFile ? 'wait' : 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  textAlign: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".txt,.epub,.mobi"
+                  onChange={handleFileInputChange}
+                  style={{ display: 'none' }}
+                />
+
+                {isUploadingFile ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 0',
+                    }}
+                  >
+                    <Loader2 size={24} color={NM.amber} className="animate-spin" />
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: NM.textMain }}>
+                      {uploadStatusMsg || '正在处理电子书...'}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        backgroundColor: NM.cardBg,
+                        boxShadow: NM.convexXs,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <UploadCloud size={22} color={NM.amber} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: NM.textMain }}>
+                        点击或拖拽上传本地电子书
+                      </div>
+                      <div style={{ fontSize: '11px', color: NM.textMuted, marginTop: '2px' }}>
+                        自动解析目录章节，持久化保存至 IndexedDB
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                      {['TXT 纯文本', 'EPUB 电子书', 'MOBI 电子书'].map(fmt => (
+                        <span
+                          key={fmt}
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            backgroundColor: NM.bgInset,
+                            boxShadow: NM.insetXs,
+                            color: NM.textSub,
+                          }}
+                        >
+                          {fmt}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* 分割线：或者手动粘贴文本 */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  margin: '2px 0',
+                }}
+              >
+                <div style={{ flex: 1, height: '1px', backgroundColor: NM.borderSoft }} />
+                <span style={{ fontSize: '11px', color: NM.textMuted, fontWeight: 700 }}>
+                  或者直接粘贴文本
+                </span>
+                <div style={{ flex: 1, height: '1px', backgroundColor: NM.borderSoft }} />
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
                   <label

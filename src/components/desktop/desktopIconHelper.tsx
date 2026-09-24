@@ -26,6 +26,8 @@ import {
   Clapperboard,
   BookMarked,
   GraduationCap,
+  Disc,
+  Gift,
 } from 'lucide-react';
 import { getCustomAppById } from '../../core/sdk/customAppRegistry';
 import { listStoreCatalog } from '../../core/sdk/appStoreCatalog';
@@ -44,7 +46,7 @@ export function getAppIcon(appId: string, size = 24): React.ReactNode {
 
     // 应用商店与精选微应用
     case 'appstore': return <ShoppingBag size={size} strokeWidth={2.2} />;
-    case 'mood_fortune': return <Scroll size={size} strokeWidth={2.2} />;
+    case 'mood_fortune': return <BookOpen size={size} strokeWidth={2.2} />;
     case 'calculator': return <Calculator size={size} strokeWidth={2.2} />;
     case 'pomodoro': return <Clock size={size} strokeWidth={2.2} />;
     case 'camera': return <Camera size={size} strokeWidth={2.2} />;
@@ -67,6 +69,8 @@ export function getAppIcon(appId: string, size = 24): React.ReactNode {
     case 'storyword': return <BookOpen size={size} strokeWidth={2.2} />;
     case 'course_kanban':
     case 'kanban': return <GraduationCap size={size} strokeWidth={2.2} />;
+    case 'pocketpad': return <Disc size={size} strokeWidth={2.2} />;
+    case 'gachapon': return <Gift size={size} strokeWidth={2.2} />;
 
     default:
       // 自定义应用：从商店或注册表中查找定义
@@ -97,7 +101,7 @@ export function getAppTitle(appId: string): string {
     case 'checkphone': return '查手机';
     case 'settings': return '设置';
     case 'appstore': return '应用商店';
-    case 'mood_fortune': return '心事抽签';
+    case 'mood_fortune': return '答案之书';
     case 'calculator': return '计算器';
     case 'pomodoro': return '番茄钟';
     case 'camera': return '相册';
@@ -118,6 +122,8 @@ export function getAppTitle(appId: string): string {
     case 'books':
     case 'bookvault': return '书藏';
     case 'storyword': return '爽文背词';
+    case 'pocketpad': return 'Pocket Pad';
+    case 'gachapon': return '扭蛋';
     default: {
       const storeItem = listStoreCatalog().find((item) => item.id === appId);
       if (storeItem) return storeItem.name;

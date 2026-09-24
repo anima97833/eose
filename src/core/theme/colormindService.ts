@@ -187,9 +187,16 @@ export async function fetchColormindPalette(options?: ColormindPaletteOptions): 
   const endpoints = ['/api/colormind', 'http://colormind.io/api/'];
 
   for (const endpoint of endpoints) {
+    let timeoutId: any = null;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      timeoutId = setTimeout(() => {
+        try {
+          controller.abort(new DOMException('Timeout', 'TimeoutError'));
+        } catch {
+          // ignore
+        }
+      }, 4000);
 
       const resp = await fetch(endpoint, {
         method: 'POST',
@@ -198,18 +205,20 @@ export async function fetchColormindPalette(options?: ColormindPaletteOptions): 
         },
         body: JSON.stringify(postBody),
         signal: controller.signal,
-      });
+      }).catch(() => null);
 
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
 
-      if (resp.ok) {
-        const json = await resp.json();
-        if (json.result && Array.isArray(json.result) && json.result.length === 5) {
+      if (resp && resp.ok) {
+        const json = await resp.json().catch(() => null);
+        if (json && json.result && Array.isArray(json.result) && json.result.length === 5) {
           return json.result as RGBColor[];
         }
       }
     } catch {
       // 失败自动尝试下一个 endpoint 或降级到本地确定性生成
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }
 

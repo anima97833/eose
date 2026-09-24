@@ -27,6 +27,7 @@ import {
   Search,
   Settings,
   Hourglass,
+  Disc,
 } from 'lucide-react';
 import {
   listStoreCatalog,
@@ -66,6 +67,7 @@ export function renderStoreIcon(iconName: string, size = 22) {
     case 'Search': return <Search size={size} strokeWidth={2.2} />;
     case 'Settings': return <Settings size={size} strokeWidth={2.2} />;
     case 'Hourglass': return <Hourglass size={size} strokeWidth={2.2} />;
+    case 'Disc': return <Disc size={size} strokeWidth={2.2} />;
     default: return <Sparkles size={size} strokeWidth={2.2} />;
   }
 }

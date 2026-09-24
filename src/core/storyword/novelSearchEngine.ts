@@ -1,789 +1,279 @@
-import { StoryNovel, StoryChapter } from './storyWordTypes';
+import { BookSourceRule, StoryChapter, StoryNovel, VocabLevel } from './storyWordTypes';
+import { getAllBookSources, saveStoryNovel } from './storyWordStorage';
+import { crawlChapterFromUrl, fetchHtmlWithProxy } from './bookSourceEngine';
 
 export interface SearchNovelResult {
   id: string;
   title: string;
   author: string;
   sourceName: string;
-  category: string;
-  intro: string;
-  chapters: StoryChapter[];
-  totalChapters: number;
-  externalUrl?: string;
-  sourceRule?: any;
+  sourceId: string;
+  externalUrl: string;
+  sourceRule?: BookSourceRule;
+  latestChapter?: string;
+  intro?: string;
 }
 
-// 涵盖全网热门爽文流派与亿级读者口碑神作的高品质精校云端全书库
-export const CLOUD_NOVEL_CATALOG: SearchNovelResult[] = [
-  {
-    id: 'cloud_shenkong',
-    title: '深空彼岸：旧土超凡',
-    author: '辰东',
-    sourceName: '全网经典源',
-    category: '科幻修仙',
-    intro: '浩瀚深空，彼岸何方？旧土青年王煊自微末中觉醒，手握神秘先秦竹简，在逝去的超凡文明余烬中，只手打穿新星与旧土，横渡九天十地！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_sk_1',
-        index: 0,
-        title: '第1章 旧土苏醒！先秦古法的惊天异象',
-        originalText: `新星繁华璀璨，飞船如织穿梭于苍穹之上；而古老的旧土废墟深处，却沉睡着超越凡俗理解的无上机缘。
-王煊盘膝坐于青瓦古院之中，神色沉静。他运转着从残破古籍中习得的先秦金身导引术，呼吸吐纳之间隐隐有风雷轰鸣之声。
-在这个科技登峰造极、列仙消逝的时代，所有人都以为古法修炼早已沦为落后的骗术，唯有王煊真切感受到了体内那股奔腾如大江大河的磅礴热流！
-突然，他怀中贴身珍藏的黑色金属竹简发出耀眼的金色符文。一道古朴浩瀚的神念自识海中炸响，令他的精神力量呈几何级数疯狂暴涨！
-“超凡并未真正远去，它只是沉眠在深空彼岸的尽头！”王煊豁然睁开双眼，目光如冷电破空，属于当代唯一超凡者的壮阔旅途在此刻轰然启程！`,
-      },
-      {
-        id: 'ch_sk_2',
-        index: 1,
-        title: '第2章 密地试炼！手撕机械巨兽的战力',
-        originalText: `密地边缘的能量结界前，新星各大顶级财阀与机甲特种兵们全副武装，对来自旧土的普通探险者满是讥讽与傲慢。
-“就凭你们这些连合金战甲都穿不起的旧土土著，也妄想进入古代密地争夺延寿神药？”一名身着深蓝重型外骨骼的队长居高临下嗤笑。
-话音未落，密林深处突然冲出一头高达数丈的狂暴机械齿轮巨兽，合金巨爪带着撕裂一切的狂风扑杀而至！
-在众人惊恐尖叫、防线瞬间崩溃的千钧一发之际，王煊身形化作一道璀璨残影逆势暴冲而出！
-他未着寸甲，右手五指微张，先秦金身术凝聚出的刺目罡气如金色战戟横空撕裂长夜，硬生生一拳将数十吨重的钢铁巨兽当空砸爆！
-漫天机械碎屑与烈焰火光中，全场所有人窒息般呆立当场，看向王煊的背影宛若瞻仰远古重生的真神！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_dawang',
-    title: '大王饶命：负面情绪神树',
-    author: '会说话的肘子',
-    sourceName: '爆款网文源',
-    category: '爆笑逆袭',
-    intro: '灵气复苏大世开启！高中生吕树偶得奇特星图，只要收集别人的负面情绪就能无限兑换逆天神果与璀璨星辰，靠疯狂搞人心态一路碾压登顶王座！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_dw_1',
-        index: 0,
-        title: '第1章 车祸重生！负面情绪值系统的激活',
-        originalText: `洛城郊外老旧的小胡同里，刚经历一场诡异车祸的孤儿吕树捂着毫无伤痕的心口，满脸不可思议。
-在他识海深处，一颗晶莹剔透的神奇小树苗正在静静生长，树梢上挂着一个散发着幽蓝光芒的抽奖罗盘。
-【叮！来自李弦一的疑惑，负面情绪值 +99！】
-【叮！来自黑市摊主的愤怒，负面情绪值 +233！】
-“只要让人心生郁闷或者抓狂，我就能赚取情绪点数兑换洗髓果实？”吕树嘴角忍不住扬起一抹古怪而灿烂的微笑。
-他转头看向身旁眼巴巴盯着烤地瓜的妹妹吕小鱼，一本正经地说道：“小鱼，今晚我们吃青菜炒苦瓜，听说特别下饭。”
-【叮！来自吕小鱼的怨念，负面情绪值 +666！】
-吕树眼前一亮，豪气干云地挥手买下两箱洗髓果实，属于大魔王的灵气觉醒之路在笑料中疯狂暴走！`,
-      },
-      {
-        id: 'ch_dw_2',
-        index: 1,
-        title: '第2章 天罗地网！臭豆腐摊前的大宗师',
-        originalText: `北芒山遗迹即将现世，天罗地网精锐与各方超凡觉醒者齐聚洛城，气氛紧张肃杀剑拔弩张。
-在一众神色威严的大修行者中间，吕树推着一辆铁皮三轮车，扯着嗓门大声吆喝：“正宗原味臭豆腐！闻着臭吃着香，觉醒灵气必备神药，只要两百块一份！”
-刺鼻浓烈的特殊气味瞬间弥漫了整条街道，周围心浮气躁的觉醒者们差点当场被熏晕过去。
-“小子你找死是不是！信不信老子一掌劈了你的破摊子！”一名满脸横肉的二品高手暴怒拔刀冲来。
-吕树连眼皮都没眨一下，反手随手一挥，体内浩瀚如星海的深邃剑气如天河倒卷，当场将对方的精钢长刀切为两段，整个人震飞数米深陷水泥墙面！
-全场觉醒者瞬间倒吸一口凉气，脑海中疯狂跳动的情绪数值几乎将吕树的系统面板撑爆！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_wanxiang',
-    title: '万相之王：李洛崛起',
-    author: '天蚕土豆',
-    sourceName: '全网经典源',
-    category: '热血玄幻',
-    intro: '天地间有万相，而少年李洛却天生空相。洛岚府风雨飘摇强敌环伺，未婚妻姜青娥名动天下。少年在绝境中后天纳相，逆转乾坤主宰天地！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_wx_1',
-        index: 0,
-        title: '第1章 天生空相！洛岚府少府主的隐忍',
-        originalText: `南风城洛岚府内，金碧辉煌的大厅深处却暗流汹涌。
-府内各大派系长老们眼神闪烁各怀鬼胎，将目光投向坐于主座之上的清秀少年李洛。
-在这个以相性品阶决定命运的世界，天生空相的李洛被外界视为无法修行的废物。父母失踪五年，昔日庞大的洛岚府已然摇摇欲坠。
-“少府主，今日若再无法觉醒相性，按府规必须交出府主金印！”一名居心叵测的长老步步紧逼。
-就在全场气氛冰封至极点之时，一袭白衣如雪、容颜倾城绝世的姜青娥按剑而入，九品光明相的无上威压瞬间笼罩全场：“谁敢逼他退位，先问过我手中的重剑！”
-李洛望着坚决站在自己身前的绝代天骄，掌心中父亲留下的绝密水晶悄然泛起九道神相的磅礴微光。属于他的逆袭大幕，终将彻底撕裂黑暗！`,
-      },
-      {
-        id: 'ch_wx_2',
-        index: 1,
-        title: '第2章 后天水相！后山石窟的相力蜕变',
-        originalText: `后山幽静的水晶地穴内，李洛盘膝于灵潭中央，将剧痛无比的后天灵晶狠狠拍入胸膛。
-空相并非残缺，而是世间最为浩瀚包容的神迹容器！
-伴随着水龙吟般的清越长啸，清澈灵动的碧蓝水相如怒浪滔天，在李洛的相宫之中奔腾咆哮！
-天地间的能量因子疯狂汇聚，原本停滞多年的相力等级在短短数息之间接连跨越三重壁障！
-当李洛推开石门踏出密室时，眼中已褪去青涩，取而代之的是睥睨山河的自信与霸气。洛岚府的少府主，将亲自让那些落井下石的敌人们付出惨痛代价！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_douluo',
-    title: '斗罗大陆：双生武魂',
-    author: '唐家三少',
-    sourceName: '全网经典源',
-    category: '经典玄幻',
-    intro: '唐门外门弟子唐三跳崖明志，转世斗罗大陆圣魂村。觉醒看似废物的蓝银草与至尊昊天锤，手握唐门绝世暗器，一步步铸就无上帝皇神祇！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_dl_1',
-        index: 0,
-        title: '第1章 武魂觉醒！先天满魂力的废武魂',
-        originalText: `圣魂村简陋的武魂殿分殿内，素云涛大师正在为村里的孩童们主持觉醒仪式。
-当六角法阵金光绽放，唐三缓缓伸出右手，一株极为普通的淡蓝色蓝银草在掌心徐徐摇曳。
-“唉，居然是公认的废武魂蓝银草，根本没有修炼成强大魂师的潜能。”素云涛失望地摇了摇头。
-然而当唐三的手掌按上测试水晶球的瞬间，原本黯淡的水晶骤然爆发出一抹刺穿房顶的璀璨耀目光芒！
-“天啊！先天满魂力！整整十级满魂力！”素云涛失声惊呼。
-而无人知晓的是，唐三悄悄背在身后的左手掌心之中，一柄沉重如山岳、通体缠绕着漆黑电芒的精致小铁锤，正悄然散发着毁天灭地的至尊威严！`,
-      },
-      {
-        id: 'ch_dl_2',
-        index: 1,
-        title: '第2章 猎魂森林！曼陀罗蛇的第一魂环',
-        originalText: `危机四伏的猎魂森林深处，拥有四百年修为的凶悍曼陀罗蛇张开血盆大口，毒雾如箭直射而出。
-大师玉小刚身中剧毒危在旦夕，唐三眼神沉凝如止水，脚踏玄天宝录中的鬼影迷踪步，身形在树影间轻盈如鬼魅。
-“玄玉手！控鹤擒龙！”唐三双手化作莹白坚硬的温润玉色，不闪不避徒手抓住蛇吻，袖中无声袖箭如流星般精准贯穿曼陀罗蛇的脆弱七寸！
-伴随着绚烂温润的黄色百年魂环缓缓升起，唐三盘膝而坐引魂入体，蓝银草的坚韧与剧毒双重变异在此刻彻底觉醒！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_wanmei',
-    title: '完美世界：荒天帝的传说',
-    author: '辰东',
-    sourceName: '全网经典源',
-    category: '东方仙侠',
-    intro: '一粒尘可填海，一根草斩尽日月星辰！大荒深处石村走出的奶娃石昊，怀揣被挖至尊骨的滔天遗恨，独断万古，战至九天十地苍穹崩裂！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_wm_1',
-        index: 0,
-        title: '第1章 石村奶娃！万兽精血鼎中熬炼',
-        originalText: `苍茫大荒古木参天，太古凶兽咆哮震荡山岳。
-在被焦黑雷击柳木守护的祥和石村中，年幼的石昊抱着用兽骨制成的奶罐，眨巴着大眼睛好奇地看着村长族老们将珍贵的大荒狻猊真血倒入沸腾的青铜巨鼎。
-“孩子，你体内曾遭逢大劫，骨骼虽残但生机深藏，唯有借至尊凶兽神血熬炼，方能涅槃重生！”老族长石云峰神色庄重。
-小石昊毫不犹豫地跃入滚烫药鼎之中。凶暴狂猛的太古凶兽符文在血脉中疯狂肆虐，犹如万蚁噬骨！
-但他咬紧牙关不发一声，识海深处那一截曾经被生生剥离的至尊骨创口处，一缕蕴含着天地原始真解的至高符文正在浴火重生！`,
-      },
-      {
-        id: 'ch_wm_2',
-        index: 1,
-        title: '第2章 搬血极境！单臂十万八千斤神力',
-        originalText: `石村前演武场上，上百名精壮汉子屏气凝神。
-石昊小脸红扑扑的，走到一座重达数万斤的青铜古鼎旁，两只稚嫩的小手轻轻贴在冰冷的鼎足之上。
-“起！”伴随着一声清脆的喝喊，小石昊浑身气血如神霞喷薄，浩瀚如星海的力量自四肢百骸轰然炸裂！
-庞大沉重如小山丘的青铜古鼎被他单臂轻而易举高高举过头顶，甚至如玩具般凌空抛起数十丈高，大地在巨力践踏下崩裂出深不见底的沟壑！
-“搬血极境！这是打破了太古神禽纯血幼崽的无敌肉身记录！”村人老少目瞪口呆狂喜欢呼。荒天帝独断万古的无敌神话，从这片莽荒山林毅然启航！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_shengxu',
-    title: '圣墟：神祇黄昏',
-    author: '辰东',
-    sourceName: '全网经典源',
-    category: '高燃玄幻',
-    intro: '在破败中崛起，在寂灭中复苏。沧海成尘，雷电枯竭，那一缕幽雾又一次临近大地。楚风手握三颗神秘石籽，踏上踏平诸天禁区的征程！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_sx_1',
-        index: 0,
-        title: '第1章 太行山异变！银色神树上的异果',
-        originalText: `后文明时代，太行山脉深处霞光冲天，天地剧变灵气复苏。
-原本普通的山峦一夜之间拔高数万丈，直插云霄，无数奇花异草吞吐着令人心悸的非凡能量。
-楚风背负行囊走在山林间，亲眼目睹一株高达百丈的古树通体如白银浇筑，树冠顶端结着三颗散发着浓郁异香的紫色神果。
-来自异人组织的凶悍觉醒者们在树下疯狂厮杀争夺，热武器与超凡异能在夜空下爆发出刺耳火光。
-楚风目光如炬，暗中运转太行山下偶得的古老盗引呼吸法，整个人宛若与虚空融为一体，在混乱硝烟中从容摘得至尊异果！`,
-      },
-      {
-        id: 'ch_sx_2',
-        index: 1,
-        title: '第2章 牛神传道！觉醒肉身通天神藏',
-        originalText: `山洞避难所内，异果下肚化作浩荡无匹的热流，撕裂着楚风每一寸筋骨皮肉。
-一只金色皮毛、神态倨傲的大黑牛翘着二郎腿坐在青石上，手中用树枝写写画画，传授着世间无上的呼吸引导神术。
-在呼吸法的完美配合下，楚风体内原本沉寂的人体神藏轰然爆开，肉身泛起如琉璃般的纯净神光，听力与视力突破至不可思议的超凡境地！
-洞外猛然传来异人高手的嚣张叫嚣：“藏头缩尾的鼠辈，立刻交出神果，饶你全尸！”
-楚风缓缓站起身来，一步跨出山洞，单手握拳随手轰出，恐怖的拳风如十二级飓风将前方的钢铁巨石与数十名强敌彻底连根拔起！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_xuezong',
-    title: '雪中悍刀行：劣马黄酒六千里',
-    author: '烽火戏诸侯',
-    sourceName: '全网经典源',
-    category: '武侠江湖',
-    intro: '白马出凉州，春风吹塞北。北凉世子徐凤年历经三年六千里风刀霜剑，归来接掌北凉三十万铁骑，一刀劈开江湖庙堂，试问天上仙人，谁敢来此人间！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_xz_1',
-        index: 0,
-        title: '第1章 风尘仆仆！北凉王府前的草鞋世子',
-        originalText: `北凉王府高大雄伟的朱红大门前，两侧数十名身着亮银铠甲的亲兵持戟肃立，威严慑人。
-烈日下，一匹瘦骨嶙峋的跛脚老马慢吞吞地走来，马背上坐着一位衣衫褴褛、发丝凌乱的落魄青年，身后跟着个缺了门牙、背负剑匣的干瘪老仆。
-“哪来的乞丐！速速退去，冲撞了王府大驾要你项上人头！”守门校尉厉声呵斥。
-青年翻身下马，懒洋洋地伸了个懒腰，擦去脸上的泥污，露出一双清亮深邃如鹰隼般的眼眸：“三年流散六千里，老子徐凤年终于活着回凉州了！”
-校尉定睛一看，吓得魂飞魄散兵器当啷落地，扑通一声双膝跪倒在大理石地面上：“北凉亲兵，恭迎世子殿下归府！”`,
-      },
-      {
-        id: 'ch_xz_2',
-        index: 1,
-        title: '第2章 剑九黄决战！武帝城头为天下争气',
-        originalText: `东海武帝城头，海风猎猎，天下第二王仙芝巍然屹立，一甲子无敌于人间。
-老仆剑九黄褪下破旧羊皮袄，拍了拍跟随自己大半生的剑匣，轻声道：“少爷，这最后一杯黄酒，老黄敬你。”
-话音落下，剑匣中五柄名剑破空而出，化作漫天森冷剑气长虹直冲九霄云外！
-“剑九！六千里！”
-伴随着老黄一生中最辉煌最豪迈的狂放长啸，浩荡无边的剑气如滚滚江河横跨整个东海，硬生生在武帝城头劈开一道十丈深的惊天剑痕！
-酒肆茶摊上，徐凤年双手紧握酒碗，泪流满面，属于北凉新刀魁的宿命在心头如烈火般疯狂燃烧！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_qingyuniang',
-    title: '庆余年：澹州少年的传奇',
-    author: '猫腻',
-    sourceName: '全网经典源',
-    category: '架空权谋',
-    intro: '积善之家，必有余庆。澹州杂货铺走出的私生子范闲，怀揣绝世武功与现代记忆，踏入风起云涌的京都棋局。在皇权与阴谋的漩涡中，掀翻整座天下！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_qy_1',
-        index: 0,
-        title: '第1章 澹州小院！蒙眼五竹叔的铁钎',
-        originalText: `澹州海风微凉，海浪拍打着礁石。范府别院的青石天井里，少年范闲正在咬牙扎着马步。
-不远处的石阶上，坐着一位黑布蒙眼、手握黑色铁钎的神秘男子五竹。
-“叔，你这套霸道真气的行气路线，每次在体内冲撞都疼得像刀割一样，到底靠不靠谱啊？”范闲一边擦汗一边咧嘴抱怨。
-五竹头也没抬，声音没有半点人间情绪的起伏：“你母亲留下的功法，练到九品可以开山碎石，练到大宗师可以只手抗衡十万大军。”
-突然，小院后门传来数道极为微弱的阴冷杀气，三名黑衣刺客手持淬毒短刃无声翻墙而入！
-范闲眼神一凝，霸道真气如火山般轰然爆发，身形如离弦之箭后发先至，一掌便将领头刺客击碎内脏震退数丈！`,
-      },
-      {
-        id: 'ch_qy_2',
-        index: 1,
-        title: '第2章 京都风云！庆庙初遇鸡腿姑娘',
-        originalText: `京都庆庙偏殿深处，香火缭绕，帷幔轻拂。
-初入繁华京都的范闲为了躲避府内耳目，悄悄溜进偏殿，却在供桌后撞见了一位手持油纸鸡腿、清纯脱俗如画中仙子的白衣少女。
-少女眼神惊惶如小鹿，嘴角还挂着一丝顽皮的油渍，两人目光相对，时光仿佛在这一瞬静止凝固。
-“你是神仙派来收我的吗？”范闲忍不住脱口而出。
-当少女被侍从匆匆接走，只留下一方绣有淡淡海棠花香的锦帕时，范闲握着锦帕微微一笑。京都的波诡云谲纵然凶险万分，但有了这份执念，整座天下亦不足为惧！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_daogui',
-    title: '道诡异仙：迷妄修真录',
-    author: '狐尾的笔',
-    sourceName: '爆款网文源',
-    category: '克系仙侠',
-    intro: '诡异仙道，莫辨真假！李火旺在精神病院与光怪陆离的绝望修仙界之间反复横跳。为了保护心中的白灵淼与伙伴，手持脊骨长剑，斩尽漫天邪祟！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_dg_1',
-        index: 0,
-        title: '第1章 清旺来！虚幻与真实的癫狂边缘',
-        originalText: `冰冷刺眼的白炽灯下，戴着氧气面罩的病床上，监护仪发出急促刺耳的滴答声。
-“李火旺，快醒醒！你又产生幻觉了，你根本不在什么修真门派，你只是患了严重的精神分裂症！”医生杨娜的声音在耳边剧烈回荡。
-可当李火旺狠狠揉揉眼睛，眼前的白色病房骤然扭曲崩溃，变成了一间阴森恐怖、挂满人皮与干瘪内脏的道观炼丹房！
-赤发獠牙的癞子道人正举着滴血的剔骨尖刀，贪婪地盯着他的胸口：“好药引！好一个先天心素的好苗子！”
-李火旺死死咬牙，掌中紧扣一枚淬毒银针，分不清到底哪个世界才是真实的幻象。
-“管你是仙是鬼，想吃老子，老子先拉你陪葬！”他狂暴怒吼，在癫狂的绝望中悍然暴起！`,
-      },
-      {
-        id: 'ch_dg_2',
-        index: 1,
-        title: '第2章 苍蜣登阶！大千录下的无上神威',
-        originalText: `荒郊破庙之外，漫天飞舞着诡异长着人脸的黑色飞蛾，阴风呼啸如怨魂哭嚎。
-同行的单纯白发少女白灵淼被邪教妖人逼入绝境，嘴角溢血满脸绝望。
-李火旺猛然抽出怀中那本散发着腥臭血光的人皮大千录，右手五指狠狠刺入自己的腹腔，将血淋淋的内脏与铜钱红线缠绕在手臂之上！
-“借法！苍蜣登阶！列位游老爷，今日借我三千神通，灭了这群披皮恶鬼！”
-刹那间，苍穹化作一片猩红血海，无上诡异的大道法则附体而下，李火旺手持白骨脊剑狂斩而出，漫天妖邪在惨烈剑气下尽数化为飞灰！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_doupo',
-    title: '斗破苍穹：三年之约',
-    author: '天蚕土豆',
-    sourceName: '全网经典源',
-    category: '玄幻逆袭',
-    intro: '三十年河东，三十年河西，莫欺少年穷！当昔日天才萧炎陨落为废柴，身怀骨灵冷火的药老苏醒，少年踏上一条逆天改命的异火主宰之路。',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_dp_1',
-        index: 0,
-        title: '第1章 陨落的天才！冷血的退婚协议',
-        originalText: `乌坦城，萧家演武场上，刺骨的喧嚣与冷笑声如潮水般涌来。
-“斗之力，三段！”测验魔石碑旁，中年男子冰冷无情地念出石碑上的刺目大字，眼中没有丝毫掩饰的轻蔑。
-人群瞬间爆发出一阵刺耳的哄笑。三年前名震加玛帝国的绝顶天才萧炎，如今却沦为连普通杂役都不如的废柴。
-就在全族嘲弄之际，云岚宗的高贵少女纳兰嫣然一身月白长袍，在数名宗门强者的簇拥下缓缓走出。她神色冷傲高高在上，优雅地递上一纸盖有宗门金印的退婚合同。
-“萧炎，你我身份已如云泥之别，强行维持婚约只会让萧家陷入万劫不复的深渊。”纳兰嫣然的声音淡漠而没有任何犹豫，“签了它，对你而言是唯一的解脱。”
-全场一片死寂。面对如此刺骨的轻蔑与背叛，萧炎死死紧握双拳，指甲深深掐入掌心，鲜血顺着指缝滴落。
-“纳兰小姐，三十年河东，三十年河西，莫欺少年穷！”少年掷地有声的咆哮在大厅中回荡，属于无敌王者的命运齿轮，在今夜轰然运转！`,
-      },
-      {
-        id: 'ch_dp_2',
-        index: 1,
-        title: '第2章 药老苏醒！至高异火的传承',
-        originalText: `深夜，后山孤崖峭壁之上，狂风呼啸。
-萧炎瘫坐在青石之上，胸口黑色古朴的戒指忽然发出一抹幽暗神秘的深蓝色火焰。
-“嘿嘿，小家伙，老夫吸了你三年的斗之气，可曾让你心生绝望？”一道苍老而充满玄奥威压的声音突兀地在虚空中响起。
-只见一团白色的灵魂火光从戒指中缓缓飘荡而出，化作一位仙风道骨的白袍老者。老者的眼神中蕴含着超脱凡俗的恐怖力量。
-“三年嘲弄，不仅磨砺了你的心性，更让你原本脆弱的心智蜕变为百折不挠的精金！”药老抚须大笑，“老夫乃八品炼药至尊药尘，你可愿拜我为师，主宰九天十地无数神火？”
-萧炎没有半分迟疑，轰然跪倒在地，重重磕下三个响头：“师傅在上，请受徒儿一拜！”
-复仇与崛起的烈焰，在黑夜中爆发出空前绚烂的辉煌神芒！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_guimi',
-    title: '诡秘之主：廷根值夜者',
-    author: '爱潜水的乌贼',
-    sourceName: '全网经典源',
-    category: '奇幻悬疑',
-    intro: '蒸汽与机械的浪潮中，谁能触及非凡的大道？赤红色的绯红之月升起，灰雾之上的愚者轻轻转动高维塔罗牌，开启不可名状的神话冒险。',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_gm_1',
-        index: 0,
-        title: '第1章 绯红之月！灰雾之上的神秘祭祀',
-        originalText: `煤气路灯照耀着潮湿冰冷的廷根街道，头顶的红月散发着诡异莫测的猩红微光。
-周明瑞从混沌的剧烈头痛中惊醒，愕然发现自己身处一间散发着机油与旧书气味的维多利亚式卧室内。
-桌面上一本摊开的古老笔记本上，用褐色的墨水写着令人毛骨悚然的预言。
-当他下意识转动手指上的神秘银质指环时，周围的虚空骤然扭曲崩塌。无边无际的浓郁灰雾升腾而起，将他带到了一座浩瀚宏伟的神殿上方。
-宏伟的高背椅整齐排列，二十二张象征着至高序列的神秘塔罗牌在虚空之中徐徐旋转。
-“愚者……不属于这个时代的愚者，灰雾之上的神秘主宰，执掌好运的黄黑之王……”深邃的祈祷赞美诗自时空的彼端低语传来。
-面对这超越凡人理解极限的超自然神秘现象，克莱恩保持着绝对的冷静与沉着，神明般的蜕变与探索就此拉开序幕。`,
-      },
-      {
-        id: 'ch_gm_2',
-        index: 1,
-        title: '第2章 占卜家启程！非凡魔药的吞服',
-        originalText: `黑荆棘安保公司地下深处，密封的炼金密室内，纯银长桌上摆放着两瓶散发着幽蓝光晕的玻璃试剂。
-“魔药不仅仅是力量的源泉，更伴随着致命的失控与疯狂。”值夜者队长邓恩·史密斯用深邃而灰色的眼眸注视着克莱恩，“一旦选择成为非凡者，危险便不可避免。”
-克莱恩没有任何犹豫。在这个充满阴谋与邪神低语的残酷世界，唯有强大的力量才能守护至亲至爱之人。
-他优雅地举起试剂瓶，将泛着星辰般奇异泡沫的‘占卜家’魔药一饮而尽！
-狂暴无匹的神秘灵性如翻江倒海般瞬间灌入他的脑海，无数诡谲莫测的虚幻低语险些将他的理智碾碎。
-但他凭借着磐石般的顽强毅力守住灵台清明，在剧烈的精神震荡中彻底完成了质变的蜕变！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_dafeng',
-    title: '大奉打更人：税银惊天秘案',
-    author: '卖报小郎君',
-    sourceName: '爆款网文源',
-    category: '仙侠探案',
-    intro: '警校毕业的许七安穿越大奉王朝，开局沦为死囚大牢。凭借现代刑侦学与炼金术，一步步从勾栏听曲的小捕快卷成镇国武神！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_df_1',
-        index: 0,
-        title: '第1章 天牢死局！十五万两税银蒸发',
-        originalText: `京城大理寺死牢内，阴暗潮湿，空气中弥漫着刺鼻的霉味与血腥气。
-许七安缓缓睁开双眼，脑海中如潮水般涌入前身的记忆：二叔押送的十五万两户部税银在渡口神秘沉江消失，全家老小被构陷合谋吞银，三日之后即将问斩菜阳市！
-“穿越开局就是死局？”许七安冷笑一声，强行压下心头的慌乱，前世资深刑侦专家的思维火速运转。
-他仔细查阅卷宗上关于‘白银突遇河水化作沉泥’的离奇供述。在这个拥有道门符箓与儒家浩然正气的超凡世界，寻常官差以为是天谴妖法，但许七安一眼便识破了背后的诡异阴谋。
-“河水化银？这不过是用化学置换反应掩人耳目的把戏罢了！”
-他在湿漉漉的青石地面上用木棍推导出关键破绽，对着门外的狱卒朗声大喝：“去告诉魏公！罪民许七安，已有破案神策，可保十五万两税银完璧归赵！”`,
-      },
-      {
-        id: 'ch_df_2',
-        index: 1,
-        title: '第2章 金銮殿对质！力挽狂澜斩贪官',
-        originalText: `大奉金銮殿上，文武百官神色肃杀，户部侍郎与刑部主事步步紧逼，企图将谋反罪名彻底扣死在许家头上。
-白衣宦官魏渊负手而立，眼神深邃，身后的铜锣打更人们按刀而侍，气氛压抑到了极点。
-就在满朝大臣以为胜券在握之时，许七安一身粗布囚衣昂首踏入大殿，面对衮衮诸公的轻蔑审视，神态从容不迫。
-他端起一盆清水，将藏在死者鞋底的白色结晶投入其中，伴随着刺鼻的青烟，纯银瞬间析出，真相大白于天下！
-“这就是你们所谓的妖法天灾？分明是户部贪官监守自盗的卑鄙阴谋！”许七安字字珠玑，如惊雷般震动整个朝堂。
-铁证如山面前，贪官污吏们面无人色扑通跪地。魏公眼中闪过惊艳的赞赏光芒：“好一个后生小辈！从今日起，你便是我打更人衙门的铜锣！”`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_fanren',
-    title: '凡人修仙传：七玄门小药童',
-    author: '忘语',
-    sourceName: '全网经典源',
-    category: '经典修真',
-    intro: '山村穷小子韩立，机缘巧合进入七玄门神手谷。偶得吸收日月精华的神秘绿瓶，凭借谨慎沉稳的心性，走出一条长生大道的凡人传奇。',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_fr_1',
-        index: 0,
-        title: '第1章 神手谷！泥土下的神秘绿瓶',
-        originalText: `彩霞山深处，神手谷内药香袅袅，鸟鸣山幽。
-肤色黝黑的山村少年韩立正小心翼翼地侍弄着草药圃，神色沉稳内敛，远比同龄少年多了一份谨慎与坚毅。
-在翻动谷底背阴处的泥土时，他的药铲忽然碰触到一件质地极其温润坚硬的硬物。
-扒开泥土，只见一只只有巴掌大小、通体墨绿晶莹的古朴小瓶静静躺在石缝之间。
-瓶身上雕刻着无数繁复奥妙的天地符文，散发着一股令人心旷神怡的纯净灵气。
-韩立环顾四周，确定没有任何人影后，迅速将小瓶藏入怀中。他明白，在这个弱肉强食充满危机与算计的修真世界，任何一件不可思议的宝物都可能引来杀身之祸。
-这只看似普通的小瓶，将成为他超越凡俗、登临三界之巅的最大机缘！`,
-      },
-      {
-        id: 'ch_fr_2',
-        index: 1,
-        title: '第2章 夺舍危机！墨大夫的真面目',
-        originalText: `月黑风高的深夜，神手谷静室内烛火摇曳。
-昔日慈祥温和的师尊墨大夫此刻面容狰狞宛如厉鬼，双手如鬼爪般死死按住韩立的天灵盖！
-“好徒儿，你苦修三年的长春功终于大成，如今正合老夫夺舍重生！”墨大夫发出刺耳疯狂的长笑，一道阴冷诡异的元神自他头顶暴冲而出。
-面对这生死攸关的绝境危机，韩立眼中没有丝毫绝望与犹豫。
-三年来，他早已暗中提防墨大夫的种种反常举动，并在体内经脉中藏有一柄淬有七毒绝命散的飞刀法宝！
-就在元神即将侵入识海的刹那，韩立反手一刺，毒刀携带着狂暴真气瞬间贯穿墨大夫的心脏！
-雷霆般的果决反击，让这位老谋深算的宗门宿老至死都没能明白，自己竟然会败给一个看似憨厚的凡人少年！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_gaowu',
-    title: '全球高武：地窟大降临',
-    author: '老鹰吃小鸡',
-    sourceName: '高燃玄幻源',
-    category: '高燃战斗',
-    intro: '地窟入侵，人类武者以血肉铸长城！方平带着财富转换系统穿越高武世界，只要搞钱气血就能无限狂飙，一刀横扫异界万族神魔！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_gw_1',
-        index: 0,
-        title: '第1章 气血测验！财富系统的初次激活',
-        originalText: `阳城一中高三操场上，巨大的气血检测仪红光闪烁，气氛极其压抑紧张。
-在武者享有无上崇高地位与财富的世界里，气血值的高低直接决定了能否考入顶尖武大，迈向超凡巅峰。
-“方平，气血 108 卡，不合格！”监考老师面无表情地宣布成绩，台下的同班同学们纷纷投来惋惜与嘲弄的目光。
-方平紧咬牙关，心中泛起强烈的不甘。就在他将口袋里仅剩的一百块现金攥紧时，脑海中忽然响起清脆悦耳的机械提示音：
-【叮！财富气血转换系统成功绑定！检测到现金 100 元，是否转换为 1 点气血点数？】
-“转换！全部转换！”方平毫不迟疑在心中怒吼。
-刹那间，一股汹涌澎湃的热流从他心脏轰然迸发，充斥着全身四肢百骸，原本停滞不前的气血指针如狂暴火箭般疯狂飙升！`,
-      },
-      {
-        id: 'ch_gw_2',
-        index: 1,
-        title: '第2章 一拳惊全校！南江武考第一人',
-        originalText: `“重新测试！”方平大步走回检测仪前，眼神如鹰隼般锐利慑人。
-在全校师生难以置信的注视下，他右拳骤然轰出，带起撕裂空气的剧烈破空声，重重砸在测力靶心之上！
-轰！整座坚固的测力仪器发出不堪重负的剧烈哀鸣，显示屏上的数字断崖式跳动，最终定格在一个令人窒息的高度：
-“气血 149 卡！力量 450 公斤！特等武道奇才！”
-刺耳的警报声响彻整个校园，全场陷入了死一般的震撼与寂静。
-昔日那些轻视他的师生们个个目瞪口呆倒吸凉气。方平收回拳头，嘴角勾起一抹霸气张扬的从容笑容。从这一刻起，地窟将记住他的名字！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_zhetian',
-    title: '遮天：九龙拉棺',
-    author: '辰东',
-    sourceName: '全网经典源',
-    category: '洪荒仙侠',
-    intro: '冰冷与黑暗并存的宇宙深处，九具庞大的龙尸拉着一口青铜古棺，踏破无尽星域降临泰山之巅，浩瀚无垠的修仙神话大世轰然揭开！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_zt_1',
-        index: 0,
-        title: '第1章 泰山之巅！九龙拉棺凌空降临',
-        originalText: `泰山巍峨，拔地通天。玉皇顶上，狂风大作，整片苍穹骤然化作一片漆黑的永夜。
-叶凡与一众大学同窗站在祭坛边缘，惊恐地望向天际。只见九具长达百丈的远古漆黑巨龙尸骸，拉着一口巨大的青铜古棺，轰然砸穿虚空呼啸坠落！
-大地剧烈颤抖，青铜古棺散发出苍凉浩瀚的洪荒气息，瞬间将所有人卷入棺内神秘的星际空间。
-面对这超越凡人科学认知的震撼神迹，叶凡眼神凝重而深邃，右手死死护住身边的同伴。
-星空彼岸，属于荒古圣体的浩瀚无敌征途，自此拉开不可阻挡的帷幕！`,
-      },
-      {
-        id: 'ch_zt_2',
-        index: 1,
-        title: '第2章 荒古禁地！圣果觉醒无上神体',
-        originalText: `青铜巨棺降落在危机四伏的荒古禁地之内。四周神峰环绕，古木参天，岁月的气息令人瞬间衰老。
-众人陷入了难以言喻的绝望与恐慌，唯独叶凡与庞博沉着冷静，在悬崖绝壁之下寻得了九座圣山上的绝世神泉与九枚剔透圣果。
-圣果入口即化，庞大的天地源气如火山喷发般疯狂冲刷着叶凡的气海！
-原本被天地法则诅咒的荒古圣体，在此刻金光璀璨照耀九重天穹，金色的苦海轰然开辟，海啸连天，雷电万道！
-“这就是属于大帝的无敌体质！”叶凡握拳，无视禁地恐怖威压，踏出通往长生的第一步！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_jianlai',
-    title: '剑来：大骊骊珠洞天',
-    author: '烽火戏诸侯',
-    sourceName: '全网经典源',
-    category: '东方仙侠',
-    intro: '大千世界，无奇不有。骊珠洞天小镇少年陈平安，手握草鞋青衫一柄木剑，为天地立心，为生民立命，一剑斩出浩然长气！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_jl_1',
-        index: 0,
-        title: '第1章 泥瓶巷少年！命悬一线的草鞋客',
-        originalText: `落魄小镇泥瓶巷深处，阴雨绵绵。
-孤苦无依的草鞋少年陈平安蹲在自家破败的门槛前，眼神清澈而坚定，哪怕腹中饥肠辘辘，脊梁骨依然挺得笔直。
-小镇压胜三百年，仙家巨擘与宗门大佬纷纷降临这方洞天福地，争夺机缘气运，视小镇凡人如蝼蚁草芥。
-当正阳山与清风城的剑仙弟子拔剑凌空、盛气凌人逼问机缘时，陈平安面无惧色，双手紧扣腰间一把简陋的柴刀。
-“世间道理千千万，唯有自己走出的路才是真道理。”少年神色平静，字字坚定，属于未来剑仙的剑心，在微末泥泞中悄然铸就。`,
-      },
-      {
-        id: 'ch_jl_2',
-        index: 1,
-        title: '第2章 齐先生赠字！天不生我李淳罡',
-        originalText: `小镇学塾之内，圣人齐静春温和一笑，目光深邃宛若浩瀚星海。
-他提起饱蘸浓墨的长毫，在陈平安的本命印章上端端正正刻下四个温润大字：“莫向外求”。
-一刹那，浩然天地的浩荡正气如江河倒灌，将小镇所有的阴暗诡计与压制彻底冲刷荡平！
-“陈平安，遇事莫慌，天底下最大的道理，便在你的心头。”
-少年深深一揖到地。背负着圣人的嘱托与期望，草鞋少年背负长剑，迈步走出了骊珠洞天，向着无边辽阔的山海江湖从容行去！`,
-      },
-    ],
-  },
-  {
-    id: 'cloud_longwang',
-    title: '龙王赘婿：隐龙觉醒',
-    author: '修罗战神',
-    sourceName: '热血都市源',
-    category: '都市逆袭',
-    intro: '入赘豪门三年，洗脚做饭受尽丈母娘嘲弄冷眼。当十万黑衣战神齐聚江城，一声龙王归来，天下财阀巨头尽数颤抖跪迎！',
-    totalChapters: 2,
-    chapters: [
-      {
-        id: 'ch_lw_1',
-        index: 0,
-        title: '第1章 家族寿宴！折辱与绝境反击',
-        originalText: `江城林家奢华的寿宴大厅内，推杯换盏，喜气洋洋。
-入赘三年的陈飞身系围裙，端着滚烫的洗脚水快步走进大厅，却被狂妄跋扈的林家堂兄故意一脚踹翻。
-“废物就是废物！今天老太太八十大寿，全城名流云集，你这丧门犬也配端水上台？”堂兄双手抱胸，神色极其嚣张桀骜。
-四周的林家亲戚们纷纷发出哄堂嘲笑，丈母娘更是尖酸刻薄地指着他的鼻子破口大骂，逼迫他立刻在离婚协议书上签字画押，交出名下所有微薄的财产与股份。
-陈飞静静伫立在泼洒满地的污水中，没有愤怒，更没有丝毫的慌乱与动摇。
-就在这时，大厅外忽然传来震耳欲聋的螺旋桨轰鸣声。十二架纯黑色的军用武装直升机遮天蔽日，盘旋在林家庄园上空！
-数千名全副武装气势滔天的铁血战神破门而入，整齐划一地单膝跪地，声音如天雷炸裂：“属下拜见龙神至尊！十万龙王殿大军已就位，请龙王示下！”`,
-      },
-      {
-        id: 'ch_lw_2',
-        index: 1,
-        title: '第2章 千亿财团！商业帝国的彻底降伏',
-        originalText: `林家大厅内，原本趾高气扬的堂兄和丈母娘瞬间吓得面无人色，浑身剧烈颤抖，双腿发软直接瘫倒在冰冷的地板上。
-陈飞缓缓脱下身上的旧围裙，露出了里面绣有九爪金龙的至尊战袍。他的气场深邃浩瀚，令人心生无尽的敬畏。
-“三年来，我顾念妻子恩情，对你们一再隐忍包容。”陈飞的声音冰冷得不带半点同情，“可你们的得寸进尺与背信弃义，已经彻底超越了我的底线。”
-特使恭敬地上前，递上一份烫金的绝密档案：“禀龙王，林家赖以生存的三大上市集团，已被龙王殿资金完全封杀，今日正式宣布全面破产倒闭！”
-在全场众人万念俱灰的绝望目光中，陈飞从容不迫地牵起妻子的手，大步踏出大门。属于龙王的都市传奇，在此刻彻底拉开帷幕。`,
-      },
-    ],
-  },
-];
-
 /**
- * 万能动态生成器：当用户检索任意自定义或冷门小说时，动态生成高质量对应篇章
- * 保证零落空、秒级直达、且完美契合英语完形填空阅读！
+ * 智能解析与清洗书源搜索 URL（兼容开源阅读 Legado 各种语法、POST格式及相对路径）
  */
-export function generateDynamicNovel(rawTitle: string): SearchNovelResult {
-  const cleanTitle = rawTitle.replace(/[《》]/g, '').trim() || '热血修仙逆袭';
-  
-  // 智能推测流派
-  let category = '爆款爽文';
-  let intro = `全网实时转译匹配神作《${cleanTitle}》。少年自微末中觉醒无上神力，撕裂黑暗桎梏，登临万道之巅！`;
+function resolveSearchUrl(source: BookSourceRule, keyword: string): string | null {
+  let raw = (source.searchUrlPattern || '').trim();
 
-  if (/仙|修真|道|剑|宗|魔|灵|乾坤|混沌/.test(cleanTitle)) {
-    category = '修真逆袭';
-    intro = `天道崩塌，九域震荡！《${cleanTitle}》少年身怀至尊灵根，在万千古教围剿中斩灭万魔，剑开天门！`;
-  } else if (/神|龙|帝|皇|遮天|完美|斗/.test(cleanTitle)) {
-    category = '玄幻无双';
-    intro = `天地为炉，造化为工！《${cleanTitle}》少年踏着诸神尸骸前行，只手挽天倾，独断万古岁月！`;
-  } else if (/赘婿|龙王|都市|战神|总裁|豪门|神医/.test(cleanTitle)) {
-    category = '都市热血';
-    intro = `三年隐忍，一朝潜龙出海！《${cleanTitle}》战神归来，十万铁血卫士跪迎，天下财阀莫敢不从！`;
-  } else if (/系统|签到|无敌|模拟|开局|神级/.test(cleanTitle)) {
-    category = '系统爽文';
-    intro = `【叮！神级系统激活！】在《${cleanTitle}》的世界里，开局觉醒神级天赋，呼吸都在狂飙暴涨战力！`;
-  } else if (/诡秘|诡异|深空|星际|科幻|末日|灾变/.test(cleanTitle)) {
-    category = '异界悬疑';
-    intro = `深渊凝视，不可名状！《${cleanTitle}》穿透重重迷雾，在旧日支配者与神话序列的废墟中探索终极真实！`;
+  // 如果没有显式配置搜索规则，尝试以 host/search 为默认
+  if (!raw) {
+    if (source.host && source.host !== 'local' && source.host !== 'universal') {
+      raw = `${source.host}/search?key={{key}}`;
+    } else {
+      return null;
+    }
   }
 
-  return {
-    id: `dyn_${cleanTitle.slice(0, 10)}_${Date.now()}`,
-    title: cleanTitle,
-    author: '网络文学大家',
-    sourceName: '⚡ 全网智能同步',
-    category,
-    intro,
-    totalChapters: 2,
+  // 1. 如果规则包含 Legado 的 @js: 或 <js> 脚本，提取其中的真实 HTTP URL，无法提取则安全跳过
+  if (raw.startsWith('@js:') || raw.startsWith('<js>')) {
+    const match = raw.match(/https?:\/\/[^\s"'`]+/);
+    if (match) {
+      raw = match[0];
+    } else {
+      return null;
+    }
+  }
+
+  // 2. Legado 语法中，逗号后面通常是 POST 参数或 headers 如: "url, {'method': 'POST'}"
+  if (raw.includes(',')) {
+    const parts = raw.split(',');
+    if (parts[0].includes('http') || parts[0].includes('/')) {
+      raw = parts[0].trim();
+    }
+  }
+
+  // 3. 替换各类搜索占位符 (支持 {{key}}, {{searchKey}}, %s 等)
+  let searchUrl = raw
+    .replace(/\{\{\s*key\s*\}\}/g, encodeURIComponent(keyword))
+    .replace(/\{\{\s*searchKey\s*\}\}/g, encodeURIComponent(keyword))
+    .replace(/%s/g, encodeURIComponent(keyword));
+
+  // 4. 清理残留的多余外部代理前缀
+  if (searchUrl.includes('api.allorigins.win/raw?url=')) {
+    searchUrl = decodeURIComponent(searchUrl.split('api.allorigins.win/raw?url=')[1]);
+  }
+  if (searchUrl.includes('corsproxy.io/?')) {
+    searchUrl = decodeURIComponent(searchUrl.split('corsproxy.io/?')[1]);
+  }
+
+  // 5. 如果是相对路径 (如 /fiction/search 或 novel/search)，结合 source.host 补全绝对路径
+  if (!searchUrl.startsWith('http://') && !searchUrl.startsWith('https://')) {
+    let host = (source.host || '').trim();
+    if (!host || host === 'local' || host === 'universal') return null;
+    if (!host.startsWith('http://') && !host.startsWith('https://')) {
+      host = `https://${host}`;
+    }
+    if (host.endsWith('/')) host = host.slice(0, -1);
+    if (!searchUrl.startsWith('/')) searchUrl = `/${searchUrl}`;
+    searchUrl = `${host}${searchUrl}`;
+  }
+
+  // 6. 最终严格校验：必须是合法的 http/https 协议
+  try {
+    const parsed = new URL(searchUrl);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return searchUrl;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/**
+ * 严格只从用户已导入且启用的书源中进行全网真实检索
+ * 绝无任何硬编码预设书目，绝无任何伪造数据
+ */
+export async function searchFromImportedSources(
+  query: string
+): Promise<{ results: SearchNovelResult[]; error?: string }> {
+  const keyword = query.trim();
+  if (!keyword) {
+    return { results: [] };
+  }
+
+  // 1. 读取用户已导入并启用的真实书源
+  const allSources = await getAllBookSources();
+  const enabledSources = allSources.filter((s) => s.isEnabled && (s.searchUrlPattern || s.host));
+
+  if (enabledSources.length === 0) {
+    return {
+      results: [],
+      error: '暂无可用的已启用书源，请先在规则库中导入或启用书源',
+    };
+  }
+
+  const results: SearchNovelResult[] = [];
+  const seenUrls = new Set<string>();
+
+  // 2. 并发向已启用的各书源发送真实检索请求
+  const tasks = enabledSources.map(async (source) => {
+    try {
+      const searchUrl = resolveSearchUrl(source, keyword);
+      if (!searchUrl) return;
+
+      const html = await fetchHtmlWithProxy(searchUrl);
+      if (!html) return;
+
+      const trimmed = html.trim();
+
+      // 2.1 针对返回 JSON 数据的接口型书源进行解析
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try {
+          const json = JSON.parse(trimmed);
+          const list = Array.isArray(json)
+            ? json
+            : Array.isArray(json.data)
+            ? json.data
+            : Array.isArray(json.list)
+            ? json.list
+            : Array.isArray(json.result)
+            ? json.result
+            : Array.isArray(json.books)
+            ? json.books
+            : [];
+
+          for (const item of list) {
+            if (!item || typeof item !== 'object') continue;
+            const title =
+              item.title || item.bookName || item.name || item.articlename || '';
+            const author = item.author || item.writer || '网络作者';
+            let bookUrl =
+              item.url ||
+              item.bookUrl ||
+              item.link ||
+              (item.id && source.host ? `${source.host}/book/${item.id}` : '');
+
+            if (title && (title.includes(keyword) || keyword.includes(title))) {
+              if (bookUrl && !bookUrl.startsWith('http')) {
+                try {
+                  bookUrl = new URL(bookUrl, searchUrl).href;
+                } catch {
+                  // ignore
+                }
+              }
+              if (bookUrl && !seenUrls.has(bookUrl)) {
+                seenUrls.add(bookUrl);
+                results.push({
+                  id: `src_res_${Date.now()}_${results.length}_${Math.random().toString(36).slice(2, 6)}`,
+                  title,
+                  author,
+                  sourceName: source.name || '外部书源',
+                  sourceId: source.id,
+                  externalUrl: bookUrl,
+                  sourceRule: source,
+                  intro: item.intro || item.desc || '',
+                });
+              }
+            }
+          }
+          return;
+        } catch {
+          // 不是合法 json，继续向下执行 HTML 提取
+        }
+      }
+
+      // 2.2 针对返回 HTML 网页的标准书源进行提取
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+
+      // 提取链接与书名
+      const links = Array.from(doc.querySelectorAll('a'));
+
+      for (const a of links) {
+        const text = a.textContent?.trim() || '';
+        const href = a.getAttribute('href') || '';
+
+        // 仅匹配与关键词相关的超链接
+        if (
+          text.length >= 1 &&
+          text.length <= 50 &&
+          (text.includes(keyword) || keyword.includes(text)) &&
+          href &&
+          !href.startsWith('javascript') &&
+          !href.startsWith('#')
+        ) {
+          let fullUrl = href;
+          try {
+            fullUrl = new URL(href, searchUrl).href;
+          } catch {
+            continue;
+          }
+
+          if (seenUrls.has(fullUrl)) continue;
+          seenUrls.add(fullUrl);
+
+          // 尝试提取作者与简介
+          let author = '网络连载';
+          const parent = a.closest('li, tr, div, .bookbox, .item, .novel-item');
+          if (parent) {
+            const authorEl = parent.querySelector(
+              '.author, .s4, .author-name, td:nth-child(3), .book-author'
+            );
+            if (authorEl?.textContent?.trim()) {
+              author = authorEl.textContent.trim().replace(/^作者[:：\s]*/, '');
+            }
+          }
+
+          results.push({
+            id: `src_res_${Date.now()}_${results.length}_${Math.random().toString(36).slice(2, 6)}`,
+            title: text,
+            author,
+            sourceName: source.name || '外部书源',
+            sourceId: source.id,
+            externalUrl: fullUrl,
+            sourceRule: source,
+          });
+
+          if (results.length >= 25) break;
+        }
+      }
+    } catch {
+      // 外部书源网络波动或单源失效时跳过，不影响其他书源
+    }
+  });
+
+  await Promise.allSettled(tasks);
+
+  return { results };
+}
+
+/**
+ * 将检索到的真实小说一键抓取并加入书架
+ */
+export async function addSearchedNovelToShelf(
+  item: SearchNovelResult,
+  targetLevel: VocabLevel = 'cet4'
+): Promise<StoryNovel> {
+  const chapterData = await crawlChapterFromUrl(item.externalUrl, item.sourceRule);
+
+  const novel: StoryNovel = {
+    id: `novel_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    title: item.title,
+    author: item.author || '网络作者',
+    sourceId: item.sourceId,
+    sourceName: item.sourceName,
+    currentChapterIndex: 0,
+    totalChapters: 1,
+    targetLevel,
+    insertDensity: 0.18,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
     chapters: [
       {
-        id: `ch_dyn_${cleanTitle}_1`,
+        id: `ch_${Date.now()}_0`,
         index: 0,
-        title: `第1章 《${cleanTitle}》开篇！绝境中的神秘觉醒`,
-        originalText: `黑云压城城欲摧，狂暴的疾风撕扯着古老的大地。
-面对强敌步步紧逼的无耻围堵与家族同门的无情嘲弄，少年擦去嘴角刺目的殷红鲜血，胸腔中却翻滚着如烈火般不屈的滔天意志。
-“世间弱小便是原罪？今日尔等加诸于我的所有折辱，他日我必当百倍奉还！”
-伴随着这一声掷地有声的坚定宣誓，少年识海深处那一枚沉睡已久的神秘金色神纹忽然绽放出冲天异彩。
-狂暴浩瀚的天地能量如奔腾的海啸倒灌而入，将他原本濒临枯竭的经脉洗刷淬炼得坚如磐石！
-刺目的神光自他瞳孔深处呼啸射出，原本轻视他的各方强敌瞬间心惊胆战纷纷后撤。属于《${cleanTitle}》的无敌传奇，在此刻正式拉开波澜壮阔的帷幕！`,
-      },
-      {
-        id: `ch_dyn_${cleanTitle}_2`,
-        index: 1,
-        title: `第2章 《${cleanTitle}》锋芒！一战震动诸天强敌`,
-        originalText: `演武大殿前，狂风呼啸，气压骤降。
-不可一世的宿敌首领冷笑一声，拔出寒光凛冽的重型长兵，夹带着撕裂虚空的恐怖威压悍然凌空斩落：“狂妄小儿，萤火之光也敢与皓月争辉！”
-面对这致命一击，少年从容不迫不退反进。
-他双眸微凝，体内蜕变完成的神级功法顺着四肢百骸轰然运转，周身升腾起金色璀璨的无上罡气！
-轰隆！
-两道狂暴力量在半空中悍然碰撞，伴随着一声震耳欲聋的惊天巨响，不可一世的对手如遭雷击狂喷鲜血倒飞百丈，重重将坚固的山壁砸穿坍塌！
-漫天烟尘消散之际，全场诸位宗门宿老与天下强者个个倒吸凉气目瞪口呆，无人再敢小觑眼前这位横空出世的盖世天骄！`,
+        title: chapterData.title || `${item.title} · 第1章`,
+        originalText: chapterData.content,
+        sourceUrl: item.externalUrl,
       },
     ],
   };
-}
 
-/**
- * 实时跨所有导入书源（外部站点）+ 云端全书库进行全网联合并发检索
- * 彻底杜绝空响应与死等：秒级本地响应 + 快速外源探查 + 万能兜底生成
- */
-export async function searchAcrossBookSources(
-  query: string,
-  sources: any[] = []
-): Promise<SearchNovelResult[]> {
-  const trimmed = query.trim();
-  if (!trimmed) return CLOUD_NOVEL_CATALOG;
-
-  // 1. 本地/云端全书库模糊检索（0ms 响应）
-  const q = trimmed.toLowerCase();
-  const localMatched = CLOUD_NOVEL_CATALOG.filter(novel => {
-    return (
-      novel.title.toLowerCase().includes(q) ||
-      q.includes(novel.title.toLowerCase()) ||
-      novel.author.toLowerCase().includes(q) ||
-      novel.category.toLowerCase().includes(q) ||
-      novel.intro.toLowerCase().includes(q)
-    );
-  });
-
-  // 2. 尝试从启用的外部书源抓取
-  const externalResults: SearchNovelResult[] = [];
-  const validSources = (sources || [])
-    .filter((s: any) => s.isEnabled && s.searchUrlPattern)
-    .slice(0, 4);
-
-  if (validSources.length > 0 && typeof window !== 'undefined') {
-    const searchTasks = validSources.map(async (source: any) => {
-      try {
-        let pattern = source.searchUrlPattern;
-        // 清洗 pattern，去除内嵌的冗余代理前缀
-        if (pattern.includes('api.allorigins.win/raw?url=')) {
-          pattern = decodeURIComponent(pattern.split('api.allorigins.win/raw?url=')[1]);
-        }
-        let searchUrl = pattern
-          .replace('{{key}}', encodeURIComponent(trimmed))
-          .replace('%s', encodeURIComponent(trimmed));
-
-        // 统一走安全代理
-        const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(searchUrl)}`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1800); // 1.8秒超时限制，绝不卡死
-        
-        const res = await fetch(proxyUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const html = await res.text();
-          const doc = new DOMParser().parseFromString(html, 'text/html');
-          const links = Array.from(doc.querySelectorAll('a'));
-
-          for (const a of links) {
-            const text = a.textContent?.trim() || '';
-            const href = a.getAttribute('href') || '';
-            if (
-              text.length >= 2 &&
-              text.length <= 25 &&
-              (text.includes(trimmed) || trimmed.includes(text)) &&
-              href &&
-              !href.startsWith('javascript')
-            ) {
-              let fullUrl = href;
-              if (href.startsWith('//')) fullUrl = 'https:' + href;
-              else if (href.startsWith('/')) {
-                const base = source.host?.endsWith('/') ? source.host.slice(0, -1) : (source.host || '');
-                fullUrl = base ? base + href : href;
-              }
-
-              externalResults.push({
-                id: `ext_${Date.now()}_${externalResults.length}_${Math.random().toString(36).slice(2, 6)}`,
-                title: text,
-                author: '网络连载',
-                sourceName: source.name || '外部网络源',
-                category: '全网书源',
-                intro: `源自【${source.name}】实时在线检索匹配结果，点击即可加入书架开启背词阅读。`,
-                totalChapters: 2,
-                externalUrl: fullUrl,
-                sourceRule: source,
-                chapters: [
-                  {
-                    id: `ch_ext_1`,
-                    index: 0,
-                    title: `${text} · 第1章`,
-                    originalText: `正在从【${source.name}】实时同步《${text}》正文内容...请稍候。`,
-                    sourceUrl: fullUrl,
-                  },
-                ],
-              });
-              if (externalResults.length >= 3) break;
-            }
-          }
-        }
-      } catch {
-        // 网络超时或站点阻断时平滑降级
-      }
-    });
-
-    await Promise.race([
-      Promise.allSettled(searchTasks),
-      new Promise(resolve => setTimeout(resolve, 1500)),
-    ]);
-  }
-
-  // 3. 组合与去重
-  const combined = [...localMatched, ...externalResults];
-
-  // 4. 万能兜底：如果完全没有命中任何现成小说，生成该书名的专属即时作品
-  if (combined.length === 0) {
-    const dynamicNovel = generateDynamicNovel(trimmed);
-    combined.push(dynamicNovel);
-    // 附带推荐两本热门
-    combined.push(CLOUD_NOVEL_CATALOG[0]);
-    combined.push(CLOUD_NOVEL_CATALOG[1]);
-  }
-
-  const seen = new Set<string>();
-  return combined.filter(item => {
-    const key = `${item.title.trim()}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-/**
- * 基础同步检索（0ms 响应，零落空）
- */
-export function searchNovels(query: string): SearchNovelResult[] {
-  const trimmed = query.trim().toLowerCase();
-  if (!trimmed) return CLOUD_NOVEL_CATALOG;
-
-  const matches = CLOUD_NOVEL_CATALOG.filter(novel => {
-    return (
-      novel.title.toLowerCase().includes(trimmed) ||
-      trimmed.includes(novel.title.toLowerCase()) ||
-      novel.author.toLowerCase().includes(trimmed) ||
-      novel.category.toLowerCase().includes(trimmed) ||
-      novel.intro.toLowerCase().includes(trimmed)
-    );
-  });
-
-  if (matches.length > 0) {
-    return matches;
-  }
-
-  // 如果没有匹配项，秒级动态生成对应的专属小说！
-  const dynamic = generateDynamicNovel(query.trim());
-  return [dynamic, ...CLOUD_NOVEL_CATALOG.slice(0, 3)];
+  await saveStoryNovel(novel);
+  return novel;
 }

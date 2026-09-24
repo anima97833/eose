@@ -439,6 +439,8 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
                             backgroundColor:
                               course.platform === 'bilibili'
                                 ? '#FB7299'
+                                : course.platform === 'xiaohongshu'
+                                ? '#FF2442'
                                 : course.platform === 'pan'
                                 ? '#06A7FF'
                                 : NM.gold,
@@ -446,7 +448,13 @@ export const CourseKanbanApp: React.FC<CourseKanbanAppProps> = ({ onBack }) => {
                             flexShrink: 0,
                           }}
                         >
-                          {course.platform === 'bilibili' ? 'B站' : course.platform === 'pan' ? '网盘' : '自学'}
+                          {course.platform === 'bilibili'
+                            ? 'B站'
+                            : course.platform === 'xiaohongshu'
+                            ? '小红书'
+                            : course.platform === 'pan'
+                            ? '网盘'
+                            : '自学'}
                         </span>
 
                         {/* 六维分类属性胶囊 */}

@@ -181,13 +181,21 @@ export const CourseDetailModal: React.FC<CourseDetailModalProps> = ({
                 backgroundColor:
                   currentCourse.platform === 'bilibili'
                     ? '#FB7299'
+                    : currentCourse.platform === 'xiaohongshu'
+                    ? '#FF2442'
                     : currentCourse.platform === 'pan'
                     ? '#06A7FF'
                     : NM.gold,
                 color: '#fff',
               }}
             >
-              {currentCourse.platform === 'bilibili' ? 'B站课程' : currentCourse.platform === 'pan' ? '网盘课程' : '自主规划'}
+              {currentCourse.platform === 'bilibili'
+                ? 'B站课程'
+                : currentCourse.platform === 'xiaohongshu'
+                ? '小红书精选'
+                : currentCourse.platform === 'pan'
+                ? '网盘课程'
+                : '自主规划'}
             </span>
 
             {/* 六维分类属性徽标 */}
@@ -215,7 +223,7 @@ export const CourseDetailModal: React.FC<CourseDetailModalProps> = ({
                 color: NM.textMuted,
               }}
             >
-              讲师: {currentCourse.author}
+              讲师/作者: {currentCourse.author}
             </span>
           </div>
 
@@ -263,6 +271,37 @@ export const CourseDetailModal: React.FC<CourseDetailModalProps> = ({
               >
                 {currentCourse.intro}
               </div>
+            )}
+            {currentCourse.sourceUrl && (
+              <a
+                href={currentCourse.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  marginTop: '8px',
+                  padding: '5px 12px',
+                  borderRadius: '8px',
+                  backgroundColor: NM.bgInset,
+                  border: NM.borderSoft,
+                  color: currentCourse.platform === 'xiaohongshu' ? '#FF2442' : currentCourse.platform === 'bilibili' ? '#FB7299' : NM.gold,
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  boxShadow: NM.convexXs,
+                }}
+              >
+                <ExternalLink size={12} />
+                <span>
+                  {currentCourse.platform === 'xiaohongshu'
+                    ? '在小红书查看原笔记'
+                    : currentCourse.platform === 'bilibili'
+                    ? '在 B 站观看原视频'
+                    : '打开课程来源'}
+                </span>
+              </a>
             )}
           </div>
 

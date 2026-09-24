@@ -76,9 +76,9 @@ export const HoroscopeWidget: React.FC<HoroscopeWidgetProps> = ({ onOpenModal })
           position: 'relative',
           overflow: 'hidden',
           boxSizing: 'border-box',
-          background: '#FFFFFF',
+          background: 'var(--nm-bg)',
           cursor: 'pointer',
-          transition: 'transform 0.12s ease',
+          transition: 'transform 0.12s ease, background 0.35s ease, box-shadow 0.35s ease',
         }}
       >
         {/* 顶部 Header: 星座符号/名称 + 综合星级 */}
@@ -95,7 +95,7 @@ export const HoroscopeWidget: React.FC<HoroscopeWidgetProps> = ({ onOpenModal })
               style={{
                 fontSize: '14px',
                 fontWeight: 900,
-                color: '#6366F1',
+                color: 'var(--nm-primary)',
                 lineHeight: 1,
               }}
             >
@@ -105,7 +105,7 @@ export const HoroscopeWidget: React.FC<HoroscopeWidgetProps> = ({ onOpenModal })
               style={{
                 fontSize: '12px',
                 fontWeight: 900,
-                color: '#334155',
+                color: 'var(--nm-text-main)',
                 letterSpacing: '0.3px',
                 fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", sans-serif',
               }}
@@ -115,7 +115,7 @@ export const HoroscopeWidget: React.FC<HoroscopeWidgetProps> = ({ onOpenModal })
           </div>
 
           {/* 综合星级 */}
-          <div style={{ display: 'flex', gap: '1px', color: '#F59E0B' }}>
+          <div style={{ display: 'flex', gap: '1px', color: 'var(--nm-accent)' }}>
             {Array.from({ length: 5 }).map((_, i) => (
               <span key={i} style={{ fontSize: '10px', lineHeight: 1 }}>
                 {i < data.fortuneStar ? '★' : '☆'}
@@ -130,8 +130,9 @@ export const HoroscopeWidget: React.FC<HoroscopeWidgetProps> = ({ onOpenModal })
             margin: '3px 0',
             padding: '6px 8px',
             borderRadius: '10px',
-            background: '#F8FAFC',
-            border: '1px solid #E2E8F0',
+            background: 'var(--nm-bg-lighter)',
+            border: '1px solid var(--nm-shadow-soft)',
+            boxShadow: 'var(--nm-inset-sm)',
             display: 'flex',
             alignItems: 'center',
             minHeight: '46px',
@@ -142,7 +143,7 @@ export const HoroscopeWidget: React.FC<HoroscopeWidgetProps> = ({ onOpenModal })
             style={{
               fontSize: '11px',
               fontWeight: 800,
-              color: '#334155',
+              color: 'var(--nm-text-main)',
               lineHeight: '1.35',
             }}
           >

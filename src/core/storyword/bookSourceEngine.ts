@@ -1,9 +1,9 @@
 import { BookSourceRule, StoryChapter, StoryNovel, VocabLevel } from './storyWordTypes';
 
 const CORS_PROXIES = [
-  (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-  (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  (url: string) => `/api/proxy?url=${encodeURIComponent(url)}`,
   (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
 ];
 
 /**
@@ -42,27 +42,37 @@ export async function fetchHtmlWithProxy(targetUrl: string): Promise<string> {
   let lastError: any = null;
 
   for (const makeProxyUrl of CORS_PROXIES) {
+    let timeoutId: any = null;
     try {
       const proxyUrl = makeProxyUrl(targetUrl);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 9000); // 9秒超时
+      timeoutId = setTimeout(() => {
+        try {
+          controller.abort(new DOMException('Timeout', 'TimeoutError'));
+        } catch {
+          // ignore
+        }
+      }, 7000);
 
       const res = await fetch(proxyUrl, {
         signal: controller.signal,
         headers: {
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
-      });
-      clearTimeout(timeoutId);
+      }).catch(() => null);
 
-      if (res.ok) {
-        const text = await res.text();
+      if (timeoutId) clearTimeout(timeoutId);
+
+      if (res && res.ok) {
+        const text = await res.text().catch(() => '');
         if (text && text.length > 100) {
           return text;
         }
       }
     } catch (err) {
       lastError = err;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }
 
@@ -136,7 +146,28 @@ export async function crawlChapterFromUrl(
   }
 
   if (!content || content.length < 50) {
-    throw new Error('未能在该网页中识别出小说章节正文，请检查选择器规则');
+    // 兼容目录页/详情页：自动探查第一章链接
+    const firstChapterLink = doc.querySelector(
+      '.chapter-list a, #list a, .section-box a, .dir a, dd a, a[href*="chapter"], a[href*="read"], a[href*="html"]'
+    ) as HTMLAnchorElement | null;
+
+    if (firstChapterLink) {
+      let nextUrl = firstChapterLink.getAttribute('href') || '';
+      if (nextUrl && !nextUrl.startsWith('javascript') && !nextUrl.startsWith('#')) {
+        if (nextUrl.startsWith('//')) {
+          nextUrl = 'https:' + nextUrl;
+        } else if (nextUrl.startsWith('/')) {
+          const origin = new URL(chapterUrl).origin;
+          nextUrl = origin + nextUrl;
+        } else if (!nextUrl.startsWith('http')) {
+          nextUrl = new URL(nextUrl, chapterUrl).href;
+        }
+        if (nextUrl !== chapterUrl) {
+          return crawlChapterFromUrl(nextUrl, sourceRule);
+        }
+      }
+    }
+    throw new Error('未能在该网页中识别出小说正文，请检查书源规则');
   }
 
   return {
@@ -293,17 +324,25 @@ export async function fetchRemoteBookSources(sourceUrl: string): Promise<BookSou
 
   let lastErr: any = null;
   for (const mirrorUrl of mirrors) {
+    let timeoutId: any = null;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      timeoutId = setTimeout(() => {
+        try {
+          controller.abort(new DOMException('Timeout', 'TimeoutError'));
+        } catch {
+          // ignore
+        }
+      }, 7000);
       const res = await fetch(mirrorUrl, {
         signal: controller.signal,
         headers: { 'Accept': 'application/json, text/plain, */*' },
-      });
-      clearTimeout(timeoutId);
+      }).catch(() => null);
 
-      if (res.ok) {
-        const text = await res.text();
+      if (timeoutId) clearTimeout(timeoutId);
+
+      if (res && res.ok) {
+        const text = await res.text().catch(() => '');
         const trimmed = text.trim();
         if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
           return parseBookSourceRulesFromJson(trimmed);
@@ -311,6 +350,8 @@ export async function fetchRemoteBookSources(sourceUrl: string): Promise<BookSou
       }
     } catch (e) {
       lastErr = e;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }
 

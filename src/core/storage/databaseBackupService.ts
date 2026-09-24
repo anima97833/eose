@@ -71,6 +71,7 @@ export const TABLE_FRIENDLY_NAMES: Record<string, string> = {
   rpg_life_stories: '岁月胶囊旅程卡',
   rpg_background_images: '主界面立绘与舞台背景',
   rpg_activity_banners: '活动看板背板',
+  virtual_files: '离线笔记与虚拟文件',
 };
 
 const LAST_BACKUP_TIME_KEY = 'cloudfly_last_database_backup_time';

@@ -11,7 +11,7 @@ export interface DesktopLayout {
 const LAYOUT_STORAGE_KEY = 'neumorphic_phone_desktop_layout_v2';
 const ARCADE_INIT_PAGE2_KEY = 'neumorphic_arcade_initial_page2_v1';
 
-export const DEFAULT_PAGE1_APPS = ['phone', 'assistant', 'diary', 'profile', 'memories'];
+export const DEFAULT_PAGE1_APPS = ['phone', 'assistant', 'diary', 'profile', 'gachapon', 'memories'];
 export const DEFAULT_DOCK_APPS = ['chat', 'moments', 'checkphone', 'settings'];
 
 export function loadDesktopLayout(): DesktopLayout {

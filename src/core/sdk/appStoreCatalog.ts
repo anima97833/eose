@@ -142,26 +142,26 @@ export const DEFAULT_STORE_CATALOG: AppStoreItem[] = [
   },
   {
     id: 'mood_fortune',
-    name: '心事抽签',
-    version: '1.0.0',
+    name: '答案之书',
+    version: '1.2.0',
     category: 'ai',
-    categoryLabel: '陪伴',
-    iconName: 'Scroll',
-    description: '轻拟物摇签盲盒，联动 AI 伴侣独家解签寄语与历史纪录。',
-    features: ['3D 拟物摇签', 'AI 角色个性化解签', '私有记录数据库', '桌面红点联动'],
+    categoryLabel: '启示',
+    iconName: 'BookOpen',
+    description: '轻拟物精装互动《答案之书》，默念困惑翻开指引之页，获得心灵解答。',
+    features: ['经典中英权威词库', '心理投射启示', '触觉翻书质感', '私有问答手账', '伴侣专属寄语'],
     isInstalled: true,
     isSystem: false,
     htmlContent: MOOD_FORTUNE_APP_HTML,
   },
   {
     id: 'calculator',
-    name: '经典计算器',
-    version: '1.1.0',
+    name: '全能计算器',
+    version: '2.0.0',
     category: 'tools',
-    categoryLabel: '效率',
+    categoryLabel: '解压·效率',
     iconName: 'Calculator',
-    description: '复古纯正轻拟物按键计算器，深凹陷触感与音效反馈。',
-    features: ['拟物立体凹陷屏幕', '触觉按键反馈', '快速清零与运算', '完全离线免联网'],
+    description: '青轴/打字机/钢琴音阶声学盲盒，生活直算面板与算术反应堆RPG。',
+    features: ['机械轴体声学盲盒', '聚餐AA/满减/时薪生活直算', '算术反应堆RPG脑力对决', '琴键音阶弹曲', '完全离线免联网'],
     isInstalled: true,
     isSystem: false,
     htmlContent: CALCULATOR_APP_HTML,
@@ -272,6 +272,30 @@ export const DEFAULT_STORE_CATALOG: AppStoreItem[] = [
     iconName: 'GraduationCap',
     description: '战胜课程囤积症，将B站与网盘大课结构化为低阻力学习看板，遵循WIP专注准则。',
     features: ['B站视频解析', '网盘目录清洗', 'WIP专注在学限制', '逐讲通关打卡', '心理降维时长折算'],
+    isInstalled: true,
+    isSystem: false,
+  },
+  {
+    id: 'pocketpad',
+    name: 'Pocket Pad',
+    version: '1.0.0',
+    category: 'media',
+    categoryLabel: '电音',
+    iconName: 'Disc',
+    description: '16 宫格高保真轻拟物电音打击垫、三大声乐套件、16 步节奏伴奏与实时波纹光效。',
+    features: ['高保真 Web Audio 合成器', '808 Sub 重低音 / Lo-Fi / 8-Bit', '16 步自动节奏伴奏机', '实时滤波与过载失真', 'PC 键盘 16 键双手演奏'],
+    isInstalled: true,
+    isSystem: false,
+  },
+  {
+    id: 'gachapon',
+    name: '扭蛋',
+    version: '1.0.0',
+    category: 'life',
+    categoryLabel: '治愈',
+    iconName: 'Gift',
+    description: '轻拟物心愿扭蛋机，写下想做却一直搁置的心愿小纸条放入机器，转动旋钮盲盒开出心愿，完成仅提升角色心情值。',
+    features: ['手绘复古粉色扭蛋机', '自主写纸条装填心愿', '物理转动手柄与滚蛋碰撞声', '折痕纸条展开与放回', '完成小纸条专属心情+10', 'Colormind 深度学习一键换色'],
     isInstalled: true,
     isSystem: false,
   },
@@ -413,6 +437,11 @@ export function listStoreCatalog(): AppStoreItem[] {
             securityItem.isInstalled = true;
             hasNew = true;
           }
+        }
+        const pocketPadItem = parsed.find((item) => item.id === 'pocketpad');
+        if (pocketPadItem && !pocketPadItem.isInstalled) {
+          pocketPadItem.isInstalled = true;
+          hasNew = true;
         }
         if (hasNew) {
           saveStoreCatalog(parsed);

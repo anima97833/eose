@@ -139,6 +139,7 @@ export class DirectBrowserAdapter implements ILLMAdapter {
         model: this.config.model.trim(),
         messages,
         temperature: this.config.temperature ?? 0.7,
+        max_tokens: this.config.maxTokens ?? 4096,
         stream: isStream,
       }),
     });

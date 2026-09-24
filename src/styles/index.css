@@ -32,6 +32,21 @@ input, textarea {
   -webkit-user-select: text;
 }
 
+/* 允许正文、阅读器全面划选、双击、长按文本与呼出原生物理长按 */
+.story-reader-content,
+.story-reader-content *,
+.allow-text-selection,
+.allow-text-selection * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -webkit-touch-callout: default !important;
+}
+
+.story-reader-content p,
+.story-reader-content span.story-text-token {
+  cursor: text;
+}
+
 html, body {
   width: 100%;
   height: 100%;

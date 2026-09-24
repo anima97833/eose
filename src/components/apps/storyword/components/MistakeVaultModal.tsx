@@ -49,9 +49,13 @@ export const MistakeVaultModal: React.FC<MistakeVaultModalProps> = ({
 
   const handleToggleMaster = async (item: StoryWordMistake) => {
     const nextVal = !item.mastered;
-    await markMistakeMastered(item.id, nextVal);
+    const rewardRes = await markMistakeMastered(item.id, nextVal);
     await loadMistakes();
-    showToast(nextVal ? '已掌握' : '重入错阁');
+    if (rewardRes?.rewarded) {
+      showToast(rewardRes.message);
+    } else {
+      showToast(nextVal ? '已掌握' : '重入错阁');
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -60,6 +64,7 @@ export const MistakeVaultModal: React.FC<MistakeVaultModalProps> = ({
     showToast('已斩杀');
   };
 
+  const masteredCount = mistakes.filter(m => m.mastered).length;
   const filteredList = mistakes.filter(m => (filter === 'unmastered' ? !m.mastered : true));
 
   return (
@@ -131,6 +136,87 @@ export const MistakeVaultModal: React.FC<MistakeVaultModalProps> = ({
           >
             ✕
           </button>
+        </div>
+
+        {/* 智力 (INT) 突破激励卡片 */}
+        <div
+          style={{
+            margin: '10px 16px 2px 16px',
+            padding: '10px 14px',
+            borderRadius: '12px',
+            backgroundColor: NM.bgInset,
+            boxShadow: NM.insetXs,
+            border: NM.borderSoft,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Zap size={14} color="#2563EB" />
+              <span style={{ fontSize: '12px', fontWeight: 800, color: NM.textMain }}>
+                错词顿悟 · 智力沉淀
+              </span>
+            </div>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#2563EB',
+                backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                padding: '2px 8px',
+                borderRadius: '8px',
+              }}
+            >
+              每掌握 10 词 智力 (INT) +2
+            </span>
+          </div>
+
+          <div
+            style={{
+              width: '100%',
+              height: '6px',
+              borderRadius: '3px',
+              backgroundColor: '#E5DCce',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${(masteredCount % 10) * 10}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #3B82F6, #1D4ED8)',
+                borderRadius: '3px',
+                transition: 'width 0.3s ease',
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '10px',
+              color: NM.textMuted,
+            }}
+          >
+            <span>已累计掌握：{masteredCount} 词</span>
+            <span>
+              阶段进度：{masteredCount % 10}/10 词 (
+              {masteredCount % 10 === 0 && masteredCount > 0
+                ? '已达成阶段奖励！'
+                : `还差 ${10 - (masteredCount % 10)} 词突破`}
+              )
+            </span>
+          </div>
         </div>
 
         {/* 过滤按钮组 */}

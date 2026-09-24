@@ -8,16 +8,16 @@ const STORAGE_KEY = 'neumorphic_phone_installed_custom_apps';
 export const PRESET_CUSTOM_APPS: CustomAppMeta[] = [
   {
     id: 'mood_fortune',
-    name: '心事抽签',
-    version: '1.0.0',
-    description: '轻拟物摇签盲盒，联动 AI 角色专属解签与私有数据纪录。',
-    icon: 'Scroll',
+    name: '答案之书',
+    version: '1.2.0',
+    description: '在心中默念困惑或抉择，翻开指引之页，获得属于你的心灵答案。',
+    icon: 'BookOpen',
     htmlContent: MOOD_FORTUNE_APP_HTML,
     manifest: {
       id: 'mood_fortune',
-      name: '心事抽签盲盒',
-      version: '1.0.0',
-      description: '轻拟物摇签盲盒，联动 AI 角色专属解签',
+      name: '答案之书',
+      version: '1.2.0',
+      description: '轻拟物经典答案之书，翻开属于你的心灵解答与哲思启示',
       sdkVersion: '1.0',
       permissions: [
         'characters.read',
@@ -33,15 +33,15 @@ export const PRESET_CUSTOM_APPS: CustomAppMeta[] = [
   },
   {
     id: 'calculator',
-    name: '经典计算器',
-    version: '1.1.0',
-    description: '复古纯正轻拟物按键计算器，深凹陷触感与音效反馈。',
+    name: '全能计算器',
+    version: '2.0.0',
+    description: '青轴/打字机/钢琴音阶声学盲盒，生活直算面板与算术反应堆RPG。',
     icon: 'Calculator',
     htmlContent: CALCULATOR_APP_HTML,
     manifest: {
       id: 'calculator',
-      name: '经典计算器',
-      version: '1.1.0',
+      name: '全能计算器',
+      version: '2.0.0',
       sdkVersion: '1.0',
       permissions: ['ui.toast'],
     },
@@ -74,6 +74,23 @@ export function listInstalledCustomApps(): CustomAppMeta[] {
     if (raw) {
       const parsed: CustomAppMeta[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // 自动同步官方预置微应用最新元数据与 HTML
+        let hasChanges = false;
+        for (const preset of PRESET_CUSTOM_APPS) {
+          const item = parsed.find(a => a.id === preset.id);
+          if (item) {
+            if (item.htmlContent !== preset.htmlContent || item.name !== preset.name || item.icon !== preset.icon) {
+              item.htmlContent = preset.htmlContent;
+              item.name = preset.name;
+              item.icon = preset.icon;
+              item.description = preset.description;
+              hasChanges = true;
+            }
+          }
+        }
+        if (hasChanges) {
+          saveInstalledCustomApps(parsed);
+        }
         return parsed;
       }
     }

@@ -23,6 +23,11 @@ import { SecurityApp } from './components/apps/security/SecurityApp';
 import { CompassApp } from './components/apps/compass/CompassApp';
 import { QuestJournalApp } from './components/apps/quest/QuestJournalApp';
 import { RadioApp } from './components/apps/radio/RadioApp';
+import { BookOfAnswersApp } from './components/apps/answers/BookOfAnswersApp';
+import { CalculatorApp } from './components/apps/calculator/CalculatorApp';
+import { PocketPadApp } from './components/apps/pocketpad/PocketPadApp';
+import { GachaponApp } from './components/apps/gachapon/GachaponApp';
+import { FilesApp } from './components/apps/files/FilesApp';
 import { getCustomAppById } from './core/sdk/customAppRegistry';
 import { initIdleMasterDetector, checkLateNightActivity } from './core/quest/easterEggEngine';
 
@@ -120,6 +125,16 @@ export const App: React.FC = () => {
             <CompassApp onBack={() => setActiveApp(null)} />
           ) : activeApp === 'radio' ? (
             <RadioApp onBack={() => setActiveApp(null)} />
+          ) : activeApp === 'mood_fortune' || activeApp === 'answers' || activeApp === 'book_of_answers' ? (
+            <BookOfAnswersApp onBack={() => setActiveApp(null)} />
+          ) : activeApp === 'calculator' ? (
+            <CalculatorApp onBack={() => setActiveApp(null)} />
+          ) : activeApp === 'pocketpad' ? (
+            <PocketPadApp onBack={() => setActiveApp(null)} />
+          ) : activeApp === 'gachapon' ? (
+            <GachaponApp onBack={() => setActiveApp(null)} onOpenApp={(id) => setActiveApp(id)} />
+          ) : activeApp === 'files' ? (
+            <FilesApp onBack={() => setActiveApp(null)} onOpenApp={(id) => setActiveApp(id)} />
           ) : isCustomApp ? (
             <CustomAppRunner
               appId={activeApp!}

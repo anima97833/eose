@@ -139,7 +139,7 @@ export const CustomAppRunner: React.FC<CustomAppRunnerProps> = ({
             ref={iframeRef}
             src={blobUrl}
             title={appMeta?.name || 'custom-app'}
-            sandbox="allow-scripts allow-forms allow-modals"
+            sandbox="allow-scripts allow-forms allow-modals allow-same-origin"
             style={{
               width: '100%',
               height: '100%',

@@ -1,4 +1,4 @@
-import { Course, CourseChapter, CoursePlatform } from './courseKanbanTypes';
+import { Course, CourseChapter, CoursePlatform, CourseAttributeTag } from './courseKanbanTypes';
 
 /**
  * 格式化秒数为直观时间字符串（如 14小时20分 或 45分钟）
@@ -297,3 +297,211 @@ export function createCustomCourse(
     updatedAt: Date.now(),
   };
 }
+
+/**
+ * 根据标题与正文关键词推断最匹配的六维 RPG 属性
+ */
+export function inferAttributeTagFromText(text: string): CourseAttributeTag {
+  const t = text.toLowerCase();
+  if (/(减脂|体态|拉伸|普拉提|腹肌|马甲线|慢跑|早睡|养生|饮食|控糖|健康|护肤|睡眠|作息|瑜伽)/i.test(t)) {
+    return 'CON';
+  }
+  if (/(深蹲|力量|举重|硬拉|爆发力|增肌|哑铃|卧推|拳击|体能)/i.test(t)) {
+    return 'STR';
+  }
+  if (/(穿搭|变美|化妆|发型|情商|社交|演讲|表达|说话|拍照|上镜|魅力|职场人际|沟通|气质)/i.test(t)) {
+    return 'CHA';
+  }
+  if (/(画画|插画|排版|手作|手工|折纸|修图|摄影|剪辑|烘焙|调酒|乐器|吉他|钢琴|手绘)/i.test(t)) {
+    return 'DEX';
+  }
+  if (/(冥想|正念|心理|治愈|玄学|八字|灵性|断舍离|极简|焦虑|内耗|心流|静心|释怀)/i.test(t)) {
+    return 'SPI';
+  }
+  return 'INT'; // 默认：智力/学习/思维/认知
+}
+
+/**
+ * 从小红书输入文本中提取有效链接与预估标题
+ */
+export function extractXiaohongshuInfo(input: string): { url: string | null; cleanTitle: string | null } {
+  const trimmed = input.trim();
+
+  // 1. 提取链接 (xhslink.com 或 xiaohongshu.com)
+  const urlMatch = trimmed.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)*(?:xhslink\.com|xiaohongshu\.com)\/[^\s]+/i);
+  const url = urlMatch ? urlMatch[0] : null;
+
+  // 2. 清洗提取分享文本自带的标题
+  // 小红书常见格式形如: "89 每天10分钟，普拉提改善圆肩驼背 http://xhslink.com/a/xxxx 复制本条信息打开【小红书】App查看精彩内容！"
+  let cleanTitle = trimmed;
+  if (url) {
+    cleanTitle = cleanTitle.replace(url, '');
+  }
+  // 去除口令前后缀
+  cleanTitle = cleanTitle
+    .replace(/^[\d\s]+/, '') // 去除开头的分享数字编码 (如 "89 ")
+    .replace(/复制(?:本条)?信息打开[【\[]小红书[】\]]App[^\n]*/gi, '')
+    .replace(/[【\[]小红书[】\]][^\n]*/gi, '')
+    .replace(/#[\w\u4e00-\u9fa5]+/g, '') // 去除 #话题
+    .trim();
+
+  // 过滤多行只取第一行作为候选标题
+  const firstLine = cleanTitle.split(/\r?\n/).map(l => l.trim()).find(l => l.length > 0);
+
+  return {
+    url,
+    cleanTitle: firstLine && firstLine.length > 2 ? firstLine.slice(0, 60) : null,
+  };
+}
+
+/**
+ * 将小红书图文内容/笔记按分步标记或核心要点拆解为章节打卡清单
+ */
+export function splitXiaohongshuChapters(
+  title: string,
+  content: string,
+  sourceUrl?: string
+): CourseChapter[] {
+  const lines = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const stepPattern = /^(?:第?[0-9一二三四五六七八九十]+[讲天步期点章节篇]|步骤[0-9一二三四五六七八九十]|Day\s*\d+|Step\s*\d+|[0-9]{1,2}[.、\s]+|【[^】]+】|·\s*)(.+)/i;
+
+  const extractedTitles: string[] = [];
+
+  for (const line of lines) {
+    // 忽略过长段落（可能不是标题，而是详细说明）
+    if (line.length > 45) continue;
+    // 忽略标签和链接
+    if (line.startsWith('#') || line.startsWith('http') || line.startsWith('![') || line.startsWith('[')) continue;
+
+    const match = line.match(stepPattern);
+    if (match) {
+      extractedTitles.push(line);
+    }
+  }
+
+  // 如果成功提取到 2 个以上清晰步骤/要点
+  if (extractedTitles.length >= 2) {
+    return extractedTitles.slice(0, 30).map((chTitle, idx) => ({
+      id: `ch_xhs_${Date.now()}_${idx}`,
+      index: idx,
+      title: chTitle,
+      durationSeconds: 900, // 小红书图文单点打卡默认预估15分钟
+      isCompleted: false,
+      url: sourceUrl,
+    }));
+  }
+
+  // 兜底拆解：如果正文没有显式编号，按典型自学三阶段或5步拆解
+  const defaultSteps = [
+    `01 核心认知：梳理笔记关键要点与概念`,
+    `02 实操落地：对照图文步骤初次演练`,
+    `03 举一反三：形成个人方法并打卡复盘`,
+  ];
+
+  return defaultSteps.map((chTitle, idx) => ({
+    id: `ch_xhs_${Date.now()}_${idx}`,
+    index: idx,
+    title: chTitle,
+    durationSeconds: 900,
+    isCompleted: false,
+    url: sourceUrl,
+  }));
+}
+
+/**
+ * 解析小红书笔记 / 分享链接
+ */
+export async function parseXiaohongshuCourse(input: string): Promise<Course> {
+  const { url, cleanTitle } = extractXiaohongshuInfo(input);
+
+  let title = cleanTitle || '小红书精选笔记指南';
+  let author = '小红书博主';
+  let coverUrl: string | undefined = undefined;
+  let intro = '来自小红书收藏的干货教程与打卡心得。';
+  let rawContent = input;
+
+  // 1. 如果存在链接，尝试借助 Jina Reader 抓取页面
+  if (url) {
+    try {
+      const res = await fetch(`https://r.jina.ai/${url}`, {
+        signal: AbortSignal.timeout(7000),
+      });
+      if (res.ok) {
+        const text = await res.text();
+        rawContent = text;
+
+        // 提取标题
+        const titleMatch = text.match(/Title:\s*(.+)/i);
+        if (titleMatch) {
+          const parsed = titleMatch[1]
+            .replace(/_小红书/gi, '')
+            .replace(/ - 小红书/gi, '')
+            .replace(/\| 小红书/gi, '')
+            .trim();
+          if (parsed && parsed !== '小红书') {
+            title = parsed;
+          }
+        }
+
+        // 提取博主名
+        const authorMatch = text.match(/\[([^\]]+)\]\(https:\/\/www\.xiaohongshu\.com\/user\/profile\/[^\)]+\)/i);
+        if (authorMatch) {
+          author = authorMatch[1].trim();
+        } else {
+          const authorLineMatch = text.match(/(?:作者|博主|发布者)[:：]\s*([^\n\r]+)/i);
+          if (authorLineMatch) {
+            author = authorLineMatch[1].trim();
+          }
+        }
+
+        // 提取封面首图
+        const imageMatch = text.match(/!\[[^\]]*\]\((https:\/\/[^\)]+)\)/i);
+        if (imageMatch) {
+          coverUrl = imageMatch[1];
+        }
+
+        // 提取正文摘要
+        const descMatch = text.match(/Markdown Content:([\s\S]*)/i);
+        if (descMatch && descMatch[1]) {
+          const cleanDesc = descMatch[1]
+            .replace(/!\[.*?\]\(.*?\)/g, '')
+            .replace(/\[.*?\]\(.*?\)/g, '')
+            .replace(/#+/g, '')
+            .trim();
+          if (cleanDesc.length > 0) {
+            intro = cleanDesc.slice(0, 120).trim() + (cleanDesc.length > 120 ? '...' : '');
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Jina 小红书链接抓取超时或拦截，采用本地智能提取兜底:', e);
+    }
+  }
+
+  // 2. 章节切分
+  const chapters = splitXiaohongshuChapters(title, rawContent, url || undefined);
+  const totalDurationSeconds = chapters.reduce((sum, c) => sum + c.durationSeconds, 0);
+
+  // 3. 推断六维属性
+  const attributeTag = inferAttributeTagFromText(`${title} ${intro} ${rawContent}`);
+
+  return {
+    id: `course_xhs_${Date.now()}`,
+    title: title.slice(0, 60),
+    platform: 'xiaohongshu',
+    status: 'backlog',
+    author,
+    coverUrl,
+    sourceUrl: url || undefined,
+    intro,
+    totalChapters: chapters.length,
+    completedChapters: 0,
+    totalDurationSeconds,
+    chapters,
+    dailyGoalMinutes: 20, // 小红书碎片化学习，默认每日20分钟
+    attributeTag,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+}
+

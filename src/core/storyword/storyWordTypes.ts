@@ -47,9 +47,11 @@ export interface StoryNovel {
   totalChapters: number;
   chapters: StoryChapter[];
   targetLevel: VocabLevel;
-  insertDensity: number; // 0.1 ~ 0.35
+  activeLexiconId?: string | null; // 自定义私人词库 ID
+  insertDensity: number; // 0.1 ~ 1.0
   createdAt: number;
   updatedAt: number;
+  customWords?: EnglishWord[];
 }
 
 export interface ClozeOption {
@@ -84,10 +86,22 @@ export interface StoryWordMistake {
   createdAt: number;
 }
 
+export interface CustomLexicon {
+  id: string;
+  name: string;
+  description?: string;
+  wordCount: number;
+  words: EnglishWord[];
+  createdAt: number;
+  updatedAt: number;
+  sourceFormat?: string; // 如 'Anki / 欧路制表符 (TSV)', 'CSV', '纯英文列表 (已自动补齐)'
+}
+
 export interface StoryWordUserSettings {
   targetLevel: VocabLevel;
-  density: number; // 0.15 默认
-  fontSize: number; // 15 默认
+  activeLexiconId?: string | null;
+  density: number; // 0.35 默认
+  fontSize: number; // 16 默认
   autoPronounce: boolean;
   soundVolume: number;
 }

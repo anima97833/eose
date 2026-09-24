@@ -72,7 +72,8 @@ export const TaskDropWidget: React.FC = () => {
         position: 'relative',
         overflow: 'hidden',
         boxSizing: 'border-box',
-        background: '#FFFFFF',
+        background: 'var(--nm-bg)',
+        transition: 'background 0.35s ease, box-shadow 0.35s ease',
       }}
     >
       {/* 飘字动效: 精神 +5 */}
@@ -128,7 +129,7 @@ export const TaskDropWidget: React.FC = () => {
           style={{
             fontSize: '12px',
             fontWeight: 900,
-            color: '#475569',
+            color: 'var(--nm-text-main)',
             letterSpacing: '0.4px',
             fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", sans-serif',
           }}
@@ -148,9 +149,9 @@ export const TaskDropWidget: React.FC = () => {
             width: '24px',
             height: '24px',
             borderRadius: '50%',
-            border: '1px solid #CBD5E1',
-            background: task.source === 'ai' ? '#EDE9FE' : '#F8FAFC',
-            color: task.source === 'ai' ? '#7C3AED' : '#64748B',
+            border: '1px solid var(--nm-shadow-soft)',
+            background: task.source === 'ai' ? 'var(--nm-primary-light)' : 'var(--nm-bg-lighter)',
+            color: task.source === 'ai' ? '#FFFFFF' : 'var(--nm-primary)',
             cursor: 'pointer',
             boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             transition: 'all 0.15s ease',
@@ -159,7 +160,7 @@ export const TaskDropWidget: React.FC = () => {
           {isAiLoading ? (
             <Loader2 size={12} className="animate-spin" />
           ) : (
-            <Sparkles size={12} color={task.source === 'ai' ? '#7C3AED' : '#8B5CF6'} />
+            <Sparkles size={12} color={task.source === 'ai' ? '#FFFFFF' : 'var(--nm-primary)'} />
           )}
         </button>
       </div>
@@ -192,8 +193,9 @@ export const TaskDropWidget: React.FC = () => {
             margin: '3px 0',
             padding: '6px 8px',
             borderRadius: '10px',
-            background: '#F8FAFC',
-            border: '1px solid #E2E8F0',
+            background: 'var(--nm-bg-lighter)',
+            border: '1px solid var(--nm-shadow-soft)',
+            boxShadow: 'var(--nm-inset-sm)',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
@@ -210,7 +212,7 @@ export const TaskDropWidget: React.FC = () => {
             style={{
               fontSize: '11.5px',
               fontWeight: 700,
-              color: '#1E293B',
+              color: 'var(--nm-text-main)',
               lineHeight: '1.4',
               wordBreak: 'break-word',
             }}
@@ -227,16 +229,16 @@ export const TaskDropWidget: React.FC = () => {
             width: '100%',
             padding: '5px 0',
             borderRadius: '10px',
-            border: '1px solid #86EFAC',
-            background: '#DCFCE7',
-            color: '#166534',
+            border: '1px solid var(--nm-primary-dark)',
+            background: 'var(--nm-bg-lighter)',
+            color: 'var(--nm-primary-dark)',
             fontSize: '11px',
             fontWeight: 900,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '4px',
-            boxShadow: 'inset 0 1px 2px rgba(22, 101, 52, 0.08)',
+            boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.06)',
             userSelect: 'none',
           }}
         >
@@ -261,9 +263,9 @@ export const TaskDropWidget: React.FC = () => {
               flex: 1,
               padding: '5px 0',
               borderRadius: '10px',
-              border: '1px solid #CBD5E1',
-              background: '#F1F5F9',
-              color: '#64748B',
+              border: '1px solid var(--nm-shadow-soft)',
+              background: 'var(--nm-bg-lighter)',
+              color: 'var(--nm-text-sub)',
               fontSize: '11px',
               fontWeight: 800,
               cursor: 'pointer',
@@ -287,8 +289,8 @@ export const TaskDropWidget: React.FC = () => {
               flex: 1,
               padding: '5px 0',
               borderRadius: '10px',
-              border: '1px solid #10B981',
-              background: 'linear-gradient(135deg, #10B981, #059669)',
+              border: '1px solid var(--nm-primary-dark)',
+              background: 'linear-gradient(135deg, var(--nm-primary-light), var(--nm-primary))',
               color: '#FFFFFF',
               fontSize: '11px',
               fontWeight: 900,
@@ -297,7 +299,7 @@ export const TaskDropWidget: React.FC = () => {
               alignItems: 'center',
               justifyContent: 'center',
               gap: '4px',
-              boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)',
+              boxShadow: '0 2px 4px var(--nm-shadow-soft)',
               transition: 'transform 0.1s ease',
             }}
           >

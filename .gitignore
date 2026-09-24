@@ -31,3 +31,15 @@ dist-ssr/
 
 # TypeScript cache
 tsconfig.tsbuildinfo
+
+# User personal backups & notes (protect privacy)
+*.pwb
+*.mht
+*.mhtml
+*.db
+*.zip
+pure_writer_export*
+scratch_*
+scratch/
+scratch_pwb/
+

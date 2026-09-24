@@ -1,4 +1,4 @@
-export type CoursePlatform = 'bilibili' | 'pan' | 'custom';
+export type CoursePlatform = 'bilibili' | 'pan' | 'custom' | 'xiaohongshu';
 export type CourseStatus = 'backlog' | 'in_progress' | 'completed';
 export type CourseAttributeTag = 'STR' | 'DEX' | 'INT' | 'SPI' | 'CON' | 'CHA';
 

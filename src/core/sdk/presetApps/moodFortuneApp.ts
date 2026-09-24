@@ -3,35 +3,45 @@ export const MOOD_FORTUNE_APP_HTML = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>心事抽签筒</title>
+  <title>答案之书</title>
   <style>
     :root {
-      --nm-bg: #E9EEF5;
-      --nm-primary: #5096C6;
-      --nm-text: #334257;
-      --nm-sub: #7D8CA3;
-      --nm-convex: 5px 5px 12px rgba(160, 175, 195, 0.55), -5px -5px 12px rgba(255, 255, 255, 0.95);
-      --nm-inset: inset 3px 3px 7px rgba(150, 168, 190, 0.7), inset -3px -3px 7px rgba(255, 255, 255, 0.95);
+      --nm-bg: #EAEFF5;
+      --nm-card: #EAEFF5;
+      --nm-primary: #7A5C3E;
+      --nm-gold: #C59A4E;
+      --nm-gold-dark: #8F6927;
+      --nm-text: #2C3545;
+      --nm-sub: #7A899E;
+      --nm-convex: 6px 6px 14px rgba(160, 175, 195, 0.55), -6px -6px 14px rgba(255, 255, 255, 0.95);
+      --nm-convex-sm: 3px 3px 8px rgba(160, 175, 195, 0.45), -3px -3px 8px rgba(255, 255, 255, 0.95);
+      --nm-inset: inset 3px 3px 7px rgba(150, 168, 190, 0.65), inset -3px -3px 7px rgba(255, 255, 255, 0.95);
+      --nm-inset-sm: inset 2px 2px 5px rgba(150, 168, 190, 0.5), inset -2px -2px 5px rgba(255, 255, 255, 0.95);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, sans-serif; }
-    body {
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, Georgia, serif; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
       background-color: var(--nm-bg);
       color: var(--nm-text);
-      min-height: 100vh;
-      padding: 18px 16px 24px;
+    }
+    body {
+      padding: 14px 16px 16px;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justifyContent: space-between;
-      user-select: none;
-      -webkit-user-select: none;
+      justify-content: space-between;
+      gap: 12px;
+      box-sizing: border-box;
     }
+    /* 顶部导航 */
     .header {
       width: 100%;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 12px;
+      flex-shrink: 0;
     }
     .title {
       font-size: 16px;
@@ -40,139 +50,259 @@ export const MOOD_FORTUNE_APP_HTML = `<!DOCTYPE html>
       display: flex;
       align-items: center;
       gap: 6px;
+      letter-spacing: 0.5px;
+    }
+    .header-btns {
+      display: flex;
+      gap: 8px;
     }
     .btn-circle {
       width: 36px;
       height: 36px;
       border-radius: 50%;
-      background: var(--nm-bg);
+      background: var(--nm-card);
       border: none;
-      box-shadow: var(--nm-convex);
+      box-shadow: var(--nm-convex-sm);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--nm-sub);
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 700;
       outline: none;
-      transition: transform 0.1s;
+      transition: transform 0.1s, box-shadow 0.1s;
+      user-select: none;
     }
     .btn-circle:active {
-      box-shadow: var(--nm-inset);
+      box-shadow: var(--nm-inset-sm);
       transform: scale(0.95);
     }
+
+    /* 主舞台 */
     .main-stage {
       flex: 1;
       width: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justifyContent: center;
-      gap: 18px;
+      justify-content: center;
+      gap: 12px;
+      position: relative;
     }
-    /* 拟物抽签筒 */
-    .tube-container {
-      width: 110px;
-      height: 140px;
-      background: var(--nm-bg);
-      border-radius: 24px;
-      box-shadow: 8px 8px 18px rgba(160, 175, 195, 0.6), -8px -8px 18px rgba(255, 255, 255, 0.95);
-      border: 1px solid rgba(255, 255, 255, 0.6);
+
+    /* 轻拟物精装书实体 */
+    .book-container {
+      width: 100%;
+      max-width: 280px;
+      height: 200px;
+      perspective: 1000px;
+      position: relative;
+    }
+    .book {
+      width: 100%;
+      height: 100%;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #F8FAFD 0%, #E3E9F2 100%);
+      box-shadow: 8px 8px 20px rgba(150, 168, 190, 0.6), -7px -7px 18px rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.85);
       position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justifyContent: flex-end;
-      padding-bottom: 16px;
+      justify-content: center;
+      padding: 16px;
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
       cursor: pointer;
-      transition: transform 0.2s;
+      user-select: none;
     }
-    .tube-container.shaking {
-      animation: shake 0.5s ease-in-out infinite alternate;
+    .book:active {
+      transform: scale(0.98);
     }
-    @keyframes shake {
-      0% { transform: rotate(-8deg) translateY(-4px); }
-      100% { transform: rotate(8deg) translateY(4px); }
+    .book.flipping {
+      transform: rotateY(-18deg) scale(0.96);
+      filter: brightness(1.05);
     }
-    .sticks {
+
+    /* 书籍封面装饰线条与烫金 */
+    .book-spine {
       position: absolute;
-      top: -24px;
-      display: flex;
-      gap: 5px;
+      left: 12px;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: linear-gradient(to right, rgba(0,0,0,0.06), rgba(255,255,255,0.7));
+      border-radius: 2px;
+      pointer-events: none;
     }
-    .stick {
-      width: 6px;
-      height: 48px;
-      background: #D9A066;
-      border-radius: 3px 3px 0 0;
-      box-shadow: 1px 1px 3px rgba(0,0,0,0.15);
+    .book-border {
+      position: absolute;
+      inset: 10px;
+      border: 1px dashed rgba(197, 154, 78, 0.45);
+      border-radius: 10px;
+      pointer-events: none;
     }
-    .stick.active {
-      background: #E85A71;
-      height: 58px;
-      transform: translateY(-8px);
-      transition: all 0.3s;
+    .book-emblem {
+      font-size: 24px;
+      margin-bottom: 4px;
+      filter: drop-shadow(0 2px 4px rgba(197, 154, 78, 0.3));
     }
-    .tube-label {
-      font-size: 13px;
+    .book-en-title {
+      font-size: 10px;
       font-weight: 800;
-      color: var(--nm-primary);
-      letter-spacing: 1px;
+      letter-spacing: 2px;
+      color: var(--nm-gold-dark);
+      text-transform: uppercase;
+      margin-bottom: 2px;
     }
-    /* 结果卡片 */
-    .result-card {
-      width: 100%;
-      background: var(--nm-bg);
-      border-radius: 20px;
-      box-shadow: var(--nm-convex);
-      padding: 16px 18px;
-      display: none;
-      flex-direction: column;
-      gap: 8px;
-      animation: fadeIn 0.3s ease-out;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .fortune-badge {
-      align-self: flex-start;
-      background: linear-gradient(135deg, #5CA4D5 0%, #468EC0 100%);
-      color: #fff;
-      font-size: 12px;
-      font-weight: 800;
-      padding: 3px 10px;
-      border-radius: 12px;
-      box-shadow: 0 2px 6px rgba(70, 142, 192, 0.4);
-    }
-    .fortune-quote {
-      font-size: 14px;
-      font-weight: 700;
+    .book-cn-title {
+      font-size: 20px;
+      font-weight: 900;
       color: var(--nm-text);
+      letter-spacing: 3px;
+      margin-bottom: 4px;
+    }
+    .book-hint {
+      font-size: 11px;
+      color: var(--nm-sub);
+      text-align: center;
       line-height: 1.4;
     }
-    .ai-reply-box {
-      margin-top: 4px;
-      padding: 10px 12px;
-      background: rgba(255, 255, 255, 0.4);
-      border-radius: 14px;
-      font-size: 12px;
-      color: #4A5B73;
-      line-height: 1.6;
-      min-height: 38px;
-      position: relative;
+
+    /* 翻开后的内页展示卡片 */
+    .page-reveal {
+      display: none;
+      width: 100%;
+      height: 100%;
+      flex-direction: column;
+      justify-content: space-between;
+      animation: pageTurn 0.35s ease-out;
     }
-    /* 抽签主按键 */
+    @keyframes pageTurn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px dashed rgba(197, 154, 78, 0.35);
+      padding-bottom: 4px;
+    }
+    .page-num {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--nm-gold-dark);
+      letter-spacing: 1px;
+    }
+    .page-question-tag {
+      font-size: 10.5px;
+      color: var(--nm-sub);
+      max-width: 160px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .page-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      margin: 8px 0;
+      text-align: center;
+    }
+    .answer-en {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      color: var(--nm-gold-dark);
+      text-transform: uppercase;
+    }
+    .answer-cn {
+      font-size: 21px;
+      font-weight: 900;
+      color: var(--nm-text);
+      letter-spacing: 1.5px;
+      line-height: 1.35;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+    }
+    .ai-comment-box {
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-size: 10.5px;
+      color: #4A5B73;
+      line-height: 1.4;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+    }
+
+    /* 输入区域 */
+    .input-section {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .input-box {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 12px;
+      background: var(--nm-card);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow: var(--nm-inset);
+      font-size: 12.5px;
+      color: var(--nm-text);
+      outline: none;
+      box-sizing: border-box;
+      transition: all 0.2s;
+    }
+    .input-box::placeholder {
+      color: #9AA8BC;
+    }
+    .input-box:focus {
+      border-color: rgba(197, 154, 78, 0.5);
+    }
+
+    /* 快捷问题胶囊 */
+    .quick-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+    }
+    .tag-btn {
+      padding: 5px 11px;
+      border-radius: 12px;
+      background: var(--nm-card);
+      border: none;
+      box-shadow: var(--nm-convex-sm);
+      font-size: 11px;
+      color: var(--nm-sub);
+      cursor: pointer;
+      outline: none;
+      transition: all 0.12s;
+      user-select: none;
+    }
+    .tag-btn:hover {
+      color: var(--nm-gold-dark);
+    }
+    .tag-btn:active {
+      color: var(--nm-gold-dark);
+      box-shadow: var(--nm-inset-sm);
+      transform: scale(0.96);
+    }
+
+    /* 主翻书操作按钮 */
     .action-btn {
       width: 100%;
-      height: 48px;
-      border-radius: 24px;
-      background: var(--nm-bg);
+      height: 46px;
+      border-radius: 23px;
+      background: var(--nm-card);
       border: none;
       box-shadow: 6px 6px 14px rgba(160, 175, 195, 0.55), -5px -5px 14px rgba(255, 255, 255, 0.95);
-      color: var(--nm-primary);
-      font-size: 15px;
+      color: var(--nm-gold-dark);
+      font-size: 14.5px;
       font-weight: 800;
       cursor: pointer;
       display: flex;
@@ -181,6 +311,8 @@ export const MOOD_FORTUNE_APP_HTML = `<!DOCTYPE html>
       gap: 8px;
       outline: none;
       transition: all 0.15s;
+      flex-shrink: 0;
+      user-select: none;
     }
     .action-btn:active {
       box-shadow: var(--nm-inset);
@@ -190,23 +322,49 @@ export const MOOD_FORTUNE_APP_HTML = `<!DOCTYPE html>
       opacity: 0.6;
       cursor: not-allowed;
     }
+
+    /* 历史记录抽屉面板 */
+    .history-drawer {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: var(--nm-card);
+      border-radius: 18px;
+      box-shadow: var(--nm-convex);
+      padding: 14px;
+      z-index: 20;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      padding-bottom: 6px;
+    }
     .history-list {
-      width: 100%;
-      margin-top: 8px;
+      flex: 1;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 6px;
-      max-height: 120px;
-      overflow-y: auto;
     }
     .history-item {
-      font-size: 11px;
-      padding: 6px 10px;
+      padding: 8px 10px;
       border-radius: 10px;
-      background: rgba(255, 255, 255, 0.35);
-      color: var(--nm-sub);
+      background: rgba(255, 255, 255, 0.45);
+      font-size: 11px;
       display: flex;
-      justify-content: space-between;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .history-q {
+      color: var(--nm-sub);
+    }
+    .history-a {
+      font-weight: 800;
+      color: var(--nm-text);
     }
   </style>
 </head>
@@ -215,158 +373,315 @@ export const MOOD_FORTUNE_APP_HTML = `<!DOCTYPE html>
   <!-- 顶栏 -->
   <div class="header">
     <div class="title">
-      <span>🎋</span>
-      <span>心事抽签盲盒</span>
+      <span>📖</span>
+      <span>答案之书</span>
     </div>
-    <div style="display:flex; gap:8px;">
-      <button class="btn-circle" id="btn-history-toggle" title="查看历史记录">📜</button>
-      <button class="btn-circle" id="btn-close" title="返回桌面">✕</button>
+    <div class="header-btns">
+      <button type="button" class="btn-circle" id="btn-history" title="历史问答手账">📜</button>
+      <button type="button" class="btn-circle" id="btn-close" title="退出">✕</button>
     </div>
   </div>
 
   <!-- 主舞台 -->
   <div class="main-stage">
-    <div class="tube-container" id="tube">
-      <div class="sticks">
-        <div class="stick" style="transform: rotate(-10deg);"></div>
-        <div class="stick active" id="stick-active"></div>
-        <div class="stick" style="transform: rotate(8deg);"></div>
+    <!-- 实体精装书 (点击也可直接翻开) -->
+    <div class="book-container">
+      <div class="book" id="book-element" title="点击直接翻开指引之页">
+        <div class="book-spine"></div>
+        <div class="book-border"></div>
+
+        <!-- 封面正面 (未翻开) -->
+        <div id="cover-view" style="display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div class="book-emblem">✨</div>
+          <div class="book-en-title">The Book of Answers</div>
+          <div class="book-cn-title">答案之书</div>
+          <div class="book-hint" id="book-hint">轻触书本或下方按键<br>随心翻开，答案自现</div>
+        </div>
+
+        <!-- 内页展示 (翻开后) -->
+        <div class="page-reveal" id="page-reveal">
+          <div class="page-header">
+            <span class="page-num" id="page-num">PAGE 138</span>
+            <span class="page-question-tag" id="page-question-tag">🤔 未知困惑</span>
+          </div>
+
+          <div class="page-body">
+            <div class="answer-en" id="answer-en">WAIT AND SEE</div>
+            <div class="answer-cn" id="answer-cn">退一步海阔天空</div>
+          </div>
+
+          <div class="ai-comment-box" id="ai-comment-box">
+            🍃 答案已落在心间，倾听你的第一直觉。
+          </div>
+        </div>
       </div>
-      <div class="tube-label">心事签</div>
     </div>
 
-    <!-- 结果卡片 -->
-    <div class="result-card" id="result-card">
-      <div class="fortune-badge" id="fortune-badge">大吉 · 灵感涌动</div>
-      <div class="fortune-quote" id="fortune-quote">所思所念，皆有回响。</div>
-      <div class="ai-reply-box" id="ai-reply-box">正在请伴侣为你解签...</div>
+    <!-- 步骤 1: 用户困惑输入与快捷预设 -->
+    <div class="input-section" id="input-section">
+      <input
+        type="text"
+        class="input-box"
+        id="question-input"
+        placeholder="写下你此刻纠结的问题 (或点击下方预设)"
+        maxlength="40"
+        autocomplete="off"
+      />
+      <div class="quick-tags">
+        <button type="button" class="tag-btn" data-question="我该换工作吗？">💼 换工作？</button>
+        <button type="button" class="tag-btn" data-question="今晚要去表白吗？">💌 去表白？</button>
+        <button type="button" class="tag-btn" data-question="要不要买下它？">🛍️ 买不买？</button>
+        <button type="button" class="tag-btn" data-question="应该继续坚持吗？">🔥 坚持吗？</button>
+        <button type="button" class="tag-btn" data-question="明天会一切顺利吗？">🍀 顺利吗？</button>
+      </div>
     </div>
 
-    <!-- 历史记录面板 -->
-    <div class="history-list" id="history-list" style="display:none;"></div>
+    <!-- 历史记录抽屉面板 -->
+    <div class="history-drawer" id="history-drawer">
+      <div class="history-header">
+        <span style="font-size:12px; font-weight:800; color:var(--nm-gold-dark);">📜 启示手账纪录</span>
+        <button type="button" class="btn-circle" style="width:26px; height:26px; font-size:12px;" id="btn-close-history">✕</button>
+      </div>
+      <div class="history-list" id="history-list-items"></div>
+    </div>
   </div>
 
-  <!-- 底部操作键 -->
-  <button class="action-btn" id="btn-draw">
-    <span>✨</span>
-    <span id="draw-text">摇一摇抽心事签</span>
+  <!-- 步骤 2: 翻开答案操作按钮 -->
+  <button type="button" class="action-btn" id="btn-action">
+    <span>📖</span>
+    <span id="btn-text">翻开指引之页</span>
   </button>
 
   <script>
-    const FORTUNES = [
-      { badge: "上上签 · 灵感涌动", quote: "万物生长，今日所想之念皆有回音。" },
-      { badge: "大吉 · 岁岁温柔", quote: "日出有盼，日落有念，平安喜乐常伴心间。" },
-      { badge: "温润签 · 岁月静好", quote: "慢下来，生活自会给你最甜的答案。" },
-      { badge: "开颜签 · 惊喜相逢", quote: "不期而遇的幸运，正快马加鞭向你奔来。" },
-      { badge: "清风签 · 悠然自得", quote: "心若轻盈，哪怕细微碎屑亦是诗意浪漫。" }
+    // 原版精选《答案之书》权威经典词库 (中英双语)
+    const ANSWERS_CORPUS = [
+      { cn: "退一步海阔天空", en: "Take a step back" },
+      { cn: "勇敢迈出第一步", en: "Take the first step bravely" },
+      { cn: "毫无疑问", en: "Without a doubt" },
+      { cn: "静候最佳时机", en: "Wait for the right moment" },
+      { cn: "放手去搏", en: "Go for it" },
+      { cn: "答案显而易见", en: "The answer is obvious" },
+      { cn: "顺其自然", en: "Let nature take its course" },
+      { cn: "不要犹豫", en: "Do not hesitate" },
+      { cn: "另辟蹊径", en: "Find another way" },
+      { cn: "听从内心的第一直觉", en: "Trust your first instinct" },
+      { cn: "放下执念", en: "Let it go" },
+      { cn: "全力以赴", en: "Give it your all" },
+      { cn: "暂且搁置一下", en: "Set it aside for now" },
+      { cn: "结果会让你惊喜", en: "The result will surprise you" },
+      { cn: "珍惜眼前所拥有的", en: "Cherish what you have" },
+      { cn: "不要抱有不切实际的幻想", en: "Do not cling to illusions" },
+      { cn: "现在还不是时候", en: "Now is not the time" },
+      { cn: "你需要更多的耐心", en: "More patience is required" },
+      { cn: "换个角度看问题", en: "Look from a different angle" },
+      { cn: "大胆说出你的想法", en: "Speak your mind boldly" },
+      { cn: "其实你心里早有答案", en: "You already know the answer" },
+      { cn: "保持沉默是更好的选择", en: "Silence is a better choice" },
+      { cn: "去问问值得信赖的人", en: "Ask someone you trust" },
+      { cn: "给彼此一点空间", en: "Give each other some space" },
+      { cn: "立即行动，不要拖延", en: "Act now, do not delay" },
+      { cn: "别让过去的遗憾困扰你", en: "Leave the past behind" },
+      { cn: "准备好迎接新变化", en: "Prepare for changes" },
+      { cn: "相信一切都是最好的安排", en: "Trust the timing of your life" },
+      { cn: "坚守你的底线", en: "Hold on to your principles" },
+      { cn: "这件事值得你的付出", en: "It is worth your effort" },
+      { cn: "不要太在意别人的评价", en: "Do not care what others think" },
+      { cn: "学会拒绝", en: "Learn to say no" },
+      { cn: "专注于手头当下的事", en: "Focus on the present moment" },
+      { cn: "前方有惊喜在等你", en: "A pleasant surprise awaits" },
+      { cn: "先好好睡一觉", en: "Get a good night's sleep first" },
+      { cn: "不要为了妥协而妥协", en: "Never settle" },
+      { cn: "做最坏的打算，抱最好的希望", en: "Hope for best, prepare for worst" },
+      { cn: "结局会比你想的更好", en: "It will end better than you think" },
+      { cn: "遵循你的常识", en: "Follow common sense" },
+      { cn: "不要回头", en: "Never look back" }
     ];
 
-    const tube = document.getElementById('tube');
-    const btnDraw = document.getElementById('btn-draw');
-    const drawText = document.getElementById('draw-text');
-    const resultCard = document.getElementById('result-card');
-    const fortuneBadge = document.getElementById('fortune-badge');
-    const fortuneQuote = document.getElementById('fortune-quote');
-    const aiReplyBox = document.getElementById('ai-reply-box');
+    const bookElement = document.getElementById('book-element');
+    const coverView = document.getElementById('cover-view');
+    const pageReveal = document.getElementById('page-reveal');
+    const questionInput = document.getElementById('question-input');
+    const btnAction = document.getElementById('btn-action');
+    const btnText = document.getElementById('btn-text');
+    const pageNum = document.getElementById('page-num');
+    const pageQuestionTag = document.getElementById('page-question-tag');
+    const answerCn = document.getElementById('answer-cn');
+    const answerEn = document.getElementById('answer-en');
+    const aiCommentBox = document.getElementById('ai-comment-box');
     const btnClose = document.getElementById('btn-close');
-    const btnHistory = document.getElementById('btn-history-toggle');
-    const historyList = document.getElementById('history-list');
+    const btnHistory = document.getElementById('btn-history');
+    const btnCloseHistory = document.getElementById('btn-close-history');
+    const historyDrawer = document.getElementById('history-drawer');
+    const historyListItems = document.getElementById('history-list-items');
 
-    let isDrawing = false;
-    let showingHistory = false;
+    let isRevealed = false;
+    let isFlipping = false;
 
-    // 1. 关闭应用返回桌面
-    btnClose.addEventListener('click', function() {
-      if (window.AiPhone && window.AiPhone.app) {
-        window.AiPhone.app.close();
-      }
+    // 1. 快捷预设按钮点击监听 (严密绑定 data-question)
+    document.querySelectorAll('.tag-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const q = this.getAttribute('data-question') || this.innerText;
+        if (questionInput) {
+          questionInput.value = q.replace(/^[^\w\u4e00-\u9fa5]+/, '').trim();
+          questionInput.focus();
+        }
+      });
     });
 
-    // 2. 抽签全流程与 SDK 联动
-    btnDraw.addEventListener('click', async function() {
-      if (isDrawing) return;
-      isDrawing = true;
-      btnDraw.disabled = true;
-      drawText.textContent = "祈愿摇签中...";
-      tube.classList.add('shaking');
-      resultCard.style.display = 'none';
+    // 2. 回车键快捷翻开
+    if (questionInput) {
+      questionInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          triggerFlip();
+        }
+      });
+    }
 
-      // 震动动画 900ms
-      setTimeout(async function() {
-        tube.classList.remove('shaking');
-        const picked = FORTUNES[Math.floor(Math.random() * FORTUNES.length)];
+    // 3. 核心翻开函数
+    function triggerFlip() {
+      if (isFlipping) return;
 
-        fortuneBadge.textContent = picked.badge;
-        fortuneQuote.textContent = picked.quote;
-        aiReplyBox.textContent = "🌟 正在联络 AI 伴侣倾听并解签...";
-        resultCard.style.display = 'flex';
+      if (isRevealed) {
+        // 当前已是翻开状态 -> 合上书本，准备再问
+        coverView.style.display = 'flex';
+        pageReveal.style.display = 'none';
+        btnText.textContent = "翻开指引之页";
+        isRevealed = false;
+        if (questionInput) {
+          questionInput.value = "";
+          questionInput.focus();
+        }
+        return;
+      }
 
-        // 调用 AiPhone SDK
-        if (window.AiPhone) {
-          try {
-            // A. 读取当前角色
-            const chars = await window.AiPhone.characters.list();
-            const activeChar = chars && chars.length > 0 ? chars[0] : null;
-            const charName = activeChar ? activeChar.name : "小手机伴侣";
-            const charId = activeChar ? activeChar.id : undefined;
+      // 执行翻书抽签
+      const question = (questionInput && questionInput.value.trim()) || "我心中的困惑";
+      isFlipping = true;
+      btnAction.disabled = true;
+      btnText.textContent = "正在翻开命运之页...";
+      bookElement.classList.add('flipping');
 
-            // B. 调用大模型生成伴侣专属解签
-            const prompt = "我刚刚在小手机抽到了心事签：【" + picked.badge + "】“" + picked.quote + "”，请你用你独有的性格和语气，为我写一段充满灵气、温暖心田的专属解签寄语吧！";
-            const res = await window.AiPhone.ai.generate({
-              prompt: prompt,
-              characterId: charId
-            });
+      setTimeout(function() {
+        try {
+          bookElement.classList.remove('flipping');
+          const picked = ANSWERS_CORPUS[Math.floor(Math.random() * ANSWERS_CORPUS.length)];
+          const randomPage = Math.floor(Math.random() * 320) + 12;
 
-            const replyContent = res && res.content ? res.content : ("【" + charName + "的祝福】愿你抽中的好运全都能兑现，天天开心！");
-            aiReplyBox.textContent = replyContent;
+          pageNum.textContent = "PAGE " + randomPage;
+          pageQuestionTag.textContent = "🤔 " + question;
+          answerCn.textContent = picked.cn;
+          answerEn.textContent = picked.en;
+          aiCommentBox.textContent = "🍃 答案已然显现，去印证你心中的抉择。";
 
-            // C. 写入自定义 APP 私有数据库
-            await window.AiPhone.db.create('fortunes', {
-              badge: picked.badge,
-              quote: picked.quote,
-              reply: replyContent,
-              charName: charName,
-              timeStr: new Date().toLocaleTimeString()
-            });
+          coverView.style.display = 'none';
+          pageReveal.style.display = 'flex';
+          isRevealed = true;
+          btnText.textContent = "合上书本 · 再问一次";
 
-            // D. 在小手机桌面点亮未读红点
-            await window.AiPhone.notifications.setBadge(1);
+          // 异步伴侣互动与历史存储 (完全防御包裹，不阻碍主界面)
+          if (window.AiPhone) {
+            try {
+              if (window.AiPhone.db) {
+                window.AiPhone.db.create('answers_history', {
+                  question: question,
+                  answerCn: picked.cn,
+                  answerEn: picked.en,
+                  page: randomPage,
+                  timeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                }).catch(function() {});
+              }
 
-            // E. 触发宿主轻拟物 Toast 提示
-            await window.AiPhone.ui.toast("解签完成！愿今日温暖伴你~");
+              if (window.AiPhone.characters && window.AiPhone.ai) {
+                window.AiPhone.characters.list().then(function(chars) {
+                  const activeChar = chars && chars.length > 0 ? chars[0] : null;
+                  if (activeChar) {
+                    const prompt = "我向《答案之书》询问了：【" + question + "】，翻开得到的答案是：【" + picked.cn + "】。请你以你的性格，用一两句充满灵气与鼓励的温柔短评回答我，字数在40字以内。";
+                    window.AiPhone.ai.generate({
+                      prompt: prompt,
+                      characterId: activeChar.id
+                    }).then(function(res) {
+                      if (res && res.content) {
+                        aiCommentBox.textContent = "【" + activeChar.name + "的启示】" + res.content;
+                      }
+                    }).catch(function() {});
+                  }
+                }).catch(function() {});
+              }
 
-          } catch (e) {
-            aiReplyBox.textContent = "【伴侣解签】愿万事顺意，今天的你闪闪发光！";
-            console.error(e);
+              if (window.AiPhone.ui && window.AiPhone.ui.toast) {
+                window.AiPhone.ui.toast("答案已显现：\"" + picked.cn + "\"").catch(function() {});
+              }
+            } catch (err) {
+              console.warn("AiPhone optional sdk call error:", err);
+            }
           }
+        } finally {
+          btnAction.disabled = false;
+          isFlipping = false;
         }
+      }, 550);
+    }
 
-        drawText.textContent = "再次抽签";
-        btnDraw.disabled = false;
-        isDrawing = false;
-      }, 900);
+    // 4. 绑定底部按键与书本本身的点击翻开
+    btnAction.addEventListener('click', function(e) {
+      e.preventDefault();
+      triggerFlip();
     });
 
-    // 3. 历史记录切换
-    btnHistory.addEventListener('click', async function() {
-      showingHistory = !showingHistory;
-      historyList.style.display = showingHistory ? 'flex' : 'none';
+    bookElement.addEventListener('click', function(e) {
+      e.preventDefault();
+      triggerFlip();
+    });
 
-      if (showingHistory && window.AiPhone && window.AiPhone.db) {
-        const list = await window.AiPhone.db.list('fortunes');
-        historyList.innerHTML = '';
-        if (!list || list.length === 0) {
-          historyList.innerHTML = '<div style="font-size:11px; color:#888; text-align:center;">暂无抽签历史</div>';
-        } else {
-          list.slice(0, 5).forEach(function(item) {
-            const div = document.createElement('div');
-            div.className = 'history-item';
-            div.innerHTML = '<span>' + (item.badge || '心事签') + '</span><span>' + (item.timeStr || '') + '</span>';
-            historyList.appendChild(div);
+    // 5. 关闭应用返回桌面
+    if (btnClose) {
+      btnClose.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (window.AiPhone && window.AiPhone.app) {
+          window.AiPhone.app.close();
+        }
+      });
+    }
+
+    // 6. 历史记录手账抽屉
+    if (btnHistory) {
+      btnHistory.addEventListener('click', function(e) {
+        e.preventDefault();
+        historyDrawer.style.display = 'flex';
+        historyListItems.innerHTML = '<div style="font-size:11px; color:#888; text-align:center; padding:10px;">读取历史记录中...</div>';
+
+        if (window.AiPhone && window.AiPhone.db) {
+          window.AiPhone.db.list('answers_history').then(function(list) {
+            historyListItems.innerHTML = '';
+            if (!list || list.length === 0) {
+              historyListItems.innerHTML = '<div style="font-size:11px; color:#888; text-align:center; padding:20px;">暂无历史问答记录</div>';
+            } else {
+              list.slice(0, 15).forEach(function(item) {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = '<div class="history-q">问：' + (item.question || '心事困惑') + ' <span style="font-size:9px; color:#aaa;">(' + (item.timeStr || '') + ')</span></div>' +
+                                '<div class="history-a">答：' + (item.answerCn || '') + ' (' + (item.answerEn || '') + ')</div>';
+                historyListItems.appendChild(div);
+              });
+            }
+          }).catch(function() {
+            historyListItems.innerHTML = '<div style="font-size:11px; color:#888; text-align:center; padding:20px;">暂无历史记录</div>';
           });
+        } else {
+          historyListItems.innerHTML = '<div style="font-size:11px; color:#888; text-align:center; padding:20px;">暂无历史记录</div>';
         }
-      }
-    });
+      });
+    }
+
+    if (btnCloseHistory) {
+      btnCloseHistory.addEventListener('click', function(e) {
+        e.preventDefault();
+        historyDrawer.style.display = 'none';
+      });
+    }
   </script>
 </body>
 </html>`;
