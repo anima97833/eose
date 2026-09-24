@@ -9,6 +9,10 @@ import { loadMistakeWords } from '../storyword/storyWordStorage';
 import { SavedPoemRecord } from '../poetry/poetryTypes';
 import { PhysicalBookRecord } from '../books/bookTypes';
 import { StoryWordMistake } from '../storyword/storyWordTypes';
+import { loadQuestJournal } from '../quest/questStorage';
+import { QuestItem } from '../quest/questTypes';
+import { getInsightHistoryList, StoryInsightHistoryItem } from '../files/insightHistoryService';
+
 
 const LAST_NUDGE_TIME_KEY = 'cloudfly_last_nudge_timestamp';
 const NEXT_INTERVAL_KEY = 'cloudfly_next_nudge_interval_ms';
@@ -221,6 +225,80 @@ const DAILY_PHRASES = [
   '【主线提示】不要忘记你的终极目标，从完成当前的一个小任务开始吧！',
   '【玩家嘉奖】恭喜你今天依然保持在线，地球Online为你点亮一颗星！',
 ];
+
+const QUEST_PHRASES = [
+  (name: string, tag: string) => `【主线副本刷新】日常《${name}》尚未打卡，快去完成补充${tag}！`,
+  (name: string, tag: string) => `【主线告急】检测到今日主线《${name}》正挂机中，少侠速回手账交任务！`,
+  (name: string, tag: string) => `【精力槽充能】生活主线《${name}》等待结算，完成即可恢复元气！`,
+  (name: string, tag: string) => `【每日冒险】日常副本《${name}》待通关，顺手打个卡向满勤迈进！`,
+  (name: string, tag: string) => `【主线警报】今日主线《${name}》还没打勾，不要让任务积压到明天呀！`,
+  (name: string, tag: string) => `【支线悬赏】手账里的奇遇支线《${name}》散发微光，今天顺手清掉它吧！`,
+  (name: string, tag: string) => `【属性点判定】打卡《${name}》，即可解锁专属${tag}加成，速速行动！`,
+  (name: string, tag: string) => `【生活英雄】主线《${name}》发来传讯：按时生活也是一项神级成就！`,
+  (name: string, tag: string) => `【日常巡检】今日主线《${name}》尚未封存，快去手账记录通关时刻！`,
+  (name: string, tag: string) => `【战备状态】开启新的脑力探索前，别忘了先打卡主线《${name}》！`,
+  (name: string, tag: string) => `【任务栏闪烁】主线《${name}》挂机许久，动动手指即可完成今日打卡！`,
+  (name: string, tag: string) => `【经验结算】完成《${name}》打卡，让今日地球Online活跃度瞬间拉满！`,
+  (name: string, tag: string) => `【日常羁绊】今日副本《${name}》等待被征服，去手账给它画上完美勾选！`,
+  (name: string, tag: string) => `【主线全通召唤】离今日全部日常打卡完毕，只差一个《${name}》啦！`,
+];
+
+const ANSWERS_PHRASES = [
+  (q: string, a: string) => `【先知神谕回响】你曾问过“${q}”，神谕给出的解答是『${a}』，应验了吗？`,
+  (q: string, a: string) => `【命运回音】重温你曾向答案之书问过的“${q}”，当初的『${a}』有新体会吗？`,
+  (q: string, a: string) => `【时空信笺】“${q}”——翻开神谕的『${a}』，现在的你是否已然释怀？`,
+  (q: string, a: string) => `【先知复盘】你向答案之书问过“${q}”，那句『${a}』今天读来依然耐人寻味！`,
+  (q: string, a: string) => `【命运指引】关于“${q}”，还记得当初神殿给出的『${a}』吗？回神殿看看吧！`,
+  (q: string, a: string) => `【心灵共鸣】曾令你困惑的“${q}”，神谕曾写下『${a}』，今天偶尔又想起了它！`,
+  (q: string, a: string) => `【占卜之页】答案之书停在“${q}”的那页，神谕『${a}』正散发金色微光！`,
+  (q: string, a: string) => `【历史共振】“${q}”——答案之书当时给你的指引是『${a}』，你找到答案了吗？`,
+  (q: string, a: string) => `【迷途灯塔】还记得针对“${q}”翻出的『${a}』吗？偶尔回头看看当初的解答吧！`,
+  (q: string, a: string) => `【先知回访】那句关于“${q}”的『${a}』，有没有在某个深夜悄悄治愈过你？`,
+  (q: string, a: string) => `【灵魂对白】你曾将“${q}”托付给答案之书，翻出的『${a}』现在仍旧护佑着你！`,
+  (q: string, a: string) => `【时空交错】“${q}”配上『${a}』，去答案之书重温那次奇妙的翻页瞬间吧！`,
+  (q: string, a: string) => `【神谕沉思】关于“${q}”的解答『${a}』，现在回看是不是多了一分豁达从容？`,
+  (q: string, a: string) => `【命运之书】针对“${q}”，答案之书曾写下『${a}』，默念新困惑再去翻翻吧！`,
+];
+
+const MINDMAP_PHRASES = [
+  (title: string, node: string) => `【脑图记忆碎片】《${title}》节点【${node}】扫描中，核心逻辑还清晰吗？`,
+  (title: string, node: string) => `【全景脑图突袭】沉睡在导图里的【${node}】浮出水面，快回《${title}》重温全局！`,
+  (title: string, node: string) => `【思维导图回响】《${title}》知识图谱解析到【${node}】，点击穿透全景脉络！`,
+  (title: string, node: string) => `【思维拓扑唤醒】导图节点【${node}】正在发光，去《${title}》检视认知大纲！`,
+  (title: string, node: string) => `【深度洞察抽查】关于《${title}》里的【${node}】，你现在的理解是否更深一层？`,
+  (title: string, node: string) => `【记忆闪卡】叮！《${title}》思维导图为你送达核心锚点【${node}】，速去查阅！`,
+  (title: string, node: string) => `【认知网络展开】《${title}》全景结构之【${node}】，回文件库看看分支演化！`,
+  (title: string, node: string) => `【知识树抽枝】脑图中的【${node}】是《${title}》的关键节点，不翻开回看一眼吗？`,
+  (title: string, node: string) => `【剧情伏笔回溯】《${title}》导图记录了【${node}】，点击立刻全屏漫游脑图！`,
+  (title: string, node: string) => `【大纲雷达】扫描到《${title}》的核心分支【${node}】，思维引擎已就绪！`,
+  (title: string, node: string) => `【知识温故】沉睡在文件里的《${title}》导图，正等待你重新点亮【${node}】！`,
+  (title: string, node: string) => `【逻辑链突刺】还记得《${title}》里【${node}】的前因后果吗？回导图一探究竟！`,
+  (title: string, node: string) => `【思维结晶】《${title}》凝聚出的核心概念【${node}】，今天也是收获满满的学者！`,
+  (title: string, node: string) => `【脑力漫游】以【${node}】为起点，重新漫游一遍《${title}》的宏大脉络吧！`,
+];
+
+/**
+ * 提取思维导图中有辨识度的关键焦点节点
+ */
+function extractMindmapFocusNode(item: StoryInsightHistoryItem): string {
+  try {
+    if (item.data?.tree?.children && item.data.tree.children.length > 0) {
+      const sub = pickRandom(item.data.tree.children);
+      if (sub.children && sub.children.length > 0 && Math.random() > 0.5) {
+        const grand = pickRandom(sub.children);
+        return trimTitle(grand.label || sub.label, 10);
+      }
+      return trimTitle(sub.label, 10);
+    }
+    if (item.data?.graph?.nodes && item.data.graph.nodes.length > 0) {
+      const gNode = pickRandom(item.data.graph.nodes);
+      return trimTitle(gNode.label, 10);
+    }
+  } catch {
+    // ignore
+  }
+  return '核心脉络';
+}
 
 /**
  * 智能嗅探所有待提醒事项池，采用【防重复·真随机开盲盒算法】
@@ -435,6 +513,108 @@ export async function detectEarthOnlineNudge(force: boolean = false): Promise<Nu
     }
   } catch (err) {
     console.warn('[NudgeEngine] 检查日记手账失败:', err);
+  }
+
+  // 7. 搜集任务手账（主线任务打卡 & 支线任务冒险）
+  try {
+    const questList: QuestItem[] = loadQuestJournal();
+    // 优先筛选未完成的主线任务
+    const unfinishedMain = questList.filter((q) => q.category === 'main' && q.status !== 'completed');
+    // 其次筛选进行中的支线任务
+    const inProgressSide = questList.filter((q) => q.category === 'side' && q.status === 'in_progress');
+
+    const questTargets = unfinishedMain.length > 0 ? unfinishedMain : inProgressSide;
+    if (questTargets.length > 0) {
+      // 随机抽取最多 2 个任务候选
+      const sampledQuests = [...questTargets].sort(() => 0.5 - Math.random()).slice(0, 2);
+      for (const q of sampledQuests) {
+        const shortTitle = trimTitle(q.title, 9);
+        const tagLabel = q.tag ? q.tag.replace(/[^a-zA-Z\u4e00-\u9fa5]/g, '') : '精力';
+        const phraseGen = pickRandom(QUEST_PHRASES);
+
+        candidatePool.push({
+          id: `nudge_quest_${q.id}_${Date.now()}`,
+          source: 'quest',
+          tag: '地球Online · 任务手账',
+          icon: 'quest',
+          message: phraseGen(shortTitle, tagLabel),
+          targetAppId: 'diary',
+          actionLabel: '去交任务',
+          questId: q.id,
+          createdAt: Date.now(),
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[NudgeEngine] 检查任务手账失败:', err);
+  }
+
+  // 8. 嗅探答案之书（原味历史提问与神谕回响）
+  try {
+    let answerHistory: any[] = [];
+    const item = await db.settings.get('neumorphic_answers_book_history_v1');
+    if (item && Array.isArray(item.data)) {
+      answerHistory = item.data;
+    } else {
+      const raw = localStorage.getItem('neumorphic_answers_book_history_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) answerHistory = parsed;
+      }
+    }
+
+    if (answerHistory.length > 0) {
+      // 随机挑选最多 2 条历史提问与神谕
+      const sampledHistory = [...answerHistory].sort(() => 0.5 - Math.random()).slice(0, 2);
+      for (const record of sampledHistory) {
+        if (record.question && record.answerCn) {
+          const shortQ = trimTitle(record.question, 11);
+          const shortA = trimTitle(record.answerCn, 9);
+          const phraseGen = pickRandom(ANSWERS_PHRASES);
+
+          candidatePool.push({
+            id: `nudge_answers_${record.id || Date.now()}_${Date.now()}`,
+            source: 'answers',
+            tag: '地球Online · 先知神谕',
+            icon: 'answers',
+            message: phraseGen(shortQ, shortA),
+            targetAppId: 'mood_fortune',
+            actionLabel: '重温神谕',
+            createdAt: Date.now(),
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[NudgeEngine] 检查答案之书历史失败:', err);
+  }
+
+  // 9. 嗅探文件 · 历史思维导图（认知闪卡与知识碎片）
+  try {
+    const mindmapHistory: StoryInsightHistoryItem[] = await getInsightHistoryList();
+    if (mindmapHistory.length > 0) {
+      // 随机挑选最多 2 份历史思维导图
+      const sampledMindmaps = [...mindmapHistory].sort(() => 0.5 - Math.random()).slice(0, 2);
+      for (const mm of sampledMindmaps) {
+        const shortTitle = trimTitle(mm.title, 9);
+        const focusNode = extractMindmapFocusNode(mm);
+        const phraseGen = pickRandom(MINDMAP_PHRASES);
+
+        candidatePool.push({
+          id: `nudge_mindmap_${mm.id}_${Date.now()}`,
+          source: 'mindmap',
+          tag: '地球Online · 脑图闪卡',
+          icon: 'mindmap',
+          message: phraseGen(shortTitle, focusNode),
+          targetAppId: 'files',
+          actionLabel: '看思维导图',
+          mindmapId: mm.id,
+          createdAt: Date.now(),
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[NudgeEngine] 检查历史思维导图失败:', err);
   }
 
   // 兜底候选项

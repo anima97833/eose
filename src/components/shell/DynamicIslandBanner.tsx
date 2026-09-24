@@ -11,6 +11,9 @@ import {
   Zap,
   Volume2,
   VolumeX,
+  ScrollText,
+  HelpCircle,
+  GitBranch,
 } from 'lucide-react';
 import { NudgeNotification } from '../../core/nudge/nudgeTypes';
 import { 
@@ -117,6 +120,18 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
       window.dispatchEvent(new CustomEvent('cloudfly_open_book_detail', { detail: { bookId: activeNudge.bookId } }));
     }
 
+    // 答案之书：通知直开历史抽屉
+    if (target === 'mood_fortune') {
+      sessionStorage.setItem('cloudfly_answers_open_history', 'true');
+      window.dispatchEvent(new CustomEvent('cloudfly_open_answers_history'));
+    }
+
+    // 文件-思维导图：暂存选中的导图文件 ID
+    if (target === 'files' && activeNudge.mindmapId) {
+      sessionStorage.setItem('cloudfly_mindmap_selected_id', activeNudge.mindmapId);
+      window.dispatchEvent(new CustomEvent('cloudfly_open_mindmap_detail', { detail: { mindmapId: activeNudge.mindmapId } }));
+    }
+
     stopIslandAudio();
     setIsSpeaking(false);
     setIsExpanded(false);
@@ -185,6 +200,12 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
         return <BookOpen size={16} color="#a855f7" />;
       case 'word':
         return <Zap size={16} color="#eab308" />;
+      case 'quest':
+        return <ScrollText size={16} color="#10b981" />;
+      case 'answers':
+        return <HelpCircle size={16} color="#f43f5e" />;
+      case 'mindmap':
+        return <GitBranch size={16} color="#06b6d4" />;
       default:
         return <Globe size={16} color="#a855f7" />;
     }
