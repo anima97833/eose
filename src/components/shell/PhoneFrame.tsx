@@ -2,13 +2,21 @@ import React from 'react';
 import { useViewport } from '../../hooks/useViewport';
 import { StatusBar } from './StatusBar';
 import { HomeBar } from './HomeBar';
+import { DynamicIslandBanner } from './DynamicIslandBanner';
 
 interface PhoneFrameProps {
   children: React.ReactNode;
   onHomeClick?: () => void;
+  isOnDesktop?: boolean;
+  onOpenApp?: (appId: string) => void;
 }
 
-export const PhoneFrame: React.FC<PhoneFrameProps> = ({ children, onHomeClick }) => {
+export const PhoneFrame: React.FC<PhoneFrameProps> = ({ 
+  children, 
+  onHomeClick,
+  isOnDesktop = true,
+  onOpenApp = () => {},
+}) => {
   const { isMobileScreen } = useViewport();
 
   // 1. 移动端真机（包含夸克/QQ/Via/Chrome等移动浏览器）：全屏沉浸贴合真实设备
@@ -25,6 +33,7 @@ export const PhoneFrame: React.FC<PhoneFrameProps> = ({ children, onHomeClick })
           overflow: 'hidden',
         }}
       >
+        <DynamicIslandBanner isOnDesktop={isOnDesktop} onOpenApp={onOpenApp} />
         <StatusBar isMobileScreen={true} />
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {children}
@@ -102,45 +111,8 @@ export const PhoneFrame: React.FC<PhoneFrameProps> = ({ children, onHomeClick })
           }}
         />
 
-        {/* 顶部听筒/灵动岛微孔 */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '12px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: '74px',
-            height: '18px',
-            backgroundColor: 'var(--nm-bg)',
-            borderRadius: '12px',
-            boxShadow: 'var(--nm-inset-sm)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 60,
-          }}
-        >
-          {/* 微型镜头与听筒孔 */}
-          <div
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: '#334257',
-              opacity: 0.35,
-              marginRight: '6px',
-            }}
-          />
-          <div
-            style={{
-              width: '32px',
-              height: '4px',
-              borderRadius: '2px',
-              backgroundColor: '#334257',
-              opacity: 0.25,
-            }}
-          />
-        </div>
+        {/* 顶部听筒/灵动岛微孔动态横幅 */}
+        <DynamicIslandBanner isOnDesktop={isOnDesktop} onOpenApp={onOpenApp} />
 
         {/* 屏幕内容区 */}
         <div

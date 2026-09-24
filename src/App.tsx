@@ -28,6 +28,8 @@ import { CalculatorApp } from './components/apps/calculator/CalculatorApp';
 import { PocketPadApp } from './components/apps/pocketpad/PocketPadApp';
 import { GachaponApp } from './components/apps/gachapon/GachaponApp';
 import { FilesApp } from './components/apps/files/FilesApp';
+import { PhotoAlbumApp } from './components/apps/camera/PhotoAlbumApp';
+import { DailyPosterModal } from './components/modals/DailyPosterModal';
 import { getCustomAppById } from './core/sdk/customAppRegistry';
 import { initIdleMasterDetector, checkLateNightActivity } from './core/quest/easterEggEngine';
 
@@ -64,7 +66,11 @@ export const App: React.FC = () => {
   const isCustomApp = activeApp ? !!getCustomAppById(activeApp) : false;
 
   return (
-    <PhoneFrame onHomeClick={handleHomeClick}>
+    <PhoneFrame
+      onHomeClick={handleHomeClick}
+      isOnDesktop={activeApp === null}
+      onOpenApp={handleOpenApp}
+    >
       {activeApp === null ? (
         <DesktopHome onOpenApp={handleOpenApp} />
       ) : (
@@ -135,6 +141,8 @@ export const App: React.FC = () => {
             <GachaponApp onBack={() => setActiveApp(null)} onOpenApp={(id) => setActiveApp(id)} />
           ) : activeApp === 'files' ? (
             <FilesApp onBack={() => setActiveApp(null)} onOpenApp={(id) => setActiveApp(id)} />
+          ) : activeApp === 'camera' || activeApp === 'album' || activeApp === 'photo' ? (
+            <PhotoAlbumApp onBack={() => setActiveApp(null)} />
           ) : isCustomApp ? (
             <CustomAppRunner
               appId={activeApp!}
@@ -145,6 +153,9 @@ export const App: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* 每日晨间今日海报开屏展映 (每天自动唤醒一次，支持翻转看备忘打勾) */}
+      <DailyPosterModal onOpenAlbum={() => setActiveApp('camera')} />
     </PhoneFrame>
   );
 };
