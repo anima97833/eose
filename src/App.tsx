@@ -28,6 +28,7 @@ import { PocketPadApp } from './components/apps/pocketpad/PocketPadApp';
 import { GachaponApp } from './components/apps/gachapon/GachaponApp';
 import { FilesApp } from './components/apps/files/FilesApp';
 import { PhotoAlbumApp } from './components/apps/camera/PhotoAlbumApp';
+import { StarryAssistantApp } from './components/apps/assistant/StarryAssistantApp';
 import { DailyPosterModal } from './components/modals/DailyPosterModal';
 import { getCustomAppById } from './core/sdk/customAppRegistry';
 import { initIdleMasterDetector, checkLateNightActivity } from './core/quest/easterEggEngine';
@@ -140,6 +141,11 @@ export const App: React.FC = () => {
             <FilesApp onBack={() => setActiveApp(null)} onOpenApp={(id) => setActiveApp(id)} />
           ) : activeApp === 'camera' || activeApp === 'album' || activeApp === 'photo' ? (
             <PhotoAlbumApp onBack={() => setActiveApp(null)} />
+          ) : activeApp === 'assistant' ? (
+            <StarryAssistantApp
+              onBack={() => setActiveApp(null)}
+              onOpenSettings={() => setActiveApp('settings')}
+            />
           ) : isCustomApp ? (
             <CustomAppRunner
               appId={activeApp!}
