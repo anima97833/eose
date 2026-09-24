@@ -9,6 +9,8 @@ import {
   Sparkles,
   Feather,
   Zap,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { NudgeNotification } from '../../core/nudge/nudgeTypes';
 import { 
@@ -16,6 +18,12 @@ import {
   markNudgeTriggered, 
   resetNudgeCooldown 
 } from '../../core/nudge/nudgeEngine';
+import {
+  isIslandSoundEnabled,
+  setIslandSoundEnabled,
+  speakIslandMessage,
+  stopIslandAudio,
+} from '../../core/nudge/islandAudioService';
 
 interface DynamicIslandBannerProps {
   isOnDesktop: boolean;
@@ -28,6 +36,8 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
 }) => {
   const [activeNudge, setActiveNudge] = useState<NudgeNotification | null>(null);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [isSoundOn, setIsSoundOn] = useState<boolean>(isIslandSoundEnabled());
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
 
   // 探测逻辑：停顿发呆时探测
   const triggerNudgeCheck = async (force = false) => {
@@ -37,6 +47,14 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
         setActiveNudge(nudge);
         setIsExpanded(true);
         markNudgeTriggered();
+
+        // 若语音开启，则自动播放当前幽默活人台词
+        if (isIslandSoundEnabled()) {
+          speakIslandMessage(nudge.message, {
+            onStart: () => setIsSpeaking(true),
+            onEnd: () => setIsSpeaking(false),
+          });
+        }
       }
     } catch (err) {
       console.warn('[DynamicIsland] 探测提醒失败:', err);
@@ -99,6 +117,8 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
       window.dispatchEvent(new CustomEvent('cloudfly_open_book_detail', { detail: { bookId: activeNudge.bookId } }));
     }
 
+    stopIslandAudio();
+    setIsSpeaking(false);
     setIsExpanded(false);
     setTimeout(() => {
       setActiveNudge(null);
@@ -109,10 +129,44 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
   // 关闭收起
   const handleDismiss = (e: React.MouseEvent) => {
     e.stopPropagation();
+    stopIslandAudio();
+    setIsSpeaking(false);
     setIsExpanded(false);
     setTimeout(() => {
       setActiveNudge(null);
     }, 350);
+  };
+
+  // 音量开关控制（支持即时朗读/重播与静音）
+  const handleToggleSound = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isSoundOn) {
+      // 开启声音并即刻朗读当前内容
+      setIsSoundOn(true);
+      setIslandSoundEnabled(true);
+      if (activeNudge?.message) {
+        speakIslandMessage(activeNudge.message, {
+          onStart: () => setIsSpeaking(true),
+          onEnd: () => setIsSpeaking(false),
+        });
+      }
+    } else {
+      if (isSpeaking) {
+        // 正在播放时点击：停止当前播放并静音
+        stopIslandAudio();
+        setIsSpeaking(false);
+        setIsSoundOn(false);
+        setIslandSoundEnabled(false);
+      } else {
+        // 未在播放时点击：重新播报一遍
+        if (activeNudge?.message) {
+          speakIslandMessage(activeNudge.message, {
+            onStart: () => setIsSpeaking(true),
+            onEnd: () => setIsSpeaking(false),
+          });
+        }
+      }
+    }
   };
 
   // 渲染图标
@@ -251,26 +305,56 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
                 </span>
               </div>
 
-              <button
-                type="button"
-                style={{
-                  border: 'none',
-                  background: 'rgba(255,255,255,0.08)',
-                  color: '#94a3b8',
-                  width: 22,
-                  height: 22,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
-                title="收起"
-                onClick={handleDismiss}
-              >
-                <X size={12} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {/* 语音播报 / 静音开关按钮 */}
+                <button
+                  type="button"
+                  style={{
+                    border: 'none',
+                    background: isSpeaking ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.08)',
+                    color: isSpeaking ? '#f59e0b' : isSoundOn ? '#cbd5e1' : '#64748b',
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: 0,
+                    transition: 'all 0.2s ease',
+                  }}
+                  title={isSoundOn ? (isSpeaking ? '正在播报（点击静音）' : '点击朗读/重播') : '已静音（点击开启声音）'}
+                  onClick={handleToggleSound}
+                >
+                  {isSoundOn ? (
+                    <Volume2 size={12} style={{ animation: isSpeaking ? 'pulse 1.2s infinite' : 'none' }} />
+                  ) : (
+                    <VolumeX size={12} />
+                  )}
+                </button>
+
+                {/* 关闭收起按钮 */}
+                <button
+                  type="button"
+                  style={{
+                    border: 'none',
+                    background: 'rgba(255,255,255,0.08)',
+                    color: '#94a3b8',
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                  title="收起"
+                  onClick={handleDismiss}
+                >
+                  <X size={12} />
+                </button>
+              </div>
             </div>
 
             {/* 中间核心文字：大字号两行自然展示，绝不截断 */}
