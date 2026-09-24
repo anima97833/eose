@@ -144,66 +144,84 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             style={{ display: 'none' }}
           />
 
+          {/* 双层轻拟物凹凸雕刻头像底座 */}
           <div
-            onClick={() => fileInputRef.current?.click()}
-            className="nm-card"
             style={{
-              width: '84px',
-              height: '84px',
+              width: '98px',
+              height: '98px',
               borderRadius: '50%',
+              backgroundColor: 'var(--nm-bg)',
+              boxShadow: 'var(--nm-inset)',
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              overflow: 'hidden',
-              cursor: 'pointer',
-              position: 'relative',
-              boxShadow: 'inset 2px 2px 5px rgba(166, 180, 200, 0.4), inset -2px -2px 5px rgba(255, 255, 255, 0.9)',
-              border: '2px solid rgba(255, 255, 255, 0.8)',
+              padding: '6px',
             }}
-            title="点击上传自定义头像"
           >
-            {avatar ? (
-              <>
-                <img
-                  src={avatar}
-                  alt="角色头像"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="nm-rebound-btn"
+              style={{
+                width: '84px',
+                height: '84px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--nm-bg)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                cursor: 'pointer',
+                position: 'relative',
+                boxShadow: 'var(--nm-convex-sm)',
+                border: '1.5px solid rgba(255, 255, 255, 0.85)',
+              }}
+              title="点击上传自定义头像"
+            >
+              {avatar ? (
+                <>
+                  <img
+                    src={avatar}
+                    alt="角色头像"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      backgroundColor: 'rgba(0,0,0,0.35)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: 0,
+                      transition: 'opacity 0.2s',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = '0')}
+                  >
+                    <Camera size={20} color="#ffffff" />
+                    <span style={{ fontSize: '10px', color: '#ffffff', marginTop: '2px', fontWeight: 700 }}>更换</span>
+                  </div>
+                </>
+              ) : (
                 <div
                   style={{
-                    position: 'absolute',
-                    inset: 0,
-                    backgroundColor: 'rgba(0,0,0,0.3)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    opacity: 0,
-                    transition: 'opacity 0.2s',
+                    color: 'var(--nm-primary)',
+                    gap: '4px',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '0')}
                 >
-                  <Camera size={20} color="#ffffff" />
-                  <span style={{ fontSize: '10px', color: '#ffffff', marginTop: '2px' }}>更换</span>
+                  <Camera size={24} strokeWidth={2.2} />
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--nm-text-sub)' }}>
+                    点击上传
+                  </span>
                 </div>
-              </>
-            ) : (
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--nm-text-sub)',
-                  gap: '4px',
-                }}
-              >
-                <Camera size={26} strokeWidth={1.8} />
-                <span style={{ fontSize: '10px', fontWeight: 600 }}>上传头像</span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div style={{ textAlign: 'center' }}>
