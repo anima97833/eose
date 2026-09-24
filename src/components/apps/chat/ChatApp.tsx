@@ -5,6 +5,7 @@ import { getStorage } from '../../../core/storage';
 import { ChatMessageItem } from '../../../types/chat';
 import { CharacterEditor } from './CharacterEditor';
 import { ChatConversation } from './ChatConversation';
+import { CharacterAvatar } from './CharacterAvatar';
 
 interface ChatAppProps {
   onBack: () => void;
@@ -166,21 +167,11 @@ export const ChatApp: React.FC<ChatAppProps> = ({ onBack, onOpenSettings }) => {
                     borderRadius: '16px',
                   }}
                 >
-                  <div
-                    className="nm-card-sm"
-                    style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '20px',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {char.avatar || '🌸'}
-                  </div>
+                  <CharacterAvatar
+                    avatar={char.avatar}
+                    name={char.name}
+                    size={42}
+                  />
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
@@ -265,21 +256,11 @@ export const ChatApp: React.FC<ChatAppProps> = ({ onBack, onOpenSettings }) => {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div
-                    className="nm-card-sm"
-                    style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '18px',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {char.avatar || '🌸'}
-                  </div>
+                  <CharacterAvatar
+                    avatar={char.avatar}
+                    name={char.name}
+                    size={38}
+                  />
 
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--nm-text-main)' }}>

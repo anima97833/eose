@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { CharacterProfile } from '../../../types/character';
+import { CharacterAvatar } from './CharacterAvatar';
 
 interface ChatPreferenceDrawerProps {
   isOpen: boolean;
@@ -107,27 +108,15 @@ export const ChatPreferenceDrawer: React.FC<ChatPreferenceDrawerProps> = ({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {character.avatar && (
-                <div
-                  style={{
-                    width: '26px',
-                    height: '26px',
-                    borderRadius: '50%',
-                    overflow: 'hidden',
-                    boxShadow: 'var(--nm-convex-xs)',
-                    border: '1px solid rgba(255, 255, 255, 0.8)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <img
-                    src={character.avatar}
-                    alt={character.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                </div>
-              )}
+              <CharacterAvatar
+                avatar={character.avatar}
+                name={character.name}
+                size={28}
+                style={{
+                  boxShadow: 'var(--nm-convex-xs)',
+                  border: '1px solid rgba(255, 255, 255, 0.85)',
+                }}
+              />
               <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--nm-text-main)' }}>
                 对话偏好与模型调优
               </span>

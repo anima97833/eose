@@ -7,6 +7,7 @@ import { createLLMAdapter } from '../../../core/llm';
 import { applyRegexScripts } from '../../../core/regex/regexEngine';
 import { CharacterHudWidget } from './CharacterHudWidget';
 import { ChatPreferenceDrawer } from './ChatPreferenceDrawer';
+import { CharacterAvatar } from './CharacterAvatar';
 
 interface ChatConversationProps {
   character: CharacterProfile;
@@ -289,21 +290,11 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
             >
               {/* 角色头像 */}
               {!isUser && (
-                <div
-                  className="nm-card-sm"
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '16px',
-                    flexShrink: 0,
-                  }}
-                >
-                  {character.avatar || '🌸'}
-                </div>
+                <CharacterAvatar
+                  avatar={character.avatar}
+                  name={character.name}
+                  size={36}
+                />
               )}
 
               {/* 气泡内容 */}
@@ -348,21 +339,11 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
         {/* 流式打字实时反馈 */}
         {isTyping && streamingText && (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-            <div
-              className="nm-card-sm"
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '16px',
-                flexShrink: 0,
-              }}
-            >
-              {character.avatar || '🌸'}
-            </div>
+            <CharacterAvatar
+              avatar={character.avatar}
+              name={character.name}
+              size={36}
+            />
             <div
               className="nm-card"
               style={{
@@ -386,21 +367,11 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
         {/* 等待打字三点脉冲 */}
         {isTyping && !streamingText && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div
-              className="nm-card-sm"
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '16px',
-                flexShrink: 0,
-              }}
-            >
-              {character.avatar || '🌸'}
-            </div>
+            <CharacterAvatar
+              avatar={character.avatar}
+              name={character.name}
+              size={36}
+            />
             <div
               className="nm-card-sm"
               style={{
