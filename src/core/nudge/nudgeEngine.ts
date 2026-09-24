@@ -12,7 +12,8 @@ import { StoryWordMistake } from '../storyword/storyWordTypes';
 
 const LAST_NUDGE_TIME_KEY = 'cloudfly_last_nudge_timestamp';
 const NEXT_INTERVAL_KEY = 'cloudfly_next_nudge_interval_ms';
-const NUDGE_ROTATION_IDX_KEY = 'cloudfly_nudge_rotation_idx';
+const LAST_NUDGE_SOURCE_KEY = 'cloudfly_last_nudge_source';
+const LAST_NUDGE_ID_KEY = 'cloudfly_last_nudge_id';
 
 /**
  * 获取随机冷却间隔（15 ~ 20 分钟）
@@ -78,9 +79,9 @@ function cleanVerseLine(line: string): string {
 }
 
 /**
- * 智能嗅探所有待提醒事项池，采用轮换交替机制 (Round-Robin)
+ * 智能嗅探所有待提醒事项池，采用【防重复·真随机开盲盒算法】
  * 涵盖：课程技能树、诗阁在背诗词、书藏在读/未读书目、爽文背词错题、番茄专注、日记手账
- * 即使上一项未完成/被忽视，下一次也会智能轮换弹别的！
+ * 真正的随机抽取，越随机越好；绝不连续抽中相同的大类！
  */
 export async function detectEarthOnlineNudge(force: boolean = false): Promise<NudgeNotification | null> {
   if (!force && !isCooldownPassed()) {
@@ -120,39 +121,41 @@ export async function detectEarthOnlineNudge(force: boolean = false): Promise<Nu
     console.warn('[NudgeEngine] 检查课程失败:', err);
   }
 
-  // 2. 嗅探诗阁：提取在背诗词，趣味诗句提问/接句
+  // 2. 嗅探诗阁：提取在背诗词，趣味诗句提问/接句 (注入多个不同候选诗)
   try {
     const poems: SavedPoemRecord[] = await loadAllSavedPoems();
     const learningPoems = poems.filter((p) => p.status === 'learning');
     const targetPoemPool = learningPoems.length > 0 ? learningPoems : poems;
 
     if (targetPoemPool.length > 0) {
-      // 随机选一首在背/诗库名篇
-      const poem = targetPoemPool[Math.floor(Math.random() * targetPoemPool.length)];
-      if (poem.content && poem.content.length > 0) {
-        // 挑选前两句中的一句
-        const verseIdx = Math.floor(Math.random() * Math.min(2, poem.content.length));
-        const rawVerse = poem.content[verseIdx] || poem.content[0];
-        const cleanVerse = cleanVerseLine(rawVerse);
+      // 随机挑出最多 3 首不同诗词加入候选池
+      const shuffledPoems = [...targetPoemPool].sort(() => 0.5 - Math.random()).slice(0, 3);
 
-        const poemPhrases = [
-          `“${cleanVerse}”——下联接得住吗？快回诗阁对一句！`,
-          `《${trimTitle(poem.title, 8)}》“${cleanVerse}”，下一句是什么来着？`,
-          `${poem.author || '文豪'}拍了拍你：“${cleanVerse}”，下半句可别卡壳呀！`,
-        ];
-        const msg = poemPhrases[Math.floor(Math.random() * poemPhrases.length)];
+      for (const poem of shuffledPoems) {
+        if (poem.content && poem.content.length > 0) {
+          const verseIdx = Math.floor(Math.random() * Math.min(2, poem.content.length));
+          const rawVerse = poem.content[verseIdx] || poem.content[0];
+          const cleanVerse = cleanVerseLine(rawVerse);
 
-        candidatePool.push({
-          id: `nudge_poetry_${poem.id}_${Date.now()}`,
-          source: 'poetry',
-          tag: '地球Online · 诗阁',
-          icon: 'poetry',
-          message: msg,
-          targetAppId: 'poetry',
-          actionLabel: '去对诗',
-          poemId: poem.id,
-          createdAt: Date.now(),
-        });
+          const poemPhrases = [
+            `“${cleanVerse}”——下联接得住吗？快回诗阁对一句！`,
+            `《${trimTitle(poem.title, 8)}》“${cleanVerse}”，下一句是什么来着？`,
+            `${poem.author || '文豪'}拍了拍你：“${cleanVerse}”，下半句可别卡壳呀！`,
+          ];
+          const msg = poemPhrases[Math.floor(Math.random() * poemPhrases.length)];
+
+          candidatePool.push({
+            id: `nudge_poetry_${poem.id}_${Date.now()}`,
+            source: 'poetry',
+            tag: '地球Online · 诗阁',
+            icon: 'poetry',
+            message: msg,
+            targetAppId: 'poetry',
+            actionLabel: '去对诗',
+            poemId: poem.id,
+            createdAt: Date.now(),
+          });
+        }
       }
     }
   } catch (err) {
@@ -165,9 +168,9 @@ export async function detectEarthOnlineNudge(force: boolean = false): Promise<Nu
     const readingBooks = books.filter((b) => b.status === 'reading');
     const unreadBooks = books.filter((b) => b.status === 'unread');
 
-    // 3.1 在读图书催读
-    if (readingBooks.length > 0) {
-      const book = readingBooks[Math.floor(Math.random() * readingBooks.length)];
+    // 3.1 在读图书催读（注入在读书目候选）
+    const sampledReading = [...readingBooks].sort(() => 0.5 - Math.random()).slice(0, 2);
+    for (const book of sampledReading) {
       const pct = book.pageCount > 0 ? Math.round((book.currentPage / book.pageCount) * 100) : 50;
       const remainingPages = Math.max(1, (book.pageCount || 200) - book.currentPage);
 
@@ -191,9 +194,9 @@ export async function detectEarthOnlineNudge(force: boolean = false): Promise<Nu
       });
     }
 
-    // 3.2 未读图书吃灰预警
-    if (unreadBooks.length > 0) {
-      const unreadBook = unreadBooks[Math.floor(Math.random() * unreadBooks.length)];
+    // 3.2 未读图书吃灰预警（注入未读书目候选）
+    const sampledUnread = [...unreadBooks].sort(() => 0.5 - Math.random()).slice(0, 2);
+    for (const unreadBook of sampledUnread) {
       const loc = unreadBook.physicalLocation ? `『${unreadBook.physicalLocation}』` : '书架上';
 
       const unreadPhrases = [
@@ -218,35 +221,36 @@ export async function detectEarthOnlineNudge(force: boolean = false): Promise<Nu
     console.warn('[NudgeEngine] 检查书藏失败:', err);
   }
 
-  // 4. 嗅探爽文背词：从错题阁中抽取高频生词冷不丁突击考你
+  // 4. 嗅探爽文背词：从错题阁中随机抽取多个高频生词进行突击
   try {
     const mistakes: StoryWordMistake[] = await loadMistakeWords();
     const unmastered = mistakes.filter((m) => !m.mastered);
 
     if (unmastered.length > 0) {
-      // 优先抽取背错次数较高的高频词
+      // 提取前 5 个高频生词并随机挑选出最多 3 个注入候选池
       const sorted = [...unmastered].sort((a, b) => (b.wrongCount || 1) - (a.wrongCount || 1));
-      const topCandidates = sorted.slice(0, Math.min(5, sorted.length));
-      const targetWord = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+      const topCandidates = sorted.slice(0, Math.min(5, sorted.length)).sort(() => 0.5 - Math.random()).slice(0, 3);
 
-      const wordPhrases = [
-        `【错词突袭】“${targetWord.word}”是什么意思还记得吗？错题阁里绊倒你 ${targetWord.wrongCount} 次了！`,
-        `昨晚背错的单词“${targetWord.word}”突然跳出，这次能秒懂它的中文释义吗？`,
-        `【考官挑衅】“${targetWord.word}”向你投来挑衅目光，点进来看看能不能一次拿下它！`,
-      ];
-      const msg = wordPhrases[Math.floor(Math.random() * wordPhrases.length)];
+      for (const targetWord of topCandidates) {
+        const wordPhrases = [
+          `【错词突袭】“${targetWord.word}”是什么意思还记得吗？错题阁里绊倒你 ${targetWord.wrongCount} 次了！`,
+          `昨晚背错的单词“${targetWord.word}”突然跳出，这次能秒懂它的中文释义吗？`,
+          `【考官挑衅】“${targetWord.word}”向你投来挑衅目光，点进来看看能不能一次拿下它！`,
+        ];
+        const msg = wordPhrases[Math.floor(Math.random() * wordPhrases.length)];
 
-      candidatePool.push({
-        id: `nudge_word_${targetWord.id}_${Date.now()}`,
-        source: 'word',
-        tag: '地球Online · 爽文背词',
-        icon: 'word',
-        message: msg,
-        targetAppId: 'storyword',
-        actionLabel: '去攻克',
-        word: targetWord.word,
-        createdAt: Date.now(),
-      });
+        candidatePool.push({
+          id: `nudge_word_${targetWord.id}_${Date.now()}`,
+          source: 'word',
+          tag: '地球Online · 爽文背词',
+          icon: 'word',
+          message: msg,
+          targetAppId: 'storyword',
+          actionLabel: '去攻克',
+          word: targetWord.word,
+          createdAt: Date.now(),
+        });
+      }
     }
   } catch (err) {
     console.warn('[NudgeEngine] 检查爽文背词错题失败:', err);
@@ -317,22 +321,33 @@ export async function detectEarthOnlineNudge(force: boolean = false): Promise<Nu
     });
   }
 
-  // 7. 轮换调度机制 (Round-Robin)
-  // 即使没完成或忽视，下一次也会智能挑选下一个，绝不卡在同一项！
-  let rotationIdx = 0;
-  try {
-    rotationIdx = parseInt(localStorage.getItem(NUDGE_ROTATION_IDX_KEY) || '0', 10);
-  } catch {
-    rotationIdx = 0;
+  // 7. 【防重复 · 真随机盲盒抽取算法】（越随机越好，充满开盲盒的不可预测性与惊喜感）
+  const lastSource = localStorage.getItem(LAST_NUDGE_SOURCE_KEY);
+  const lastId = localStorage.getItem(LAST_NUDGE_ID_KEY);
+
+  // 第一优先级防连抽：排除上一次刚出现过的应用大类（例如刚对完诗，下一次绝不会又是诗歌）
+  let poolForDraw = candidatePool.filter((item) => item.source !== lastSource);
+
+  // 如果排除大类后池子为空（比如用户当前仅有一类未完成项目），退回排除具体上一次的那条特定任务
+  if (poolForDraw.length === 0) {
+    poolForDraw = candidatePool.filter((item) => item.id !== lastId);
   }
 
-  const selectedNudge = candidatePool[rotationIdx % candidatePool.length];
+  // 兜底：若依然为空，使用全量候选池
+  if (poolForDraw.length === 0) {
+    poolForDraw = candidatePool;
+  }
 
-  // 指针步进，下一次自动弹出另一个不同任务
+  // 真正开盲盒随机抽取！
+  const randomIdx = Math.floor(Math.random() * poolForDraw.length);
+  const selectedNudge = poolForDraw[randomIdx];
+
+  // 记录本次抽中的类型与具体 ID，供下一次防连抽算法比对
   try {
-    localStorage.setItem(NUDGE_ROTATION_IDX_KEY, `${rotationIdx + 1}`);
+    localStorage.setItem(LAST_NUDGE_SOURCE_KEY, selectedNudge.source);
+    localStorage.setItem(LAST_NUDGE_ID_KEY, selectedNudge.id);
   } catch (err) {
-    console.warn('[NudgeEngine] 更新轮换指针失败:', err);
+    console.warn('[NudgeEngine] 记录盲盒抽取历史失败:', err);
   }
 
   return selectedNudge;
