@@ -1,27 +1,51 @@
 import { WishItem, GachaPalette, DEFAULT_GACHA_PALETTE, CapsuleColorKey } from './gachaTypes';
 import { loadRPGProfile, saveRPGProfile } from '../../../../core/rpg/rpgStorage';
+import { db } from '../../../../core/storage/db';
 
 const WISHES_STORAGE_KEY = 'gachapon_wishes_v1';
 const PALETTE_STORAGE_KEY = 'gachapon_palette_v1';
 
+let wishesCache: WishItem[] | null = null;
+
 export function loadWishes(): WishItem[] {
+  if (wishesCache !== null) return wishesCache;
   if (typeof window === 'undefined') return [];
+
+  // 1. 优先检查 LocalStorage 历史遗留数据并迁移
   try {
-    const raw = localStorage.getItem(WISHES_STORAGE_KEY);
+    const raw = localStorage.getItem(WISHES_STORAGE_KEY) || localStorage.getItem('cloudfly_gachapon_wishes_v1');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        wishesCache = parsed;
+        db.settings.put({ key: WISHES_STORAGE_KEY, data: parsed }).catch(console.warn);
+        localStorage.removeItem(WISHES_STORAGE_KEY);
+        localStorage.removeItem('cloudfly_gachapon_wishes_v1');
+        return parsed;
+      }
     }
   } catch (err) {
     console.warn('Failed to load gachapon wishes:', err);
   }
-  return [];
+
+  // 2. 异步从 IndexedDB 抓取
+  db.settings.get(WISHES_STORAGE_KEY).then((item) => {
+    if (item && Array.isArray(item.data)) {
+      wishesCache = item.data as WishItem[];
+    }
+  }).catch(console.warn);
+
+  wishesCache = [];
+  return wishesCache;
 }
 
 export function saveWishes(wishes: WishItem[]): void {
+  wishesCache = wishes;
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(WISHES_STORAGE_KEY, JSON.stringify(wishes));
+    db.settings.put({ key: WISHES_STORAGE_KEY, data: wishes }).catch(console.warn);
+    localStorage.removeItem(WISHES_STORAGE_KEY);
+    localStorage.removeItem('cloudfly_gachapon_wishes_v1');
   } catch (err) {
     console.warn('Failed to save gachapon wishes:', err);
   }

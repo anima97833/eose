@@ -16,6 +16,7 @@ import {
 import { VirtualFileRecord } from '../../../../core/files/fileTypes';
 import { updateFile, deleteItem } from '../../../../core/files/fileStorage';
 import { db } from '../../../../core/storage/db';
+import { addWish } from '../../gachapon/core/gachaStorage';
 
 interface FileViewerModalProps {
   file: VirtualFileRecord | null;
@@ -109,17 +110,7 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
   const handleLinkToGachapon = () => {
     try {
       const wishText = name.replace(/\.(md|txt)$/i, '');
-      const key = 'cloudfly_gachapon_wishes_v1';
-      const raw = localStorage.getItem(key);
-      const existing = raw ? JSON.parse(raw) : [];
-      const newWish = {
-        id: `wish_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        text: `阅读与复盘: ${wishText}`,
-        createdAt: Date.now(),
-        isCompleted: false,
-        isArchived: false,
-      };
-      localStorage.setItem(key, JSON.stringify([newWish, ...existing]));
+      addWish(`阅读与复盘: ${wishText}`, 'pink', '📖');
       setShowLinkMenu(false);
       showToast('已折成心愿小纸条装入「扭蛋机」🌸');
     } catch (err) {

@@ -66,21 +66,45 @@ export const DEFAULT_MOMENTS: MomentItem[] = [
   },
 ];
 
+let customThemesCache: string[] | null = null;
+
 /**
- * 获取自定义木标列表
+ * 获取自定义木标列表 (从 IndexedDB 内存缓存优先读取)
  */
 export function getCustomThemes(): string[] {
+  if (customThemesCache !== null) return customThemesCache;
   if (typeof window === 'undefined') return [];
+
+  // 1. 先检查 LocalStorage 遗留数据 (触发一键迁移)
   try {
-    const raw = localStorage.getItem(CUSTOM_THEMES_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const raw = localStorage.getItem(CUSTOM_THEMES_KEY) || localStorage.getItem('cloudfly_moments_custom_themes_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        customThemesCache = parsed;
+        db.settings.put({ key: 'cloudfly_moments_custom_themes_v1', data: parsed }).catch(console.warn);
+        localStorage.removeItem(CUSTOM_THEMES_KEY);
+        localStorage.removeItem('cloudfly_moments_custom_themes_v1');
+        return parsed;
+      }
+    }
   } catch {
-    return [];
+    // ignore
   }
+
+  // 2. 异步从 IndexedDB 加载
+  db.settings.get('cloudfly_moments_custom_themes_v1').then((item) => {
+    if (item && Array.isArray(item.data)) {
+      customThemesCache = item.data as string[];
+    }
+  }).catch(console.warn);
+
+  customThemesCache = [];
+  return customThemesCache;
 }
 
 /**
- * 保存自定义木标
+ * 保存自定义木标 (持久化至 IndexedDB 并清理 LocalStorage)
  */
 export function saveCustomTheme(theme: string): string[] {
   const trimmed = theme.trim().replace(/^#+|#+$/g, '');
@@ -88,19 +112,25 @@ export function saveCustomTheme(theme: string): string[] {
   const current = getCustomThemes();
   if (!current.includes(trimmed) && !PRESET_THEMES.includes(trimmed)) {
     const next = [...current, trimmed];
-    localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(next));
+    customThemesCache = next;
+    db.settings.put({ key: 'cloudfly_moments_custom_themes_v1', data: next }).catch(console.warn);
+    localStorage.removeItem(CUSTOM_THEMES_KEY);
+    localStorage.removeItem('cloudfly_moments_custom_themes_v1');
     return next;
   }
   return current;
 }
 
 /**
- * 删除自定义木标
+ * 删除自定义木标 (同步至 IndexedDB)
  */
 export function deleteCustomTheme(theme: string): string[] {
   const current = getCustomThemes();
   const next = current.filter((t) => t !== theme);
-  localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(next));
+  customThemesCache = next;
+  db.settings.put({ key: 'cloudfly_moments_custom_themes_v1', data: next }).catch(console.warn);
+  localStorage.removeItem(CUSTOM_THEMES_KEY);
+  localStorage.removeItem('cloudfly_moments_custom_themes_v1');
   return next;
 }
 

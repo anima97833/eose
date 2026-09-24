@@ -7,10 +7,14 @@ import {
   CourseReflectionRecord,
 } from './courseKanbanTypes';
 import { loadRPGProfile, saveRPGProfile, computeAttributeMax } from '../rpg/rpgStorage';
+import { db } from '../storage/db';
 
 const STORAGE_KEY = 'neumorphic_course_kanban_v1';
 const CUSTOM_REFLECTIONS_KEY = 'neumorphic_course_custom_reflections_v1';
 export const MAX_IN_PROGRESS_COURSES = 2; // WIP 正在学限制（最多2门）
+
+let coursesCache: Course[] | null = null;
+let reflectionsCache: CourseReflectionRecord[] | null = null;
 
 export const ATTR_TAG_INFO: Record<
   CourseAttributeTag,
@@ -129,29 +133,35 @@ const PRESET_COURSES: Course[] = [
 ];
 
 export function getAllCourses(): Course[] {
+  if (coursesCache !== null) return coursesCache;
   if (typeof window === 'undefined') return PRESET_COURSES;
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(PRESET_COURSES));
-      return PRESET_COURSES;
-    }
-    const parsed: Course[] = JSON.parse(raw);
-    // 兼容补全 attributeTag
-    let hasMigration = false;
-    for (const c of parsed) {
-      if (!c.attributeTag) {
-        c.attributeTag = 'INT';
-        hasMigration = true;
+    if (raw) {
+      const parsed: Course[] = JSON.parse(raw);
+      for (const c of parsed) {
+        if (!c.attributeTag) {
+          c.attributeTag = 'INT';
+        }
       }
+      coursesCache = parsed;
+      db.settings.put({ key: STORAGE_KEY, data: parsed }).catch(console.warn);
+      localStorage.removeItem(STORAGE_KEY);
+      return parsed;
     }
-    if (hasMigration) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-    }
-    return parsed;
   } catch {
-    return PRESET_COURSES;
+    // ignore
   }
+
+  db.settings.get(STORAGE_KEY).then((item) => {
+    if (item && Array.isArray(item.data)) {
+      coursesCache = item.data as Course[];
+    }
+  }).catch(console.warn);
+
+  coursesCache = PRESET_COURSES;
+  return coursesCache;
 }
 
 export function saveCourse(course: Course): void {
@@ -166,12 +176,16 @@ export function saveCourse(course: Course): void {
   } else {
     all.unshift(course);
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  coursesCache = all;
+  db.settings.put({ key: STORAGE_KEY, data: all }).catch(console.warn);
+  localStorage.removeItem(STORAGE_KEY);
 }
 
 export function deleteCourse(id: string): void {
   const all = getAllCourses().filter(c => c.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  coursesCache = all;
+  db.settings.put({ key: STORAGE_KEY, data: all }).catch(console.warn);
+  localStorage.removeItem(STORAGE_KEY);
 }
 
 /**
@@ -387,17 +401,30 @@ export function getAllCourseReflections(): CourseReflectionRecord[] {
     }
   }
 
-  // 拼接独立自留心得
-  if (typeof window !== 'undefined') {
+  // 拼接独立自留心得 (从 IndexedDB 内存缓存优先读取)
+  if (reflectionsCache === null && typeof window !== 'undefined') {
     try {
       const raw = localStorage.getItem(CUSTOM_REFLECTIONS_KEY);
       if (raw) {
-        const customList: CourseReflectionRecord[] = JSON.parse(raw);
-        list.push(...customList);
+        reflectionsCache = JSON.parse(raw);
+        db.settings.put({ key: CUSTOM_REFLECTIONS_KEY, data: reflectionsCache }).catch(console.warn);
+        localStorage.removeItem(CUSTOM_REFLECTIONS_KEY);
       }
     } catch (e) {
       console.warn(e);
     }
+    if (reflectionsCache === null) {
+      db.settings.get(CUSTOM_REFLECTIONS_KEY).then((item) => {
+        if (item && Array.isArray(item.data)) {
+          reflectionsCache = item.data as CourseReflectionRecord[];
+        }
+      }).catch(console.warn);
+      reflectionsCache = [];
+    }
+  }
+
+  if (reflectionsCache && reflectionsCache.length > 0) {
+    list.push(...reflectionsCache);
   }
 
   list.sort((a, b) => b.createdAt - a.createdAt);
@@ -405,7 +432,7 @@ export function getAllCourseReflections(): CourseReflectionRecord[] {
 }
 
 /**
- * 添加一条独立自留心得
+ * 添加一条独立自留心得 (持久化至 IndexedDB 并清理 LocalStorage)
  */
 export function addCustomCourseReflection(
   content: string,
@@ -421,39 +448,25 @@ export function addCustomCourseReflection(
     isCustom: true,
   };
 
-  if (typeof window !== 'undefined') {
-    try {
-      const raw = localStorage.getItem(CUSTOM_REFLECTIONS_KEY);
-      const list: CourseReflectionRecord[] = raw ? JSON.parse(raw) : [];
-      list.unshift(record);
-      localStorage.setItem(CUSTOM_REFLECTIONS_KEY, JSON.stringify(list));
-    } catch (e) {
-      console.warn(e);
-    }
-  }
+  reflectionsCache = [record, ...(reflectionsCache || [])];
+  db.settings.put({ key: CUSTOM_REFLECTIONS_KEY, data: reflectionsCache }).catch(console.warn);
+  localStorage.removeItem(CUSTOM_REFLECTIONS_KEY);
 
   return record;
 }
 
 /**
- * 删除一条自留心得
+ * 删除一条自留心得 (同步至 IndexedDB)
  */
 export function deleteCustomCourseReflection(id: string): void {
-  if (typeof window !== 'undefined') {
-    try {
-      const raw = localStorage.getItem(CUSTOM_REFLECTIONS_KEY);
-      if (raw) {
-        const list: CourseReflectionRecord[] = JSON.parse(raw);
-        const filtered = list.filter(r => r.id !== id);
-        localStorage.setItem(CUSTOM_REFLECTIONS_KEY, JSON.stringify(filtered));
-      }
-    } catch (e) {
-      console.warn(e);
-    }
-  }
+  reflectionsCache = (reflectionsCache || []).filter(r => r.id !== id);
+  db.settings.put({ key: CUSTOM_REFLECTIONS_KEY, data: reflectionsCache }).catch(console.warn);
+  localStorage.removeItem(CUSTOM_REFLECTIONS_KEY);
 }
 
 export function resetDefaultCourses(): Course[] {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(PRESET_COURSES));
+  coursesCache = PRESET_COURSES;
+  db.settings.put({ key: STORAGE_KEY, data: PRESET_COURSES }).catch(console.warn);
+  localStorage.removeItem(STORAGE_KEY);
   return PRESET_COURSES;
 }

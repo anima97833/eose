@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, BookOpen, Sparkles, ScrollText, X, RotateCcw } from 'lucide-react';
 import { NM } from '../storyword/storyWordNeumorphism';
+import { db } from '../../../core/storage/db';
 
 interface AnswerRecord {
   id: string;
@@ -84,16 +85,29 @@ export const BookOfAnswersApp: React.FC<BookOfAnswersAppProps> = ({ onBack }) =>
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // 读取本地历史手账
+  // 读取本地历史手账 (优先 IndexedDB，自动平滑迁移)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        setHistory(JSON.parse(raw));
+    const loadHistory = async () => {
+      try {
+        const item = await db.settings.get(STORAGE_KEY);
+        if (item && Array.isArray(item.data)) {
+          setHistory(item.data as AnswerRecord[]);
+          return;
+        }
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            setHistory(parsed);
+            await db.settings.put({ key: STORAGE_KEY, data: parsed });
+            localStorage.removeItem(STORAGE_KEY);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load answers history:', e);
       }
-    } catch (e) {
-      console.warn('Failed to load answers history:', e);
-    }
+    };
+    loadHistory();
   }, []);
 
   const showToast = (msg: string) => {
@@ -130,7 +144,7 @@ export const BookOfAnswersApp: React.FC<BookOfAnswersAppProps> = ({ onBack }) =>
       setIsFlipping(false);
       setIsRevealed(true);
 
-      // 保存至手账纪录
+      // 保存至手账纪录 (保存至 IndexedDB 并彻底清理 LocalStorage)
       const newRecord: AnswerRecord = {
         id: `ans_${Date.now()}`,
         question: finalQuestion,
@@ -142,11 +156,8 @@ export const BookOfAnswersApp: React.FC<BookOfAnswersAppProps> = ({ onBack }) =>
 
       const updatedHistory = [newRecord, ...history.slice(0, 24)];
       setHistory(updatedHistory);
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedHistory));
-      } catch (e) {
-        console.warn(e);
-      }
+      db.settings.put({ key: STORAGE_KEY, data: updatedHistory }).catch(console.warn);
+      localStorage.removeItem(STORAGE_KEY);
 
       showToast(`已翻开第 ${page} 页：${picked.cn}`);
     }, 450);
