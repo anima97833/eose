@@ -18,6 +18,7 @@ import {
   Upload,
   Palette,
   Sparkles,
+  Smartphone,
 } from 'lucide-react';
 import { ThemeStudioModal } from './components/ThemeStudioModal';
 import { LLMTestResult } from '../../../core/llm/types';
@@ -64,6 +65,39 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({ onBack }) => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const storage = getStorage();
+
+  // PWA 安装状态
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone) {
+      setIsStandalone(true);
+    }
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallPWA = async () => {
+    if (isStandalone) {
+      showNotification('当前已在独立 App 模式中运行！');
+      return;
+    }
+    if (installPrompt) {
+      installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        setIsStandalone(true);
+        setInstallPrompt(null);
+      }
+    } else {
+      showNotification('请在浏览器菜单点击“安装至主屏幕”或“添加到桌面”');
+    }
+  };
 
   useEffect(() => {
     storage.getSettings().then((stored) => {
@@ -912,6 +946,80 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({ onBack }) => {
               style={{ display: 'none' }}
             />
           </div>
+        </div>
+
+        {/* 关于「雀」与 PWA 渐进式应用 */}
+        <div
+          className="nm-card-sm"
+          style={{
+            padding: '14px 16px',
+            borderRadius: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            border: '1px solid rgba(119, 83, 166, 0.2)',
+            background: 'linear-gradient(135deg, rgba(119, 83, 166, 0.05) 0%, rgba(37, 99, 235, 0.05) 100%)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img
+              src="/que.png"
+              alt="雀"
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '11px',
+                boxShadow: 'var(--nm-convex-xs)',
+                objectFit: 'cover',
+              }}
+            />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: 'var(--nm-text-main)' }}>
+                  雀 · Que
+                </span>
+                <span
+                  style={{
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    color: '#7753A6',
+                    backgroundColor: 'rgba(119, 83, 166, 0.12)',
+                    padding: '1px 6px',
+                    borderRadius: '6px',
+                  }}
+                >
+                  PWA
+                </span>
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--nm-text-sub)' }}>
+                极简轻拟物个人拟物终端
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleInstallPWA}
+            className="nm-rebound-btn nm-card-sm"
+            style={{
+              padding: '6px 12px',
+              borderRadius: '10px',
+              border: 'none',
+              background: 'var(--nm-bg)',
+              boxShadow: 'var(--nm-convex-xs)',
+              color: '#7753A6',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+            title="安装为独立 PWA 应用"
+          >
+            <Smartphone size={13} />
+            <span>{isStandalone ? '已安装' : '安装应用'}</span>
+          </button>
         </div>
       </div>
 
