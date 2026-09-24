@@ -527,45 +527,7 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
               <TaskDropWidget />
             </div>
 
-            {/* 负一屏快捷指引卡片 */}
-            <div
-              style={{
-                padding: '12px 14px',
-                borderRadius: '20px',
-                backgroundColor: 'rgba(235, 240, 248, 0.75)',
-                boxShadow:
-                  'inset 2px 2px 6px rgba(160, 175, 195, 0.35), inset -2px -2px 6px rgba(255, 255, 255, 0.85)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginTop: '4px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '16px' }}>📱</span>
-                <span style={{ fontSize: '11px', color: 'var(--nm-text-sub)', fontWeight: 500 }}>
-                  向左轻滑进入应用主屏 (4×4 排列)
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCurrentPage(1)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: '14px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: '#5096C6',
-                  backgroundColor: 'var(--nm-bg)',
-                  border: '1px solid rgba(80, 150, 198, 0.3)',
-                  boxShadow:
-                    '3px 3px 8px rgba(160, 175, 195, 0.4), -3px -3px 8px rgba(255, 255, 255, 0.9)',
-                  cursor: 'pointer',
-                }}
-              >
-                去主屏 →
-              </button>
-            </div>
+
           </div>
 
           {/* ================= 页面 1..N：应用主屏幕 (每页最多 16 个应用，横 4 竖 4) ================= */}
