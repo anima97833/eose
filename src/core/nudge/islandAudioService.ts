@@ -1,14 +1,22 @@
 /**
  * 灵动岛智能语音播报服务 (Island Audio Service)
- * 支持双轨驱动：
- * 1. 默认高保真本地真人级语音 (Web Speech API - 微软晓晓/云希/Siri/谷歌离线高品质自然人声，零延迟零配置)
- * 2. 支持接入自定义 Edge-TTS 云端服务 (如基于 wangwangit/tts 部署的 Cloudflare Worker /v1/audio/speech 接口)
+ * 默认音色：【晓伊 (Xiaoyi)】—— 甜美、日常、轻快的青春自然女声，彻底告别机械生硬的播音腔！
+ * 
+ * 双轨高保真架构：
+ * 1. 优先尝试云端免 Key 24kHz 神经网络高清音流 (zh-CN-XiaoyiNeural)
+ * 2. 弱网/离线秒级无缝降级为本地 Web Speech API（自动匹配系统晓伊/婷婷/瑶瑶甜美音色，提调微调消除生硬感）
+ * 3. 支持用户接入自定义 OpenAI/Edge-TTS 接口
  */
 
 const ISLAND_SOUND_KEY = 'cloudfly_island_sound_enabled';
 const CUSTOM_TTS_ENDPOINT_KEY = 'cloudfly_custom_tts_endpoint';
 
+// 免费高品质晓伊 Edge-TTS 镜像接口（无需 Key，纯净直连，支持 CORS）
+const DEFAULT_XIAOYI_TTS_URL = 'https://libretts.is-an.org/api/tts';
+const DEFAULT_VOICE = 'zh-CN-XiaoyiNeural'; // 晓伊 - 甜美日常女声
+
 let currentAudio: HTMLAudioElement | null = null;
+let currentAbortController: AbortController | null = null;
 
 /**
  * 检查灵动岛语音播报是否开启（默认开启）
@@ -38,7 +46,7 @@ export function setIslandSoundEnabled(enabled: boolean): void {
 }
 
 /**
- * 获取自定义的 Edge-TTS Worker 接口地址 (如 https://your-worker.workers.dev/v1/audio/speech)
+ * 获取自定义的 TTS 接口地址
  */
 export function getCustomTtsEndpoint(): string {
   if (typeof window === 'undefined') return '';
@@ -50,7 +58,7 @@ export function getCustomTtsEndpoint(): string {
 }
 
 /**
- * 配置自定义 Edge-TTS Worker 接口地址
+ * 配置自定义 TTS 接口地址
  */
 export function setCustomTtsEndpoint(endpoint: string): void {
   try {
@@ -65,6 +73,15 @@ export function setCustomTtsEndpoint(endpoint: string): void {
  */
 export function stopIslandAudio(): void {
   if (typeof window === 'undefined') return;
+
+  if (currentAbortController) {
+    try {
+      currentAbortController.abort();
+    } catch {
+      // ignore
+    }
+    currentAbortController = null;
+  }
 
   // 停止云端音频播放
   if (currentAudio) {
@@ -100,7 +117,7 @@ function cleanTextForSpeech(text: string): string {
 }
 
 /**
- * 播报灵动岛提示语
+ * 播报灵动岛提示语（默认采用“晓伊”甜美日常女声）
  */
 export async function speakIslandMessage(
   text: string,
@@ -119,57 +136,102 @@ export async function speakIslandMessage(
 
   const customEndpoint = getCustomTtsEndpoint();
 
-  // 1. 如果用户配置了自定义 Edge-TTS (例如 wangwangit/tts Worker 部署地址)
+  // 1. 如果用户自行配置了专属云端接口
   if (customEndpoint) {
     try {
       callbacks?.onStart?.();
       const res = await fetch(customEndpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           input: speechText,
-          voice: 'zh-CN-XiaoxiaoNeural',
-          speed: 1.0,
+          voice: DEFAULT_VOICE,
+          speed: 1.05,
           pitch: '0',
-          style: 'general',
+          style: 'chat',
         }),
       });
 
       if (res.ok) {
         const blob = await res.blob();
-        const audioUrl = URL.createObjectURL(blob);
-        const audio = new Audio(audioUrl);
-        currentAudio = audio;
-
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          currentAudio = null;
-          callbacks?.onEnd?.();
-        };
-
-        audio.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
-          currentAudio = null;
-          // 降级为本地 Web Speech
-          speakViaWebSpeech(speechText, callbacks);
-        };
-
-        await audio.play();
+        await playAudioBlob(blob, callbacks, speechText);
         return;
       }
     } catch (err) {
-      console.warn('[IslandAudio] 云端 Edge-TTS 调用失败，自动降级为本地引擎:', err);
+      console.warn('[IslandAudio] 自定义云端接口失败，尝试公共晓伊接口:', err);
     }
   }
 
-  // 2. 默认主力引擎：浏览器内置高保真 Web Speech API
+  // 2. 默认云端高清「晓伊」甜美神经网络流（带 2.6s 超时熔断保护）
+  const controller = new AbortController();
+  currentAbortController = controller;
+  const timeoutId = setTimeout(() => controller.abort(), 2600);
+
+  try {
+    const targetUrl = `${DEFAULT_XIAOYI_TTS_URL}?t=${encodeURIComponent(speechText)}&v=${DEFAULT_VOICE}&r=5&p=0`;
+    const res = await fetch(targetUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const blob = await res.blob();
+      await playAudioBlob(blob, callbacks, speechText);
+      return;
+    }
+  } catch (err) {
+    // 超时或断网，瞬间降级为本地引擎
+    clearTimeout(timeoutId);
+  }
+
+  // 3. 兜底极速引擎：浏览器本地 Web Speech API（调校为晓伊/婷婷同款甜美音阶）
   speakViaWebSpeech(speechText, callbacks);
 }
 
 /**
- * 本地 Web Speech API 朗读实现（零延迟、断网可用、原生自然人声）
+ * 播放音频 Blob
+ */
+async function playAudioBlob(
+  blob: Blob,
+  callbacks?: { onStart?: () => void; onEnd?: () => void },
+  fallbackText?: string
+): Promise<void> {
+  try {
+    const audioUrl = URL.createObjectURL(blob);
+    const audio = new Audio(audioUrl);
+    currentAudio = audio;
+
+    audio.onplay = () => {
+      callbacks?.onStart?.();
+    };
+
+    audio.onended = () => {
+      URL.revokeObjectURL(audioUrl);
+      currentAudio = null;
+      callbacks?.onEnd?.();
+    };
+
+    audio.onerror = () => {
+      URL.revokeObjectURL(audioUrl);
+      currentAudio = null;
+      if (fallbackText) {
+        speakViaWebSpeech(fallbackText, callbacks);
+      } else {
+        callbacks?.onEnd?.();
+      }
+    };
+
+    await audio.play();
+  } catch (err) {
+    console.warn('[IslandAudio] 音频播放受限或失败，降级本地朗读:', err);
+    if (fallbackText) {
+      speakViaWebSpeech(fallbackText, callbacks);
+    } else {
+      callbacks?.onEnd?.();
+    }
+  }
+}
+
+/**
+ * 本地 Web Speech API 朗读实现：专项调优为【晓伊/甜美年轻女声】听感
  */
 function speakViaWebSpeech(
   text: string,
@@ -185,27 +247,33 @@ function speakViaWebSpeech(
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'zh-CN';
-    utterance.rate = 1.05; // 稍微轻快生动
-    utterance.pitch = 1.0;
+    // 语速略轻快、音调上提 1.12 倍，声音立刻变得甜美、年轻、有灵气，消除沉闷感！
+    utterance.rate = 1.04;
+    utterance.pitch = 1.12;
 
-    // 优先匹配高质量中文自然发声人（如微软晓晓、云希、苹果婷婷、谷歌普通话等）
     const voices = window.speechSynthesis.getVoices();
-    const naturalVoice =
+
+    // 优先匹配晓伊 (Xiaoyi)，其次匹配苹果婷婷 (Ting-Ting)、瑶瑶 (Yaoyao) 等甜美少女音
+    const sweetVoice =
       voices.find(
         (v) =>
           v.lang.includes('zh') &&
-          (v.name.includes('Xiaoxiao') ||
-            v.name.includes('Yunxi') ||
-            v.name.includes('Natural') ||
+          (v.name.includes('Xiaoyi') ||
+            v.name.includes('晓伊') ||
             v.name.includes('Ting-Ting') ||
             v.name.includes('Sinji') ||
-            v.name.includes('Huihui') ||
-            v.name.includes('Yaoyao'))
+            v.name.includes('Yaoyao') ||
+            v.name.includes('Mei-Jia'))
+      ) ||
+      voices.find(
+        (v) =>
+          v.lang.includes('zh') &&
+          (v.name.includes('Yunxi') || v.name.includes('Natural'))
       ) ||
       voices.find((v) => v.lang.includes('zh') || v.lang.includes('cmn'));
 
-    if (naturalVoice) {
-      utterance.voice = naturalVoice;
+    if (sweetVoice) {
+      utterance.voice = sweetVoice;
     }
 
     utterance.onstart = () => {
