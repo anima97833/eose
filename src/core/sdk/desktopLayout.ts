@@ -1,94 +1,145 @@
 import { listDesktopInstalledApps } from './appStoreCatalog';
 
-export type DesktopZone = 'page1' | 'page2' | 'dock';
+export const APPS_PER_PAGE = 16; // 每页最多 16 个应用 (横 4 竖 4)
+export const GRID_COLS = 4;      // 横四个
+export const GRID_ROWS = 4;      // 竖四个
+
+export type DesktopZone = string; // 'page_0' | 'page_1' | 'page_2' | 'dock' | legacy 'page1' | 'page2'
 
 export interface DesktopLayout {
+  pages: string[][]; // 每个元素为一个页面的应用 ID 数组，严格每页 <= 16
+  dock: string[];    // 底部常驻应用 (通常 4 个)
+  // 保持兼容字段，方便遗留代码访问
   page1: string[];
   page2: string[];
-  dock: string[];
 }
 
 const LAYOUT_STORAGE_KEY = 'neumorphic_phone_desktop_layout_v2';
 const ARCADE_INIT_PAGE2_KEY = 'neumorphic_arcade_initial_page2_v1';
 
-export const DEFAULT_PAGE1_APPS = ['phone', 'assistant', 'diary', 'profile', 'gachapon', 'memories'];
+// 默认首屏应用：精心排布的 16 个核心高频轻拟物应用 (4x4 铺满)
+export const DEFAULT_PAGE1_APPS = [
+  'phone', 'assistant', 'diary', 'profile',
+  'gachapon', 'memories', 'radio', 'storyword',
+  'books', 'poetry', 'calculator', 'pomodoro',
+  'cinema', 'games', 'memo', 'files'
+];
+
 export const DEFAULT_DOCK_APPS = ['chat', 'moments', 'checkphone', 'settings'];
+
+/**
+ * 重新平衡页面：确保每一页应用数量严格 <= 16
+ * 多出来的自动滚入下一页，移除尾部空页 (至少保留 1 页)
+ */
+export function rebalancePages(rawPages: string[][]): string[][] {
+  const allApps: string[] = [];
+  const seen = new Set<string>();
+
+  for (const page of rawPages) {
+    if (Array.isArray(page)) {
+      for (const appId of page) {
+        if (appId && !seen.has(appId)) {
+          seen.add(appId);
+          allApps.push(appId);
+        }
+      }
+    }
+  }
+
+  const packedPages: string[][] = [];
+  for (let i = 0; i < allApps.length; i += APPS_PER_PAGE) {
+    packedPages.push(allApps.slice(i, i + APPS_PER_PAGE));
+  }
+
+  if (packedPages.length === 0) {
+    packedPages.push([]);
+  }
+
+  return packedPages;
+}
+
+export function parseZone(zone: DesktopZone): { type: 'dock' } | { type: 'page'; pageIndex: number } {
+  if (zone === 'dock') return { type: 'dock' };
+  if (zone === 'page1' || zone === 'page_0') return { type: 'page', pageIndex: 0 };
+  if (zone === 'page2' || zone === 'page_1') return { type: 'page', pageIndex: 1 };
+  if (zone.startsWith('page_')) {
+    const idx = parseInt(zone.replace('page_', ''), 10);
+    return { type: 'page', pageIndex: isNaN(idx) ? 0 : idx };
+  }
+  return { type: 'page', pageIndex: 0 };
+}
 
 export function loadDesktopLayout(): DesktopLayout {
   const installedStoreApps = listDesktopInstalledApps();
   const installedStoreAppIds = installedStoreApps.map((a) => a.id);
+  const isAppValid = (id: string) => id === 'appstore' || installedStoreAppIds.includes(id);
 
-  // 默认第二页应用：除去在第一页和 dock 的所有已安装应用（默认初始包含 games 电玩）
+  // 默认第二页应用：除去在第一页和 dock 的所有已安装应用
   const initialPage2 = installedStoreAppIds.filter(
     (id) => !DEFAULT_PAGE1_APPS.includes(id) && !DEFAULT_DOCK_APPS.includes(id)
   );
 
-  if (typeof window === 'undefined') {
+  const buildDefault = (): DesktopLayout => {
+    const defaultPages = rebalancePages([[...DEFAULT_PAGE1_APPS], initialPage2]);
     return {
-      page1: [...DEFAULT_PAGE1_APPS],
-      page2: initialPage2,
+      pages: defaultPages,
       dock: [...DEFAULT_DOCK_APPS],
+      page1: defaultPages[0] || [],
+      page2: defaultPages[1] || [],
     };
+  };
+
+  if (typeof window === 'undefined') {
+    return buildDefault();
   }
 
   try {
     const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
     if (raw) {
-      const parsed: DesktopLayout = JSON.parse(raw);
-      if (Array.isArray(parsed.page1) && Array.isArray(parsed.page2) && Array.isArray(parsed.dock)) {
-        const allPresent = new Set([...parsed.page1, ...parsed.page2, ...parsed.dock]);
-        const missingFromStore = installedStoreAppIds.filter((id) => !allPresent.has(id));
-        
-        // 核心准则：除应用商店 (appstore) 之外，所有应用必须在已安装列表中才有效，否则一律从桌面移除！
-        const isAppValid = (id: string) => id === 'appstore' || installedStoreAppIds.includes(id);
+      const parsed = JSON.parse(raw);
+      let rawPages: string[][] = [];
 
-        let page1 = parsed.page1.filter(isAppValid);
-        let page2 = [...parsed.page2.filter(isAppValid), ...missingFromStore];
-        let dock = parsed.dock.filter(isAppValid);
-
-        let hasDiff =
-          page1.length !== parsed.page1.length ||
-          page2.length !== parsed.page2.length ||
-          dock.length !== parsed.dock.length ||
-          missingFromStore.length > 0;
-
-        // 初始规约：电玩应用默认初始放置于第二页；
-        // 若之前由于旧逻辑被强制推到了第一页，仅在初次迁移时纠正至第二页；
-        // 后续无论用户拖拽至第1页、第2页、还是Dock，均尊重用户改动并永久保持！
-        const hasMigrated = localStorage.getItem(ARCADE_INIT_PAGE2_KEY);
-        if (!hasMigrated) {
-          if (page1.includes('games')) {
-            page1 = page1.filter((id) => id !== 'games');
-            if (!page2.includes('games') && !dock.includes('games')) {
-              page2.push('games');
-            }
-            hasDiff = true;
-          }
-          localStorage.setItem(ARCADE_INIT_PAGE2_KEY, 'true');
-        }
-
-        const cleanLayout: DesktopLayout = {
-          page1,
-          page2,
-          dock,
-        };
-
-        if (hasDiff) {
-          saveDesktopLayout(cleanLayout);
-        }
-
-        return cleanLayout;
+      if (Array.isArray(parsed.pages)) {
+        rawPages = parsed.pages.map((p: any) => (Array.isArray(p) ? p.filter(isAppValid) : []));
+      } else if (Array.isArray(parsed.page1) || Array.isArray(parsed.page2)) {
+        const p1 = (parsed.page1 || []).filter(isAppValid);
+        const p2 = (parsed.page2 || []).filter(isAppValid);
+        rawPages = [p1, p2];
       }
+
+      const dock = Array.isArray(parsed.dock) ? parsed.dock.filter(isAppValid) : [...DEFAULT_DOCK_APPS];
+
+      // 检查是否有新安装但尚未编入桌面的应用
+      const allPresent = new Set<string>();
+      for (const p of rawPages) {
+        for (const id of p) allPresent.add(id);
+      }
+      for (const id of dock) allPresent.add(id);
+
+      const missingFromStore = installedStoreAppIds.filter((id) => !allPresent.has(id));
+      if (missingFromStore.length > 0) {
+        if (rawPages.length === 0) rawPages.push([]);
+        rawPages[rawPages.length - 1].push(...missingFromStore);
+      }
+
+      // 严格重新平衡：每页最多 16 个，多出的顺移至下一页
+      const pages = rebalancePages(rawPages);
+
+      const cleanLayout: DesktopLayout = {
+        pages,
+        dock,
+        page1: pages[0] || [],
+        page2: pages[1] || [],
+      };
+
+      saveDesktopLayout(cleanLayout);
+      return cleanLayout;
     }
-  } catch {
-    // ignore
+  } catch (err) {
+    console.warn('[DesktopLayout] 加载布局异常，重置默认:', err);
   }
 
-  const defaultLayout: DesktopLayout = {
-    page1: [...DEFAULT_PAGE1_APPS],
-    page2: initialPage2,
-    dock: [...DEFAULT_DOCK_APPS],
-  };
+  const defaultLayout = buildDefault();
   saveDesktopLayout(defaultLayout);
   return defaultLayout;
 }
@@ -96,6 +147,8 @@ export function loadDesktopLayout(): DesktopLayout {
 export function saveDesktopLayout(layout: DesktopLayout): void {
   if (typeof window === 'undefined') return;
   try {
+    layout.page1 = layout.pages[0] || [];
+    layout.page2 = layout.pages[1] || [];
     localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout));
     window.dispatchEvent(new CustomEvent('aiphone_layout_updated'));
   } catch {
@@ -110,51 +163,92 @@ export function moveDesktopApp(
   toIndex?: number
 ): DesktopLayout {
   const layout = loadDesktopLayout();
+  const pages = layout.pages.map((p) => [...p]);
+  let dock = [...layout.dock];
 
-  if (fromZone === toZone) {
-    // 同区域内调序
-    const list = [...layout[fromZone]];
-    const fromIndex = list.indexOf(appId);
-    if (fromIndex !== -1) {
-      list.splice(fromIndex, 1);
-      const insertAt =
-        typeof toIndex === 'number'
-          ? Math.max(0, Math.min(list.length, toIndex))
-          : list.length;
-      list.splice(insertAt, 0, appId);
-      layout[fromZone] = list;
-    }
+  // 1. 从源位置移除
+  const from = parseZone(fromZone);
+  if (from.type === 'dock') {
+    dock = dock.filter((id) => id !== appId);
   } else {
-    // 跨区域移动（例如 Page 2 -> Page 1 或 Page 2 -> Dock 等）
-    layout[fromZone] = layout[fromZone].filter((id) => id !== appId);
-    const targetList = [...layout[toZone]];
-    const insertAt =
-      typeof toIndex === 'number'
-        ? Math.max(0, Math.min(targetList.length, toIndex))
-        : targetList.length;
-    targetList.splice(insertAt, 0, appId);
-    layout[toZone] = targetList;
+    if (pages[from.pageIndex]) {
+      pages[from.pageIndex] = pages[from.pageIndex].filter((id) => id !== appId);
+    }
+  }
+  for (let i = 0; i < pages.length; i++) {
+    pages[i] = pages[i].filter((id) => id !== appId);
+  }
+  dock = dock.filter((id) => id !== appId);
+
+  // 2. 插入到目标位置
+  const to = parseZone(toZone);
+  if (to.type === 'dock') {
+    const insertAt = typeof toIndex === 'number' ? Math.max(0, Math.min(dock.length, toIndex)) : dock.length;
+    dock.splice(insertAt, 0, appId);
+  } else {
+    while (pages.length <= to.pageIndex) {
+      pages.push([]);
+    }
+    const targetPage = pages[to.pageIndex];
+    const insertAt = typeof toIndex === 'number' ? Math.max(0, Math.min(targetPage.length, toIndex)) : targetPage.length;
+    targetPage.splice(insertAt, 0, appId);
+
+    // 级联溢出检测：如果当前页超过 16 个，第 17 个自动滚入下一页
+    for (let p = to.pageIndex; p < pages.length; p++) {
+      if (pages[p].length > APPS_PER_PAGE) {
+        const overflow = pages[p].splice(APPS_PER_PAGE);
+        if (p + 1 < pages.length) {
+          pages[p + 1].unshift(...overflow);
+        } else {
+          pages.push([...overflow]);
+        }
+      }
+    }
   }
 
-  saveDesktopLayout(layout);
-  return layout;
+  // 3. 整理页面结构 (剔除尾部空页，至少保留 1 页)
+  while (pages.length > 1 && pages[pages.length - 1].length === 0) {
+    pages.pop();
+  }
+
+  const newLayout: DesktopLayout = {
+    pages,
+    dock,
+    page1: pages[0] || [],
+    page2: pages[1] || [],
+  };
+
+  saveDesktopLayout(newLayout);
+  return newLayout;
 }
 
 export function removeAppFromDesktopLayout(appId: string): void {
   if (appId === 'appstore') return;
   const layout = loadDesktopLayout();
-  layout.page1 = layout.page1.filter((id) => id !== appId);
-  layout.page2 = layout.page2.filter((id) => id !== appId);
   layout.dock = layout.dock.filter((id) => id !== appId);
+  layout.pages = layout.pages.map((p) => p.filter((id) => id !== appId));
+  while (layout.pages.length > 1 && layout.pages[layout.pages.length - 1].length === 0) {
+    layout.pages.pop();
+  }
   saveDesktopLayout(layout);
 }
 
 export function addAppToDesktopLayout(appId: string): void {
   const layout = loadDesktopLayout();
-  const all = new Set([...layout.page1, ...layout.page2, ...layout.dock]);
-  if (!all.has(appId)) {
-    layout.page2.push(appId);
-    saveDesktopLayout(layout);
-  }
-}
+  const allPresent = new Set([...layout.pages.flat(), ...layout.dock]);
+  if (allPresent.has(appId)) return;
 
+  // 优先存入首个未满 16 个应用的页面
+  let added = false;
+  for (const page of layout.pages) {
+    if (page.length < APPS_PER_PAGE) {
+      page.push(appId);
+      added = true;
+      break;
+    }
+  }
+  if (!added) {
+    layout.pages.push([appId]);
+  }
+  saveDesktopLayout(layout);
+}

@@ -483,17 +483,33 @@ export function installAppToDesktop(appId: string): void {
   target.isInstalled = true;
   saveStoreCatalog(all);
 
-  // 同步添加至桌面第2页布局
+  // 同步添加至桌面布局（严格每页最多 16 个应用，多出的流入下一页）
   if (typeof window !== 'undefined') {
     const LAYOUT_KEY = 'neumorphic_phone_desktop_layout_v2';
     try {
       const raw = localStorage.getItem(LAYOUT_KEY);
       if (raw) {
         const layout = JSON.parse(raw);
-        const present = new Set([...(layout.page1 || []), ...(layout.page2 || []), ...(layout.dock || [])]);
+        const pages: string[][] = Array.isArray(layout.pages)
+          ? layout.pages
+          : [layout.page1 || [], layout.page2 || []];
+        const dock: string[] = Array.isArray(layout.dock) ? layout.dock : [];
+        const present = new Set([...pages.flat(), ...dock]);
         if (!present.has(appId)) {
-          layout.page2 = layout.page2 || [];
-          layout.page2.push(appId);
+          let placed = false;
+          for (const page of pages) {
+            if (page.length < 16) {
+              page.push(appId);
+              placed = true;
+              break;
+            }
+          }
+          if (!placed) {
+            pages.push([appId]);
+          }
+          layout.pages = pages;
+          layout.page1 = pages[0] || [];
+          layout.page2 = pages[1] || [];
           localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
           window.dispatchEvent(new CustomEvent('aiphone_layout_updated'));
         }
@@ -541,9 +557,19 @@ export function uninstallAppFromDesktop(appId: string): void {
       const raw = localStorage.getItem(LAYOUT_KEY);
       if (raw) {
         const layout = JSON.parse(raw);
+        if (Array.isArray(layout.pages)) {
+          layout.pages = layout.pages.map((p: string[]) => p.filter((id: string) => id !== appId));
+          while (layout.pages.length > 1 && layout.pages[layout.pages.length - 1].length === 0) {
+            layout.pages.pop();
+          }
+        }
         layout.page1 = (layout.page1 || []).filter((id: string) => id !== appId);
         layout.page2 = (layout.page2 || []).filter((id: string) => id !== appId);
         layout.dock = (layout.dock || []).filter((id: string) => id !== appId);
+        if (Array.isArray(layout.pages)) {
+          layout.page1 = layout.pages[0] || [];
+          layout.page2 = layout.pages[1] || [];
+        }
         localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
         window.dispatchEvent(new CustomEvent('aiphone_layout_updated'));
       }

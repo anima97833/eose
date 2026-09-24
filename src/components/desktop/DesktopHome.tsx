@@ -5,16 +5,16 @@ import { TaskDropWidget } from './widgets/TaskDropWidget';
 import { HoroscopeWidget } from './widgets/HoroscopeWidget';
 import { HoroscopeModal } from './widgets/HoroscopeModal';
 import { HoroscopeData } from '../../core/horoscope/horoscopeService';
-import { DesktopPage2 } from './DesktopPage2';
 import {
   loadDesktopLayout,
   moveDesktopApp,
   DesktopZone,
   DesktopLayout,
+  APPS_PER_PAGE,
 } from '../../core/sdk/desktopLayout';
 import { getAppIcon, getAppHasBadge, getAppTitle } from './desktopIconHelper';
 import { uninstallAppFromDesktop, listStoreCatalog } from '../../core/sdk/appStoreCatalog';
-import { ArrowLeft, ArrowRight, Anchor, LogOut, Trash2, X, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Anchor, LogOut, Trash2, X, Check, Sparkles } from 'lucide-react';
 
 interface DesktopHomeProps {
   onOpenApp?: (appId: string) => void;
@@ -37,7 +37,8 @@ interface HoverTarget {
 
 export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
   const [layout, setLayout] = useState<DesktopLayout>(loadDesktopLayout());
-  const [currentPage, setCurrentPage] = useState<number>(0);
+  // 默认启动停留在主屏幕第 1 页 (Slide 1，对应 layout.pages[0])；向右滑为负一屏小组件 (Slide 0)
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [dragOffset, setDragOffset] = useState<number>(0);
   const [isPageSwiping, setIsPageSwiping] = useState<boolean>(false);
 
@@ -49,12 +50,12 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
   const [managingAppId, setManagingAppId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // 今日星轨运势弹窗状态（顶层挂载，避免受 200% transform 切页视窗裁剪）
+  // 今日星轨运势弹窗状态
   const [activeHoroscopeData, setActiveHoroscopeData] = useState<HoroscopeData | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
-  const page1GridRef = useRef<HTMLDivElement>(null);
+  const pageGridsRef = useRef<Map<number, HTMLDivElement>>(new Map());
 
   // 边缘停留自动切页计时器
   const edgeTimerRef = useRef<number | null>(null);
@@ -87,6 +88,9 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
     onOpenApp?.(appId);
   };
 
+  // 总滑屏数 = 1 (负一屏) + 主屏幕页面数 (layout.pages)
+  const totalSlides = 1 + Math.max(1, layout.pages.length);
+
   // ================= 边缘自动切页检测 =================
   const checkEdgeAutoFlip = useCallback(
     (clientX: number) => {
@@ -94,86 +98,79 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
       const rect = containerRef.current.getBoundingClientRect();
       const edgeThreshold = 42;
 
-      // 在第二页靠近左边 -> 自动切到第一页
-      if (currentPage === 1 && clientX <= rect.left + edgeThreshold) {
+      // 靠近左边边缘 -> 自动翻向上一页
+      if (currentPage > 0 && clientX <= rect.left + edgeThreshold) {
         if (edgeDirectionRef.current !== 'left') {
           edgeDirectionRef.current = 'left';
           if (edgeTimerRef.current) clearTimeout(edgeTimerRef.current);
           edgeTimerRef.current = window.setTimeout(() => {
-            setCurrentPage(0);
+            setCurrentPage((prev) => Math.max(0, prev - 1));
             edgeDirectionRef.current = null;
           }, 320);
         }
         return;
       }
 
-      // 在第一页靠近右边 -> 自动切到第二页
-      if (currentPage === 0 && clientX >= rect.right - edgeThreshold) {
+      // 靠近右边边缘 -> 自动翻向下一页
+      if (currentPage < totalSlides - 1 && clientX >= rect.right - edgeThreshold) {
         if (edgeDirectionRef.current !== 'right') {
           edgeDirectionRef.current = 'right';
           if (edgeTimerRef.current) clearTimeout(edgeTimerRef.current);
           edgeTimerRef.current = window.setTimeout(() => {
-            setCurrentPage(1);
+            setCurrentPage((prev) => Math.min(totalSlides - 1, prev + 1));
             edgeDirectionRef.current = null;
           }, 320);
         }
         return;
       }
 
-      // 离开边缘区域，清除计时
       if (edgeTimerRef.current) {
         clearTimeout(edgeTimerRef.current);
         edgeTimerRef.current = null;
       }
       edgeDirectionRef.current = null;
     },
-    [currentPage]
+    [currentPage, totalSlides]
   );
 
-  // ================= 跨区域碰撞检测 =================
+  // ================= 计算拖拽落点目标 =================
   const computeHoverTarget = useCallback(
     (clientX: number, clientY: number): HoverTarget | null => {
-      // 1. 优先检测是否悬停在底部 Dock 栏
+      // 1. 检测是否悬停在底部常驻 Dock 栏
       if (dockRef.current) {
         const dRect = dockRef.current.getBoundingClientRect();
         if (
-          clientY >= dRect.top - 20 &&
-          clientY <= dRect.bottom + 25 &&
-          clientX >= dRect.left - 15 &&
-          clientX <= dRect.right + 15
+          clientX >= dRect.left - 10 &&
+          clientX <= dRect.right + 10 &&
+          clientY >= dRect.top - 15 &&
+          clientY <= dRect.bottom + 15
         ) {
-          const relativeX = clientX - dRect.left;
-          const dockCount = layout.dock.length;
-          const slotWidth = dRect.width / Math.max(1, dockCount + 1);
-          const index = Math.max(0, Math.min(dockCount, Math.floor(relativeX / slotWidth)));
+          const colWidth = dRect.width / Math.max(1, layout.dock.length);
+          const index = Math.max(
+            0,
+            Math.min(layout.dock.length, Math.floor((clientX - dRect.left) / colWidth))
+          );
           return { zone: 'dock', index };
         }
       }
 
-      // 2. 检测当前桌面页面（Page 1 或 Page 2）
-      const currentZone: DesktopZone = currentPage === 0 ? 'page1' : 'page2';
-      const appCount = layout[currentZone].length;
+      // 2. 检测当前应用主屏幕 (Slide 1..N 对应 page_0, page_1...)
+      const pageIndex = Math.max(0, currentPage - 1);
+      const gridEl = pageGridsRef.current.get(pageIndex);
+      const zoneName = `page_${pageIndex}`;
+      const pageApps = layout.pages[pageIndex] || [];
+      const appCount = pageApps.length;
 
-      if (currentPage === 0 && page1GridRef.current) {
-        const gRect = page1GridRef.current.getBoundingClientRect();
+      if (gridEl) {
+        const gRect = gridEl.getBoundingClientRect();
         const colWidth = gRect.width / 4;
         const col = Math.max(0, Math.min(3, Math.floor((clientX - gRect.left) / colWidth)));
-        const row = Math.max(0, Math.floor((clientY - gRect.top) / 78));
-        const index = Math.max(0, Math.min(appCount, row * 4 + col));
-        return { zone: 'page1', index };
+        const row = Math.max(0, Math.min(3, Math.floor((clientY - gRect.top) / 82)));
+        const index = Math.max(0, Math.min(Math.min(APPS_PER_PAGE - 1, appCount), row * 4 + col));
+        return { zone: zoneName, index };
       }
 
-      if (currentPage === 1 && containerRef.current) {
-        const cRect = containerRef.current.getBoundingClientRect();
-        const colWidth = cRect.width / 4;
-        const col = Math.max(0, Math.min(3, Math.floor((clientX - cRect.left) / colWidth)));
-        // 第二页顶部无组件，约从 20px 开始
-        const row = Math.max(0, Math.floor((clientY - cRect.top - 20) / 78));
-        const index = Math.max(0, Math.min(appCount, row * 4 + col));
-        return { zone: 'page2', index };
-      }
-
-      return { zone: currentZone, index: appCount };
+      return { zone: zoneName, index: appCount };
     },
     [currentPage, layout]
   );
@@ -240,9 +237,7 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
         const targetName =
           finalTarget.zone === 'dock'
             ? '底部Dock栏'
-            : finalTarget.zone === 'page1'
-            ? '主屏幕第1页'
-            : '第2页';
+            : `主屏幕第 ${parseInt(finalTarget.zone.replace('page_', '') || '0', 10) + 1} 页`;
         showToast(`已移动到 ${targetName}`);
       }
 
@@ -256,7 +251,6 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
 
   // ================= 空白处壁纸横滑翻页手势 =================
   const handleBackgroundPointerDown = (e: React.PointerEvent) => {
-    // 仅在未拖拽应用时生效
     if (dragSession) return;
     swipeStartXRef.current = e.clientX;
     swipeStartYRef.current = e.clientY;
@@ -280,7 +274,8 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
 
     if (isHorizontalSwipeRef.current) {
       let offset = deltaX;
-      if ((currentPage === 0 && deltaX > 0) || (currentPage === 1 && deltaX < 0)) {
+      // 边界阻尼回弹
+      if ((currentPage === 0 && deltaX > 0) || (currentPage === totalSlides - 1 && deltaX < 0)) {
         offset = deltaX * 0.28;
       }
       setDragOffset(offset);
@@ -292,10 +287,10 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
 
     if (isHorizontalSwipeRef.current) {
       const threshold = 40;
-      if (currentPage === 0 && dragOffset < -threshold) {
-        setCurrentPage(1);
-      } else if (currentPage === 1 && dragOffset > threshold) {
-        setCurrentPage(0);
+      if (dragOffset < -threshold && currentPage < totalSlides - 1) {
+        setCurrentPage((prev) => Math.min(totalSlides - 1, prev + 1));
+      } else if (dragOffset > threshold && currentPage > 0) {
+        setCurrentPage((prev) => Math.max(0, prev - 1));
       }
     }
 
@@ -307,11 +302,19 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
   // ================= 快捷管理菜单操作 =================
   const handleMoveToZone = (targetZone: DesktopZone) => {
     if (!managingAppId) return;
-    const fromZone: DesktopZone = layout.page1.includes(managingAppId)
-      ? 'page1'
-      : layout.dock.includes(managingAppId)
-      ? 'dock'
-      : 'page2';
+
+    // 寻找当前所在区域
+    let fromZone: DesktopZone = 'page_0';
+    if (layout.dock.includes(managingAppId)) {
+      fromZone = 'dock';
+    } else {
+      for (let i = 0; i < layout.pages.length; i++) {
+        if (layout.pages[i].includes(managingAppId)) {
+          fromZone = `page_${i}`;
+          break;
+        }
+      }
+    }
 
     if (fromZone === targetZone) {
       setManagingAppId(null);
@@ -323,8 +326,10 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
     setManagingAppId(null);
 
     const targetName =
-      targetZone === 'dock' ? '底部Dock栏' : targetZone === 'page1' ? '第1页' : '第2页';
-    showToast(`已成功移动到 ${targetName}`);
+      targetZone === 'dock'
+        ? '底部Dock栏'
+        : `主屏幕第 ${parseInt(targetZone.replace('page_', '') || '0', 10) + 1} 页`;
+    showToast(`已移动到 ${targetName}`);
   };
 
   const handleUninstallApp = (appId: string) => {
@@ -334,19 +339,16 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
     showToast('已回收到应用商店');
   };
 
-  const managingItemStore = managingAppId
-    ? listStoreCatalog().find((i) => i.id === managingAppId)
-    : null;
-  // 按照设计：除了应用商店 (appstore) 之外，所有应用均可自由卸载和安装
   const isManagingSystemApp = managingAppId === 'appstore';
 
-  const managingAppZone: DesktopZone | null = managingAppId
-    ? layout.page1.includes(managingAppId)
-      ? 'page1'
-      : layout.dock.includes(managingAppId)
-      ? 'dock'
-      : 'page2'
-    : null;
+  const managingAppZone: DesktopZone | null = (() => {
+    if (!managingAppId) return null;
+    if (layout.dock.includes(managingAppId)) return 'dock';
+    for (let i = 0; i < layout.pages.length; i++) {
+      if (layout.pages[i].includes(managingAppId)) return `page_${i}`;
+    }
+    return null;
+  })();
 
   return (
     <div
@@ -395,9 +397,9 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
       {/* 跨页拖拽边缘指引提示 */}
       {dragSession && (
         <>
-          {currentPage === 1 && (
+          {currentPage > 0 && (
             <div
-              onClick={() => setCurrentPage(0)}
+              onClick={() => setCurrentPage((prev) => Math.max(0, prev - 1))}
               style={{
                 position: 'absolute',
                 left: '6px',
@@ -420,13 +422,15 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
               }}
             >
               <ArrowLeft size={16} />
-              <span style={{ writingMode: 'vertical-lr', letterSpacing: '2px' }}>移至第1页</span>
+              <span style={{ writingMode: 'vertical-lr', letterSpacing: '2px' }}>
+                {currentPage === 1 ? '小组件' : `第 ${currentPage - 1} 页`}
+              </span>
             </div>
           )}
 
-          {currentPage === 0 && (
+          {currentPage < totalSlides - 1 && (
             <div
-              onClick={() => setCurrentPage(1)}
+              onClick={() => setCurrentPage((prev) => Math.min(totalSlides - 1, prev + 1))}
               style={{
                 position: 'absolute',
                 right: '6px',
@@ -449,7 +453,9 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
               }}
             >
               <ArrowRight size={16} />
-              <span style={{ writingMode: 'vertical-lr', letterSpacing: '2px' }}>移至第2页</span>
+              <span style={{ writingMode: 'vertical-lr', letterSpacing: '2px' }}>
+                {`第 ${currentPage + 1} 页`}
+              </span>
             </div>
           )}
         </>
@@ -473,24 +479,25 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
         <div
           style={{
             display: 'flex',
-            width: '200%',
+            width: `${totalSlides * 100}%`,
             height: '100%',
-            transform: `translate3d(calc(-${currentPage * 50}% + ${dragOffset}px), 0, 0)`,
+            transform: `translate3d(calc(-${currentPage * (100 / totalSlides)}% + ${dragOffset}px), 0, 0)`,
             transition: isPageSwiping
               ? 'none'
               : 'transform 0.38s cubic-bezier(0.25, 1, 0.5, 1)',
           }}
         >
-          {/* ================= 页面 1：主桌面 ================= */}
+          {/* ================= 页面 0：负一屏 (小组件看板) ================= */}
           <div
             style={{
-              width: '50%',
+              width: `${100 / totalSlides}%`,
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              padding: '2px 2px',
+              padding: '2px 2px 6px',
               boxSizing: 'border-box',
+              overflowY: 'auto',
             }}
           >
             {/* 1. 顶部日期看板 */}
@@ -513,215 +520,253 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
               <TaskDropWidget />
             </div>
 
-            {/* 4. 第一页应用图标区：支持自由跨区增减与拖拽调序 */}
+            {/* 负一屏快捷指引卡片 */}
             <div
-              ref={page1GridRef}
               style={{
-                padding: '4px 4px 6px',
-                minHeight: '80px',
-                maxHeight: '170px',
-                overflowY: 'auto',
+                padding: '12px 14px',
+                borderRadius: '20px',
+                backgroundColor: 'rgba(235, 240, 248, 0.75)',
+                boxShadow:
+                  'inset 2px 2px 6px rgba(160, 175, 195, 0.35), inset -2px -2px 6px rgba(255, 255, 255, 0.85)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginTop: '4px',
               }}
             >
-              <div
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>📱</span>
+                <span style={{ fontSize: '11px', color: 'var(--nm-text-sub)', fontWeight: 500 }}>
+                  向左轻滑进入应用主屏 (4×4 排列)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCurrentPage(1)}
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(4, 1fr)',
-                  columnGap: '8px',
-                  rowGap: '14px',
-                  width: '100%',
+                  padding: '5px 12px',
+                  borderRadius: '14px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#5096C6',
+                  backgroundColor: 'var(--nm-bg)',
+                  border: '1px solid rgba(80, 150, 198, 0.3)',
+                  boxShadow:
+                    '3px 3px 8px rgba(160, 175, 195, 0.4), -3px -3px 8px rgba(255, 255, 255, 0.9)',
+                  cursor: 'pointer',
                 }}
               >
-                {layout.page1.map((appId, index) => {
-                  const isBeingDragged = dragSession?.appId === appId;
-                  const isDropSlot =
-                    hoverTarget?.zone === 'page1' &&
-                    hoverTarget.index === index &&
-                    !isBeingDragged;
-                  const hasBadge = getAppHasBadge(appId);
-                  const title = getAppTitle(appId);
+                去主屏 →
+              </button>
+            </div>
+          </div>
 
-                  return (
-                    <div
-                      key={appId}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        position: 'relative',
-                        minHeight: '74px',
-                      }}
-                    >
-                      {/* 插槽吸附指示器 */}
-                      {isDropSlot && (
+          {/* ================= 页面 1..N：应用主屏幕 (每页最多 16 个应用，横 4 竖 4) ================= */}
+          {layout.pages.map((pageApps, pageIdx) => {
+            const zoneName = `page_${pageIdx}`;
+
+            return (
+              <div
+                key={zoneName}
+                style={{
+                  width: `${100 / totalSlides}%`,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'flex-start',
+                  padding: '8px 2px 2px',
+                  boxSizing: 'border-box',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* 4x4 网格：横四个，竖四个，最多 16 个应用位，无垂直滚动条 */}
+                <div
+                  ref={(el) => {
+                    if (el) pageGridsRef.current.set(pageIdx, el);
+                    else pageGridsRef.current.delete(pageIdx);
+                  }}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4, 1fr)',
+                    gridTemplateRows: 'repeat(4, minmax(74px, 86px))',
+                    columnGap: '8px',
+                    rowGap: '16px',
+                    width: '100%',
+                    alignContent: 'start',
+                  }}
+                >
+                  {pageApps.map((appId, index) => {
+                    const isBeingDragged = dragSession?.appId === appId;
+                    const isDropSlot =
+                      hoverTarget?.zone === zoneName &&
+                      hoverTarget.index === index &&
+                      !isBeingDragged;
+                    const hasBadge = getAppHasBadge(appId);
+                    const title = getAppTitle(appId);
+
+                    return (
+                      <div
+                        key={appId}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          minHeight: '74px',
+                        }}
+                      >
+                        {/* 插槽吸附指示器 */}
+                        {isDropSlot && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '-3px',
+                              width: '52px',
+                              height: '52px',
+                              borderRadius: '50%',
+                              border: '2px dashed #5096C6',
+                              backgroundColor: 'rgba(80, 150, 198, 0.12)',
+                              boxShadow:
+                                'inset 3px 3px 8px rgba(160, 175, 195, 0.4), inset -3px -3px 8px rgba(255, 255, 255, 0.9)',
+                              zIndex: 2,
+                              pointerEvents: 'none',
+                            }}
+                          />
+                        )}
+
+                        <div
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            let moved = false;
+                            const sx = e.clientX;
+                            const sy = e.clientY;
+
+                            const lpTimer = setTimeout(() => {
+                              if (!moved) setManagingAppId(appId);
+                            }, 420);
+
+                            const onMove = (me: PointerEvent) => {
+                              if (Math.hypot(me.clientX - sx, me.clientY - sy) > 5) {
+                                moved = true;
+                                clearTimeout(lpTimer);
+                                window.removeEventListener('pointermove', onMove);
+                                window.removeEventListener('pointerup', onUp);
+                                handleStartDrag(appId, zoneName, index, e);
+                              }
+                            };
+
+                            const onUp = (ue: PointerEvent) => {
+                              clearTimeout(lpTimer);
+                              window.removeEventListener('pointermove', onMove);
+                              window.removeEventListener('pointerup', onUp);
+                              if (!moved && Math.hypot(ue.clientX - sx, ue.clientY - sy) <= 5) {
+                                handleAppClick(appId);
+                              }
+                            };
+
+                            window.addEventListener('pointermove', onMove);
+                            window.addEventListener('pointerup', onUp);
+                          }}
+                          style={{
+                            width: '52px',
+                            height: '52px',
+                            borderRadius: '50%',
+                            backgroundColor: 'var(--nm-bg)',
+                            border: '1px solid rgba(255, 255, 255, 0.55)',
+                            boxShadow: isBeingDragged
+                              ? 'inset 4px 4px 10px rgba(150, 170, 195, 0.8), inset -4px -4px 10px rgba(255, 255, 255, 0.98)'
+                              : '5px 5px 12px rgba(160, 175, 195, 0.52), -5px -5px 12px rgba(255, 255, 255, 0.96)',
+                            color: isBeingDragged ? '#5096C6' : '#475971',
+                            opacity: isBeingDragged ? 0.35 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            transform: isBeingDragged ? 'scale(0.92)' : 'scale(1)',
+                            transition: 'transform 0.15s ease, opacity 0.15s ease',
+                            touchAction: 'none',
+                          }}
+                        >
+                          {getAppIcon(appId, 24)}
+                          {hasBadge && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: '3px',
+                                right: '3px',
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                backgroundColor: 'var(--nm-accent-red)',
+                                boxShadow: '0 0 6px var(--nm-accent-red)',
+                              }}
+                            />
+                          )}
+                        </div>
+
+                        <span
+                          style={{
+                            marginTop: '4px',
+                            fontSize: '11px',
+                            color: 'var(--nm-text-sub)',
+                            textAlign: 'center',
+                            width: '100%',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          {title}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {/* 页面尾部吸附槽位 */}
+                  {hoverTarget?.zone === zoneName &&
+                    hoverTarget.index >= pageApps.length &&
+                    pageApps.length < APPS_PER_PAGE && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: '74px',
+                        }}
+                      >
                         <div
                           style={{
-                            position: 'absolute',
-                            top: '-3px',
                             width: '52px',
                             height: '52px',
                             borderRadius: '50%',
                             border: '2px dashed #5096C6',
-                            backgroundColor: 'rgba(80, 150, 198, 0.12)',
-                            boxShadow:
-                              'inset 3px 3px 8px rgba(160, 175, 195, 0.4), inset -3px -3px 8px rgba(255, 255, 255, 0.9)',
-                            zIndex: 2,
-                            pointerEvents: 'none',
+                            backgroundColor: 'rgba(80, 150, 198, 0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#5096C6',
+                            fontSize: '16px',
                           }}
-                        />
-                      )}
-
-                      <div
-                        onPointerDown={(e) => {
-                          e.stopPropagation();
-                          let moved = false;
-                          const sx = e.clientX;
-                          const sy = e.clientY;
-
-                          const lpTimer = setTimeout(() => {
-                            if (!moved) setManagingAppId(appId);
-                          }, 420);
-
-                          const onMove = (me: PointerEvent) => {
-                            if (Math.hypot(me.clientX - sx, me.clientY - sy) > 5) {
-                              moved = true;
-                              clearTimeout(lpTimer);
-                              window.removeEventListener('pointermove', onMove);
-                              window.removeEventListener('pointerup', onUp);
-                              handleStartDrag(appId, 'page1', index, e);
-                            }
-                          };
-
-                          const onUp = (ue: PointerEvent) => {
-                            clearTimeout(lpTimer);
-                            window.removeEventListener('pointermove', onMove);
-                            window.removeEventListener('pointerup', onUp);
-                            if (!moved && Math.hypot(ue.clientX - sx, ue.clientY - sy) <= 5) {
-                              handleAppClick(appId);
-                            }
-                          };
-
-                          window.addEventListener('pointermove', onMove);
-                          window.addEventListener('pointerup', onUp);
-                        }}
-                        style={{
-                          width: '52px',
-                          height: '52px',
-                          borderRadius: '50%',
-                          backgroundColor: 'var(--nm-bg)',
-                          border: '1px solid rgba(255, 255, 255, 0.55)',
-                          boxShadow: isBeingDragged
-                            ? 'inset 4px 4px 10px rgba(150, 170, 195, 0.8), inset -4px -4px 10px rgba(255, 255, 255, 0.98)'
-                            : '5px 5px 12px rgba(160, 175, 195, 0.52), -5px -5px 12px rgba(255, 255, 255, 0.96)',
-                          color: isBeingDragged ? '#5096C6' : '#475971',
-                          opacity: isBeingDragged ? 0.35 : 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          position: 'relative',
-                          transform: isBeingDragged ? 'scale(0.92)' : 'scale(1)',
-                          transition: 'transform 0.15s ease, opacity 0.15s ease',
-                          touchAction: 'none',
-                        }}
-                      >
-                        {getAppIcon(appId, 24)}
-                        {hasBadge && (
-                          <span
-                            style={{
-                              position: 'absolute',
-                              top: '3px',
-                              right: '3px',
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '50%',
-                              backgroundColor: 'var(--nm-accent-red)',
-                              boxShadow: '0 0 6px var(--nm-accent-red)',
-                            }}
-                          />
-                        )}
+                        >
+                          +
+                        </div>
+                        <span style={{ marginTop: '4px', fontSize: '11px', color: '#5096C6' }}>
+                          放置此处
+                        </span>
                       </div>
-
-                      <span
-                        style={{
-                          marginTop: '4px',
-                          fontSize: '11px',
-                          color: 'var(--nm-text-sub)',
-                          textAlign: 'center',
-                          width: '100%',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          pointerEvents: 'none',
-                        }}
-                      >
-                        {title}
-                      </span>
-                    </div>
-                  );
-                })}
-
-                {/* 页面1尾部吸附槽位 */}
-                {hoverTarget?.zone === 'page1' &&
-                  hoverTarget.index >= layout.page1.length && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        minHeight: '74px',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: '52px',
-                          height: '52px',
-                          borderRadius: '50%',
-                          border: '2px dashed #5096C6',
-                          backgroundColor: 'rgba(80, 150, 198, 0.15)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#5096C6',
-                          fontSize: '16px',
-                        }}
-                      >
-                        +
-                      </div>
-                      <span style={{ marginTop: '4px', fontSize: '11px', color: '#5096C6' }}>
-                        放置此处
-                      </span>
-                    </div>
-                  )}
+                    )}
+                </div>
               </div>
-            </div>
-          </div>
-
-          {/* ================= 页面 2：扩展应用网格 ================= */}
-          <div
-            style={{
-              width: '50%',
-              height: '100%',
-              padding: '2px 2px',
-              boxSizing: 'border-box',
-            }}
-          >
-            <DesktopPage2
-              appIds={layout.page2}
-              draggedAppId={dragSession?.appId ?? null}
-              hoverIndex={hoverTarget?.zone === 'page2' ? hoverTarget.index : null}
-              isHoverZone={hoverTarget?.zone === 'page2'}
-              onOpenApp={handleAppClick}
-              onStartDrag={(id, idx, e) => handleStartDrag(id, 'page2', idx, e)}
-              onManageApp={(id) => setManagingAppId(id)}
-            />
-          </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* 桌面分页胶囊指示器 */}
+      {/* 桌面分页指示器 */}
       <div
         style={{
           display: 'flex',
@@ -731,12 +776,13 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
           padding: '6px 0 4px',
         }}
       >
+        {/* 负一屏指示器 (小组件卡片) */}
         <button
           type="button"
           onClick={() => setCurrentPage(0)}
           style={{
-            width: currentPage === 0 ? '18px' : '6px',
             height: '6px',
+            width: currentPage === 0 ? '16px' : '6px',
             borderRadius: '3px',
             backgroundColor:
               currentPage === 0 ? 'var(--nm-primary)' : 'rgba(166, 180, 200, 0.45)',
@@ -748,27 +794,36 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
             padding: 0,
             transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
           }}
-          title="第 1 页"
+          title="负一屏小组件"
         />
-        <button
-          type="button"
-          onClick={() => setCurrentPage(1)}
-          style={{
-            width: currentPage === 1 ? '18px' : '6px',
-            height: '6px',
-            borderRadius: '3px',
-            backgroundColor:
-              currentPage === 1 ? 'var(--nm-primary)' : 'rgba(166, 180, 200, 0.45)',
-            boxShadow:
-              currentPage === 1 ? '0 0 6px rgba(80, 150, 198, 0.5)' : 'none',
-            border: 'none',
-            outline: 'none',
-            cursor: 'pointer',
-            padding: 0,
-            transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          }}
-          title="第 2 页"
-        />
+
+        {/* 各主屏应用页面指示器 */}
+        {layout.pages.map((_, pIdx) => {
+          const slideIdx = pIdx + 1;
+          const isActive = currentPage === slideIdx;
+          return (
+            <button
+              key={`dot_${pIdx}`}
+              type="button"
+              onClick={() => setCurrentPage(slideIdx)}
+              style={{
+                width: isActive ? '18px' : '6px',
+                height: '6px',
+                borderRadius: '3px',
+                backgroundColor:
+                  isActive ? 'var(--nm-primary)' : 'rgba(166, 180, 200, 0.45)',
+                boxShadow:
+                  isActive ? '0 0 6px rgba(80, 150, 198, 0.5)' : 'none',
+                border: 'none',
+                outline: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              }}
+              title={`主屏幕第 ${pIdx + 1} 页`}
+            />
+          );
+        })}
       </div>
 
       {/* ================= 底部核心 Dock 栏：支持直接将图标拖入/拖出 ================= */}
@@ -1009,9 +1064,7 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
                   当前位于：
                   {managingAppZone === 'dock'
                     ? '底部Dock栏'
-                    : managingAppZone === 'page1'
-                    ? '主屏幕第1页'
-                    : '第2页'}
+                    : `主屏幕第 ${parseInt(managingAppZone?.replace('page_', '') || '0', 10) + 1} 页`}
                 </div>
               </div>
               <button
@@ -1031,32 +1084,39 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
 
             {/* 调度操作按钮组 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {managingAppZone !== 'page1' && (
-                <button
-                  type="button"
-                  onClick={() => handleMoveToZone('page1')}
-                  className="nm-btn"
-                  style={{
-                    padding: '11px 14px',
-                    borderRadius: '16px',
-                    fontSize: '13px',
-                    color: 'var(--nm-text)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    justifyContent: 'flex-start',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <ArrowLeft size={16} color="#5096C6" />
-                  <span>移动至主屏幕第 1 页</span>
-                </button>
-              )}
+              {/* 各主屏页面调度选项 */}
+              {layout.pages.map((_, pIdx) => {
+                const targetZone = `page_${pIdx}`;
+                if (managingAppZone === targetZone) return null;
+                return (
+                  <button
+                    key={`move_to_p_${pIdx}`}
+                    type="button"
+                    onClick={() => handleMoveToZone(targetZone)}
+                    className="nm-btn"
+                    style={{
+                      padding: '11px 14px',
+                      borderRadius: '16px',
+                      fontSize: '13px',
+                      color: 'var(--nm-text)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      justifyContent: 'flex-start',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <ArrowRight size={16} color="#5096C6" />
+                    <span>移动至主屏幕第 {pIdx + 1} 页</span>
+                  </button>
+                );
+              })}
 
-              {managingAppZone !== 'page2' && (
+              {/* 如果所有现有主屏页面均已满 16 个，提供新建下一页按钮 */}
+              {layout.pages.every((p) => p.length >= APPS_PER_PAGE) && (
                 <button
                   type="button"
-                  onClick={() => handleMoveToZone('page2')}
+                  onClick={() => handleMoveToZone(`page_${layout.pages.length}`)}
                   className="nm-btn"
                   style={{
                     padding: '11px 14px',
@@ -1071,7 +1131,7 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
                   }}
                 >
                   <ArrowRight size={16} color="#5096C6" />
-                  <span>移动至第 2 页</span>
+                  <span>创建并移动至新第 {layout.pages.length + 1} 页</span>
                 </button>
               )}
 
@@ -1100,7 +1160,9 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
               {managingAppZone === 'dock' && (
                 <button
                   type="button"
-                  onClick={() => handleMoveToZone(currentPage === 0 ? 'page1' : 'page2')}
+                  onClick={() =>
+                    handleMoveToZone(currentPage === 0 ? 'page_0' : `page_${currentPage - 1}`)
+                  }
                   className="nm-btn"
                   style={{
                     padding: '11px 14px',
@@ -1128,16 +1190,18 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
                     padding: '11px 14px',
                     borderRadius: '16px',
                     fontSize: '13px',
-                    color: 'var(--nm-accent-red)',
+                    color: '#E0564C',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
                     justifyContent: 'flex-start',
                     cursor: 'pointer',
+                    backgroundColor: 'rgba(235, 87, 87, 0.08)',
+                    border: '1px solid rgba(235, 87, 87, 0.25)',
                   }}
                 >
-                  <Trash2 size={16} color="var(--nm-accent-red)" />
-                  <span>卸载并回收到应用商店</span>
+                  <Trash2 size={16} color="#E0564C" />
+                  <span>回收到应用商店 (卸载)</span>
                 </button>
               )}
             </div>
@@ -1145,7 +1209,7 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
         </div>
       )}
 
-      {/* 今日星轨运势手账弹窗 (脱离 200% 滑动视窗，居中贴合手机屏幕) */}
+      {/* 今日星轨运势弹窗 */}
       {activeHoroscopeData && (
         <HoroscopeModal
           data={activeHoroscopeData}
