@@ -6,6 +6,7 @@ import { getStorage } from '../../../core/storage';
 import { createLLMAdapter } from '../../../core/llm';
 import { applyRegexScripts } from '../../../core/regex/regexEngine';
 import { CharacterHudWidget } from './CharacterHudWidget';
+import { ChatPreferenceDrawer } from './ChatPreferenceDrawer';
 
 interface ChatConversationProps {
   character: CharacterProfile;
@@ -25,6 +26,7 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [streamingText, setStreamingText] = useState<string>('');
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
+  const [isPreferenceOpen, setIsPreferenceOpen] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const storage = getStorage();
@@ -198,13 +200,13 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
           </span>
         </div>
 
-        {/* 角色人设卡快捷编辑入口 */}
+        {/* 对话偏好与模型调优设置抽屉入口 (图1) */}
         <button
           type="button"
-          onClick={() => onOpenPersona(character)}
+          onClick={() => setIsPreferenceOpen(true)}
           className="nm-rebound-btn nm-btn-circle"
           style={{ width: '38px', height: '38px', color: customTheme?.accentColor || 'var(--nm-primary)' }}
-          title="查看/编辑人设卡"
+          title="对话偏好与模型调优设置"
         >
           <UserCheck size={18} strokeWidth={2.2} />
         </button>
@@ -463,6 +465,13 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
           <Send size={16} strokeWidth={2.5} style={{ marginLeft: '2px' }} />
         </button>
       </div>
+
+      {/* 底部滑出的轻拟物对话偏好设置卡片 (参考图2~5) */}
+      <ChatPreferenceDrawer
+        isOpen={isPreferenceOpen}
+        onClose={() => setIsPreferenceOpen(false)}
+        character={character}
+      />
     </div>
   );
 };

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Check, Trash2 } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { ArrowLeft, Check, Trash2, Camera, Upload } from 'lucide-react';
 import { CharacterProfile } from '../../../types/character';
 
 interface CharacterEditorProps {
@@ -9,8 +9,6 @@ interface CharacterEditorProps {
   onBack: () => void;
 }
 
-const AVATAR_OPTIONS = ['🌸', '☕', '🐱', '🌙', '🎨', '🌿', '🦊', '⚡', '🧸', '✨'];
-
 export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   initialCharacter,
   onSave,
@@ -18,14 +16,35 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   onBack,
 }) => {
   const isEditing = Boolean(initialCharacter);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState<string>(initialCharacter?.name || '');
-  const [avatar, setAvatar] = useState<string>(initialCharacter?.avatar || '🌸');
+  const [avatar, setAvatar] = useState<string>(initialCharacter?.avatar || '');
   const [title, setTitle] = useState<string>(initialCharacter?.title || '');
   const [persona, setPersona] = useState<string>(initialCharacter?.persona || '');
   const [tone, setTone] = useState<string>(initialCharacter?.tone || '');
   const [wakeTime, setWakeTime] = useState<string>(initialCharacter?.wakeTime || '08:00');
   const [sleepTime, setSleepTime] = useState<string>(initialCharacter?.sleepTime || '23:30');
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('请选择有效的图片文件！');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        setAvatar(dataUrl);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const handleSave = () => {
     if (!name.trim()) {
@@ -36,7 +55,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
     const savedChar: CharacterProfile = {
       id: initialCharacter?.id || `char_${Date.now()}`,
       name: name.trim(),
-      avatar,
+      avatar: avatar.trim(),
       title: title.trim(),
       persona: persona.trim(),
       tone: tone.trim(),
@@ -106,57 +125,112 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
         }}
         className="no-scrollbar"
       >
-        {/* 头像选择 */}
+        {/* 自定义头像上传区 (移除预设头像，允许用户自主上传保存到 IndexedDB) */}
         <div
           className="nm-card-sm"
           style={{
-            padding: '12px 14px',
+            padding: '16px 14px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '8px',
+            gap: '10px',
           }}
         >
-          {/* 当前大头像环 */}
-          <div
-            className="nm-card"
-            style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '28px',
-            }}
-          >
-            {avatar}
-          </div>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            style={{ display: 'none' }}
+          />
 
           <div
+            onClick={() => fileInputRef.current?.click()}
+            className="nm-card"
             style={{
+              width: '84px',
+              height: '84px',
+              borderRadius: '50%',
               display: 'flex',
-              flexWrap: 'wrap',
+              flexDirection: 'column',
+              alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
-              marginTop: '4px',
+              overflow: 'hidden',
+              cursor: 'pointer',
+              position: 'relative',
+              boxShadow: 'inset 2px 2px 5px rgba(166, 180, 200, 0.4), inset -2px -2px 5px rgba(255, 255, 255, 0.9)',
+              border: '2px solid rgba(255, 255, 255, 0.8)',
             }}
+            title="点击上传自定义头像"
           >
-            {AVATAR_OPTIONS.map((av) => (
-              <button
-                key={av}
-                type="button"
-                onClick={() => setAvatar(av)}
-                className={`nm-rebound-btn nm-btn-circle ${avatar === av ? 'active' : ''}`}
+            {avatar ? (
+              <>
+                <img
+                  src={avatar}
+                  alt="角色头像"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    backgroundColor: 'rgba(0,0,0,0.3)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: 0,
+                    transition: 'opacity 0.2s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '0')}
+                >
+                  <Camera size={20} color="#ffffff" />
+                  <span style={{ fontSize: '10px', color: '#ffffff', marginTop: '2px' }}>更换</span>
+                </div>
+              </>
+            ) : (
+              <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  fontSize: '15px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--nm-text-sub)',
+                  gap: '4px',
                 }}
               >
-                {av}
-              </button>
-            ))}
+                <Camera size={26} strokeWidth={1.8} />
+                <span style={{ fontSize: '10px', fontWeight: 600 }}>上传头像</span>
+              </div>
+            )}
+          </div>
+
+          <div style={{ textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="nm-rebound-btn"
+              style={{
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: 'var(--nm-primary)',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                borderRadius: '8px',
+              }}
+            >
+              <Upload size={13} />
+              <span>{avatar ? '更换自定义头像' : '选取本地相片作为头像'}</span>
+            </button>
+            <div style={{ fontSize: '10px', color: 'var(--nm-text-sub)', marginTop: '2px' }}>
+              头像将直接安全保存于本机的 IndexedDB 数据库中
+            </div>
           </div>
         </div>
 
