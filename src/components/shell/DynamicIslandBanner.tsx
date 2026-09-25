@@ -234,9 +234,9 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
         style={{
           width: isExpanded ? '366px' : '74px',
           maxWidth: 'calc(100vw - 16px)',
-          height: isExpanded ? '96px' : '18px',
+          height: isExpanded ? '118px' : '18px',
           backgroundColor: isExpanded ? '#111318' : 'var(--nm-bg)',
-          borderRadius: isExpanded ? '26px' : '12px',
+          borderRadius: isExpanded ? '28px' : '12px',
           boxShadow: isExpanded
             ? '0 12px 36px rgba(0,0,0,0.55), 0 3px 10px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.22)'
             : 'var(--nm-inset-sm)',
@@ -244,7 +244,7 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
           display: 'flex',
           alignItems: isExpanded ? 'stretch' : 'center',
           justifyContent: isExpanded ? 'space-between' : 'center',
-          padding: isExpanded ? '10px 14px' : '0',
+          padding: isExpanded ? '11px 15px' : '0',
           cursor: isExpanded ? 'pointer' : 'default',
           transition: 'all 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.2)',
           overflow: 'hidden',
@@ -384,13 +384,13 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
                 fontSize: 12,
                 fontWeight: 600,
                 color: '#f8fafc',
-                lineHeight: 1.4,
+                lineHeight: 1.5,
                 wordBreak: 'break-word',
                 display: '-webkit-box',
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
-                margin: '2px 0',
+                margin: '3px 0 5px',
               }}
             >
               {activeNudge?.message}
@@ -403,6 +403,7 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 width: '100%',
+                paddingTop: 2,
               }}
             >
               <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>
