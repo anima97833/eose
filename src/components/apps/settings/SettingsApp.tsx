@@ -948,6 +948,72 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({ onBack }) => {
           </div>
         </div>
 
+        {/* 地球 Online 开屏 Loading 动画重温 */}
+        <div
+          className="nm-card-sm"
+          style={{
+            padding: '12px 14px',
+            borderRadius: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            border: '1px solid rgba(249, 164, 54, 0.25)',
+            background: 'linear-gradient(135deg, rgba(249, 164, 54, 0.08) 0%, rgba(250, 204, 21, 0.05) 100%)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '10px',
+                backgroundColor: '#F5ECE1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px',
+                boxShadow: 'var(--nm-convex-xs)',
+              }}
+            >
+              🐕
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--nm-text-main)' }}>
+                地球 Online · 开屏物种演化
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--nm-text-sub)' }}>
+                万物转生动画与狂点加速交互
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              onBack();
+              window.dispatchEvent(new CustomEvent('replay-earth-splash'));
+            }}
+            className="nm-rebound-btn nm-card-sm"
+            style={{
+              padding: '6px 12px',
+              borderRadius: '10px',
+              border: 'none',
+              background: 'var(--nm-bg)',
+              boxShadow: 'var(--nm-convex-xs)',
+              color: '#D97706',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <Sparkles size={12} />
+            <span>重新放映</span>
+          </button>
+        </div>
+
         {/* 关于「雀」与 PWA 渐进式应用 */}
         <div
           className="nm-card-sm"

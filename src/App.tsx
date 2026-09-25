@@ -31,17 +31,25 @@ import { FilesApp } from './components/apps/files/FilesApp';
 import { PhotoAlbumApp } from './components/apps/camera/PhotoAlbumApp';
 import { StarryAssistantApp } from './components/apps/assistant/StarryAssistantApp';
 import { DailyPosterModal } from './components/modals/DailyPosterModal';
+import { EarthLoadingScreen } from './components/loading/EarthLoadingScreen';
 import { getCustomAppById } from './core/sdk/customAppRegistry';
 import { initIdleMasterDetector, checkLateNightActivity } from './core/quest/easterEggEngine';
 
 export const App: React.FC = () => {
   const [activeApp, setActiveApp] = useState<string | null>(null);
   const [isOpeningApp, setIsOpeningApp] = useState<boolean>(false);
+  const [isBooting, setIsBooting] = useState<boolean>(true);
 
-  // 初始化桌面 15 秒静止白日梦沉思侦听
+  // 初始化桌面 15 秒静止白日梦沉思侦听 & 重温开屏动画事件侦听
   useEffect(() => {
     const cleanup = initIdleMasterDetector();
-    return () => cleanup();
+    const handleReplay = () => setIsBooting(true);
+    window.addEventListener('replay-earth-splash', handleReplay);
+
+    return () => {
+      cleanup();
+      window.removeEventListener('replay-earth-splash', handleReplay);
+    };
   }, []);
 
   const handleOpenApp = (appId: string) => {
@@ -154,8 +162,13 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {/* 地球 Online 物种服加载开屏动画 */}
+      {isBooting && (
+        <EarthLoadingScreen onFinished={() => setIsBooting(false)} />
+      )}
+
       {/* 每日晨间今日海报开屏展映 (每天自动唤醒一次，支持翻转看备忘打勾) */}
-      <DailyPosterModal onOpenAlbum={() => setActiveApp('camera')} />
+      {!isBooting && <DailyPosterModal onOpenAlbum={() => setActiveApp('camera')} />}
     </PhoneFrame>
   );
 };
