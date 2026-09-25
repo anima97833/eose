@@ -10,6 +10,7 @@ interface CharacterProps {
 export const DogCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
   const duration = isAccelerating ? 0.35 : 0.65;
   const speed = `${duration}s`;
+  const bobSpeed = `${duration * 0.5}s`;
 
   return (
     <svg
@@ -24,25 +25,23 @@ export const DogCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
         <style>{`
           @keyframes dogBob {
             0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-4px); }
+            50% { transform: translateY(-3.5px); }
           }
           @keyframes dogTail {
             0%, 100% { transform: rotate(-6deg); }
             50% { transform: rotate(16deg); }
           }
-          @keyframes dogLegSwingA {
-            0% { transform: rotate(-24deg); }
-            50% { transform: rotate(22deg); }
-            100% { transform: rotate(-24deg); }
-          }
-          @keyframes dogLegSwingB {
-            0% { transform: rotate(22deg); }
-            50% { transform: rotate(-24deg); }
-            100% { transform: rotate(22deg); }
+          /* 专业四足对角行进循环（四拍交替，绝不同手同脚） */
+          @keyframes quadrupedLegCycle {
+            0% { transform: rotate(-20deg) translateY(0px); }
+            25% { transform: rotate(0deg) translateY(-3px); }
+            50% { transform: rotate(20deg) translateY(0px); }
+            75% { transform: rotate(0deg) translateY(0px); }
+            100% { transform: rotate(-20deg) translateY(0px); }
           }
           @keyframes shadowPulse {
             0%, 100% { transform: scaleX(1); opacity: 0.6; }
-            50% { transform: scaleX(0.86); opacity: 0.4; }
+            50% { transform: scaleX(0.88); opacity: 0.42; }
           }
         `}</style>
       </defs>
@@ -56,27 +55,39 @@ export const DogCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
         fill="#D4C5B5"
         style={{
           transformOrigin: '110px 158px',
-          animation: `shadowPulse ${speed} ease-in-out infinite`,
+          animation: `shadowPulse ${bobSpeed} ease-in-out infinite`,
         }}
       />
 
-      {/* 后排腿（右后腿、右前腿，颜色稍深产生光影空间感） */}
+      {/* 后排腿（后右腿、前右腿，颜色稍深制造景深） */}
       <g style={{ fill: '#E6942C' }}>
-        {/* 后排右后腿 */}
-        <g style={{ transformOrigin: '72px 124px', animation: `dogLegSwingB ${speed} ease-in-out infinite` }}>
+        {/* 后右腿：相位差 50% */}
+        <g
+          style={{
+            transformOrigin: '72px 124px',
+            animation: `quadrupedLegCycle ${speed} linear infinite`,
+            animationDelay: `-${duration * 0.5}s`,
+          }}
+        >
           <path d="M 68 124 L 68 142 C 68 147, 70 150, 75 150 L 82 150 C 86 150, 88 146, 86 142 C 84 138, 77 139, 77 124 Z" />
         </g>
-        {/* 后排右前腿 */}
-        <g style={{ transformOrigin: '138px 124px', animation: `dogLegSwingA ${speed} ease-in-out infinite` }}>
+        {/* 前右腿：相位差 75% */}
+        <g
+          style={{
+            transformOrigin: '138px 124px',
+            animation: `quadrupedLegCycle ${speed} linear infinite`,
+            animationDelay: `-${duration * 0.75}s`,
+          }}
+        >
           <path d="M 134 124 L 134 142 C 134 147, 136 150, 141 150 L 148 150 C 152 150, 154 146, 152 142 C 150 138, 143 139, 143 124 Z" />
         </g>
       </g>
 
-      {/* 躯干、头部、脖子、尾巴一体（上下轻快颠簸） */}
+      {/* 躯干、头部、脖子、尾巴一体（每半个周期轻微颠簸一次） */}
       <g
         style={{
           transformOrigin: '110px 100px',
-          animation: `dogBob ${speed} ease-in-out infinite`,
+          animation: `dogBob ${bobSpeed} ease-in-out infinite`,
         }}
       >
         {/* 向上俏皮竖起的小尾巴 */}
@@ -124,14 +135,26 @@ export const DogCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
         />
       </g>
 
-      {/* 前排腿（左后腿、左前腿，明亮暖黄，自然前屈小肉垫足部） */}
+      {/* 前排腿（前左腿、后左腿，亮色，四拍相位交替） */}
       <g style={{ fill: '#F9A436' }}>
-        {/* 前排左后腿 */}
-        <g style={{ transformOrigin: '78px 124px', animation: `dogLegSwingA ${speed} ease-in-out infinite` }}>
+        {/* 后左腿：相位差 0% */}
+        <g
+          style={{
+            transformOrigin: '78px 124px',
+            animation: `quadrupedLegCycle ${speed} linear infinite`,
+            animationDelay: '0s',
+          }}
+        >
           <path d="M 74 124 L 74 142 C 74 147, 76 150, 81 150 L 88 150 C 92 150, 94 146, 92 142 C 90 138, 83 139, 83 124 Z" />
         </g>
-        {/* 前排左前腿 */}
-        <g style={{ transformOrigin: '132px 124px', animation: `dogLegSwingB ${speed} ease-in-out infinite` }}>
+        {/* 前左腿：相位差 25% */}
+        <g
+          style={{
+            transformOrigin: '132px 124px',
+            animation: `quadrupedLegCycle ${speed} linear infinite`,
+            animationDelay: `-${duration * 0.25}s`,
+          }}
+        >
           <path d="M 128 124 L 128 142 C 128 147, 130 150, 135 150 L 142 150 C 146 150, 148 146, 146 142 C 144 138, 137 139, 137 124 Z" />
         </g>
       </g>
@@ -140,11 +163,12 @@ export const DogCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
 };
 
 /**
- * 2. 🐱 猫猫角色（与狗狗同画风的圆润萌猫：浑然一体的胸颈身躯、绝无突兀断层、珊瑚粉项圈金铃铛、灵动三角耳与前屈软肉爪）
+ * 2. 🐱 猫猫角色（与狗狗同画风的圆润萌猫：浑然一体的胸颈身躯、绝无突兀断层、珊瑚粉项圈金铃铛、灵动三角耳与四拍交替软肉爪）
  */
 export const CatCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
   const duration = isAccelerating ? 0.32 : 0.6;
   const speed = `${duration}s`;
+  const bobSpeed = `${duration * 0.5}s`;
 
   return (
     <svg
@@ -159,21 +183,19 @@ export const CatCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
         <style>{`
           @keyframes catBob {
             0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-4px); }
+            50% { transform: translateY(-3px); }
           }
           @keyframes catTailWave {
             0%, 100% { transform: rotate(-6deg); }
             50% { transform: rotate(12deg); }
           }
-          @keyframes catLegSwingA {
-            0% { transform: rotate(-22deg); }
-            50% { transform: rotate(20deg); }
-            100% { transform: rotate(-22deg); }
-          }
-          @keyframes catLegSwingB {
-            0% { transform: rotate(20deg); }
-            50% { transform: rotate(-22deg); }
-            100% { transform: rotate(20deg); }
+          /* 专业四足对角行进循环（四拍交替，绝不同手同脚） */
+          @keyframes quadrupedLegCycleCat {
+            0% { transform: rotate(-20deg) translateY(0px); }
+            25% { transform: rotate(0deg) translateY(-3px); }
+            50% { transform: rotate(20deg) translateY(0px); }
+            75% { transform: rotate(0deg) translateY(0px); }
+            100% { transform: rotate(-20deg) translateY(0px); }
           }
           @keyframes shadowPulseCat {
             0%, 100% { transform: scaleX(1); opacity: 0.6; }
@@ -191,18 +213,30 @@ export const CatCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
         fill="#D4C5B5"
         style={{
           transformOrigin: '110px 158px',
-          animation: `shadowPulseCat ${speed} ease-in-out infinite`,
+          animation: `shadowPulseCat ${bobSpeed} ease-in-out infinite`,
         }}
       />
 
       {/* 后排腿（深暖金黄，前屈小猫爪） */}
       <g style={{ fill: '#E6A700' }}>
-        {/* 后右腿 */}
-        <g style={{ transformOrigin: '72px 124px', animation: `catLegSwingB ${speed} ease-in-out infinite` }}>
+        {/* 后右腿：相位差 50% */}
+        <g
+          style={{
+            transformOrigin: '72px 124px',
+            animation: `quadrupedLegCycleCat ${speed} linear infinite`,
+            animationDelay: `-${duration * 0.5}s`,
+          }}
+        >
           <path d="M 69 124 L 69 142 C 69 146, 71 149, 75 149 L 81 149 C 84 149, 85 146, 84 142 C 82 138, 77 139, 77 124 Z" />
         </g>
-        {/* 前右腿 */}
-        <g style={{ transformOrigin: '134px 124px', animation: `catLegSwingA ${speed} ease-in-out infinite` }}>
+        {/* 前右腿：相位差 75% */}
+        <g
+          style={{
+            transformOrigin: '134px 124px',
+            animation: `quadrupedLegCycleCat ${speed} linear infinite`,
+            animationDelay: `-${duration * 0.75}s`,
+          }}
+        >
           <path d="M 131 124 L 131 142 C 131 146, 133 149, 137 149 L 143 149 C 146 149, 147 146, 146 142 C 144 138, 139 139, 139 124 Z" />
         </g>
       </g>
@@ -211,7 +245,7 @@ export const CatCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
       <g
         style={{
           transformOrigin: '110px 100px',
-          animation: `catBob ${speed} ease-in-out infinite`,
+          animation: `catBob ${bobSpeed} ease-in-out infinite`,
         }}
       >
         {/* 优雅高挺的 S 型波浪长猫尾巴 */}
@@ -270,14 +304,26 @@ export const CatCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
         <line x1="156" y1="60" x2="170" y2="63" stroke="#241B15" strokeWidth="1.6" strokeLinecap="round" />
       </g>
 
-      {/* 前排腿（亮黄前躯，前屈可爱软爪） */}
+      {/* 前排腿（亮黄前躯，前屈可爱软爪，四拍相位交替） */}
       <g style={{ fill: '#FACC15' }}>
-        {/* 前左后腿 */}
-        <g style={{ transformOrigin: '78px 124px', animation: `catLegSwingA ${speed} ease-in-out infinite` }}>
+        {/* 后左腿：相位差 0% */}
+        <g
+          style={{
+            transformOrigin: '78px 124px',
+            animation: `quadrupedLegCycleCat ${speed} linear infinite`,
+            animationDelay: '0s',
+          }}
+        >
           <path d="M 75 124 L 75 142 C 75 146, 77 149, 81 149 L 87 149 C 90 149, 91 146, 90 142 C 88 138, 83 139, 83 124 Z" />
         </g>
-        {/* 前左前腿 */}
-        <g style={{ transformOrigin: '128px 124px', animation: `catLegSwingB ${speed} ease-in-out infinite` }}>
+        {/* 前左腿：相位差 25% */}
+        <g
+          style={{
+            transformOrigin: '128px 124px',
+            animation: `quadrupedLegCycleCat ${speed} linear infinite`,
+            animationDelay: `-${duration * 0.25}s`,
+          }}
+        >
           <path d="M 125 124 L 125 142 C 125 146, 127 149, 131 149 L 137 149 C 140 149, 141 146, 140 142 C 138 138, 133 139, 133 124 Z" />
         </g>
       </g>
@@ -633,21 +679,6 @@ export const HumanCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => 
         />
         {/* 额头前微卷的可爱小碎发 */}
         <path d="M 118 36 Q 124 40 122 46" stroke="#3B1F0A" strokeWidth="3.2" strokeLinecap="round" fill="none" />
-
-        {/* 侧脸清秀可人的闭目微笑弧（呼应狗狗与猫猫的自得神态） */}
-        <path
-          d="M 116 48 Q 121 54 126 48"
-          stroke="#451A03"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          fill="none"
-        />
-
-        {/* 柔嫩腮红 */}
-        <circle cx="119" cy="54" r="3.2" fill="#FB7185" opacity="0.65" />
-
-        {/* 嘴角微微扬起的治愈微笑 */}
-        <path d="M 124 56 Q 126 58 128 55" stroke="#451A03" strokeWidth="1.8" strokeLinecap="round" fill="none" />
       </g>
 
       {/* 前腿（左腿，步伐自信向前迈步） */}
