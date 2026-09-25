@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, Plus, Camera, Trash2, Heart, Sparkles, BookOpen } from 'lucide-react';
 import { RPGProfile, ProfileStoryPage } from '../../../../core/rpg/types';
 import { loadDossierFromDB, saveDossierToDB } from '../../../../core/rpg/dossierStorage';
+import { compressImageFile } from '../../../../utils/imageCompressor';
 
 interface ProfileDossierSheetProps {
   profile: RPGProfile;
@@ -163,14 +164,17 @@ export const ProfileDossierSheet: React.FC<ProfileDossierSheetProps> = ({
     }
   };
 
-  // 用户点击照片更换档案照片（注意：仅保存至 IndexedDB 档案专属相片，绝不污染角色自身的立绘）
-  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 用户点击照片更换档案照片（注意：强制客户端 WebP 高清压缩，存入 IndexedDB）
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const result = reader.result as string;
+    try {
+      const result = await compressImageFile(file, {
+        maxDimension: 1080,
+        quality: 0.85,
+        mimeType: 'image/webp',
+      });
       setPhotoUrl(result);
       onUpdateProfile({ dossierPhotoUrl: result });
       try {
@@ -178,9 +182,10 @@ export const ProfileDossierSheet: React.FC<ProfileDossierSheetProps> = ({
       } catch (err) {
         console.warn('saveDossierToDB error:', err);
       }
-      showToast('相片已换');
-    };
-    reader.readAsDataURL(file);
+      showToast('相片已优化并保存');
+    } catch (err) {
+      console.warn('[ProfileDossier] 相片压缩异常:', err);
+    }
   };
 
   // 更新姓名

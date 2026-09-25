@@ -26,6 +26,7 @@ import { BookOfAnswersApp } from './components/apps/answers/BookOfAnswersApp';
 import { CalculatorApp } from './components/apps/calculator/CalculatorApp';
 import { PocketPadApp } from './components/apps/pocketpad/PocketPadApp';
 import { GachaponApp } from './components/apps/gachapon/GachaponApp';
+import { GameVaultApp } from './components/apps/gamevault/GameVaultApp';
 import { FilesApp } from './components/apps/files/FilesApp';
 import { PhotoAlbumApp } from './components/apps/camera/PhotoAlbumApp';
 import { StarryAssistantApp } from './components/apps/assistant/StarryAssistantApp';
@@ -137,6 +138,8 @@ export const App: React.FC = () => {
             <PocketPadApp onBack={() => setActiveApp(null)} />
           ) : activeApp === 'gachapon' ? (
             <GachaponApp onBack={() => setActiveApp(null)} onOpenApp={(id) => setActiveApp(id)} />
+          ) : activeApp === 'gamevault' ? (
+            <GameVaultApp onBack={() => setActiveApp(null)} onOpenApp={(id) => setActiveApp(id)} />
           ) : activeApp === 'files' ? (
             <FilesApp onBack={() => setActiveApp(null)} onOpenApp={(id) => setActiveApp(id)} />
           ) : activeApp === 'camera' || activeApp === 'album' || activeApp === 'photo' ? (

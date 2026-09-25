@@ -1,12 +1,15 @@
 import React from 'react';
-import { Play, Pause, RotateCcw, SkipForward, CheckCircle2, Target, Volume2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, SkipForward, CheckCircle2, Target, Volume2, Check } from 'lucide-react';
 import { PomodoroTaskRecord } from '../../../core/storage/db';
 
 export type PomodoroMode = 'focus' | 'short_break' | 'long_break';
+export type TimerType = 'countdown' | 'countup';
 
 interface PomodoroTimerTabProps {
   mode: PomodoroMode;
+  timerType: TimerType;
   timeLeftSeconds: number;
+  elapsedSeconds: number;
   totalDurationSeconds: number;
   isRunning: boolean;
   activeTask: PomodoroTaskRecord | null;
@@ -15,13 +18,17 @@ interface PomodoroTimerTabProps {
   onStartPause: () => void;
   onReset: () => void;
   onSkip: () => void;
+  onFinishCountup: () => void;
+  onToggleTimerType: (type: TimerType) => void;
   onToggleNoise: (type: 'rain' | 'clock' | 'cafe' | 'off') => void;
   onSelectTaskClick: () => void;
 }
 
 export const PomodoroTimerTab: React.FC<PomodoroTimerTabProps> = ({
   mode,
+  timerType,
   timeLeftSeconds,
+  elapsedSeconds,
   totalDurationSeconds,
   isRunning,
   activeTask,
@@ -30,23 +37,52 @@ export const PomodoroTimerTab: React.FC<PomodoroTimerTabProps> = ({
   onStartPause,
   onReset,
   onSkip,
+  onFinishCountup,
+  onToggleTimerType,
   onToggleNoise,
   onSelectTaskClick,
 }) => {
-  const minutes = Math.floor(timeLeftSeconds / 60);
-  const seconds = timeLeftSeconds % 60;
+  const isCountup = timerType === 'countup' && mode === 'focus';
+  const displaySeconds = isCountup ? elapsedSeconds : timeLeftSeconds;
+
+  const minutes = Math.floor(displaySeconds / 60);
+  const seconds = displaySeconds % 60;
   const timeFormatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
   // 环形进度比率 (0 to 1)
-  const progressRatio = totalDurationSeconds > 0 ? timeLeftSeconds / totalDurationSeconds : 0;
+  const targetDurationSeconds = totalDurationSeconds > 0 ? totalDurationSeconds : 25 * 60;
+  let progressRatio = 0;
+  if (isCountup) {
+    // 正向计时：根据当前已耗时占目标时长的百分比递增
+    progressRatio = Math.min(1, elapsedSeconds / targetDurationSeconds);
+  } else {
+    // 倒计时：根据剩余秒数逐渐递减
+    progressRatio = totalDurationSeconds > 0 ? timeLeftSeconds / totalDurationSeconds : 0;
+  }
+
+  const isTargetReached = isCountup && elapsedSeconds >= targetDurationSeconds && targetDurationSeconds > 0;
+
   const strokeRadius = 90;
   const circumference = 2 * Math.PI * strokeRadius;
   const strokeDashoffset = circumference * (1 - progressRatio);
 
   const modeTitle =
-    mode === 'focus' ? 'Focus 专注中' : mode === 'short_break' ? 'Short Break 短休息' : 'Long Break 长休息';
-  const modeColor = mode === 'focus' ? '#2F614C' : '#4E7D96';
-  const ringAccentColor = mode === 'focus' ? '#4E937A' : '#64A6BD';
+    mode === 'focus'
+      ? isCountup
+        ? '正向专注 (Count-up)'
+        : '倒计时专注 (Focus)'
+      : mode === 'short_break'
+      ? 'Short Break 短休息'
+      : 'Long Break 长休息';
+
+  const modeColor = isCountup ? '#B45309' : mode === 'focus' ? '#2F614C' : '#4E7D96';
+  const ringAccentColor = isTargetReached
+    ? '#10B981'
+    : isCountup
+    ? '#D97706'
+    : mode === 'focus'
+    ? '#4E937A'
+    : '#64A6BD';
 
   return (
     <div
@@ -56,12 +92,12 @@ export const PomodoroTimerTab: React.FC<PomodoroTimerTabProps> = ({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '12px 16px 14px',
+        padding: '10px 16px 14px',
         boxSizing: 'border-box',
         overflowY: 'auto',
       }}
     >
-      {/* 1. 顶部当前状态 */}
+      {/* 1. 顶部模式状态与倒计时/正向计时切换器 */}
       <div
         style={{
           display: 'flex',
@@ -73,7 +109,7 @@ export const PomodoroTimerTab: React.FC<PomodoroTimerTabProps> = ({
       >
         <div
           style={{
-            fontSize: '18px',
+            fontSize: '17px',
             fontWeight: 800,
             color: modeColor,
             letterSpacing: '0.5px',
@@ -81,9 +117,66 @@ export const PomodoroTimerTab: React.FC<PomodoroTimerTabProps> = ({
         >
           {modeTitle}
         </div>
+
+        {/* 仅在专注阶段允许自由切换倒计时/正向计时 */}
+        {mode === 'focus' && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '3px',
+              borderRadius: '20px',
+              backgroundColor: 'rgba(215, 235, 220, 0.65)',
+              boxShadow:
+                'inset 1px 1px 3px rgba(160, 185, 170, 0.4), inset -1px -1px 3px rgba(255, 255, 255, 0.8)',
+              marginTop: '2px',
+            }}
+          >
+            <button
+              type="button"
+              disabled={isRunning}
+              onClick={() => onToggleTimerType('countdown')}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '16px',
+                border: 'none',
+                backgroundColor: timerType === 'countdown' ? '#3A8259' : 'transparent',
+                color: timerType === 'countdown' ? '#FFFFFF' : '#4E7D63',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: isRunning ? 'not-allowed' : 'pointer',
+                opacity: isRunning && timerType !== 'countdown' ? 0.4 : 1,
+                transition: 'all 0.2s ease',
+              }}
+              title={isRunning ? '计时运行中不可切换' : '切换为倒计时模式'}
+            >
+              ⏱️ 倒计时
+            </button>
+            <button
+              type="button"
+              disabled={isRunning}
+              onClick={() => onToggleTimerType('countup')}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '16px',
+                border: 'none',
+                backgroundColor: timerType === 'countup' ? '#D97706' : 'transparent',
+                color: timerType === 'countup' ? '#FFFFFF' : '#4E7D63',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: isRunning ? 'not-allowed' : 'pointer',
+                opacity: isRunning && timerType !== 'countup' ? 0.4 : 1,
+                transition: 'all 0.2s ease',
+              }}
+              title={isRunning ? '计时运行中不可切换' : '切换为正向计时模式'}
+            >
+              ⏳ 正向计时
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* 2. 核心大表盘（复刻用户参考图中的极简环形大时钟） */}
+      {/* 2. 核心大表盘（复刻极简环形大时钟） */}
       <div
         style={{
           position: 'relative',
@@ -92,7 +185,7 @@ export const PomodoroTimerTab: React.FC<PomodoroTimerTabProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          margin: '14px 0',
+          margin: '10px 0',
         }}
       >
         {/* 轻拟物立体微凹底座 */}
@@ -142,7 +235,7 @@ export const PomodoroTimerTab: React.FC<PomodoroTimerTabProps> = ({
           />
         </svg>
 
-        {/* 居中现代极简加粗倒计时 */}
+        {/* 居中现代极简加粗计时大字 */}
         <div
           style={{
             position: 'relative',
@@ -166,25 +259,38 @@ export const PomodoroTimerTab: React.FC<PomodoroTimerTabProps> = ({
           <span
             style={{
               fontSize: '11px',
-              color: '#6A8A73',
-              fontWeight: 600,
+              color: isTargetReached ? '#10B981' : isCountup ? '#B45309' : '#6A8A73',
+              fontWeight: 700,
               marginTop: '-4px',
               textTransform: 'uppercase',
-              letterSpacing: '1px',
+              letterSpacing: '0.8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '2px',
             }}
           >
-            {isRunning ? 'Running' : 'Paused'}
+            {isTargetReached ? (
+              '🎯 目标达成'
+            ) : isRunning ? (
+              isCountup ? (
+                `Counting (目标 ${Math.round(targetDurationSeconds / 60)}m)`
+              ) : (
+                'Running'
+              )
+            ) : (
+              'Paused'
+            )}
           </span>
         </div>
       </div>
 
-      {/* 3. 基础控制按键组（参考用户图中左中右三粒胶囊控制键） */}
+      {/* 3. 基础控制按键组（左中右三粒胶囊控制键） */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '16px',
+          gap: '14px',
           width: '100%',
         }}
       >
@@ -230,54 +336,90 @@ export const PomodoroTimerTab: React.FC<PomodoroTimerTabProps> = ({
             border: '1px solid rgba(255, 255, 255, 0.65)',
             cursor: 'pointer',
           }}
-          title="放弃并重置当前阶段"
+          title="重置计时"
         >
           <RotateCcw size={18} />
         </button>
 
-        {/* 手动跳过当前阶段 (长胶囊键) */}
-        <button
-          type="button"
-          onClick={onSkip}
-          className="nm-btn"
-          style={{
-            width: '68px',
-            height: '46px',
-            borderRadius: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#6A8A73',
-            backgroundColor: '#EDF5EE',
-            border: '1px solid rgba(255, 255, 255, 0.65)',
-            cursor: 'pointer',
-          }}
-          title="跳过至下一阶段"
-        >
-          <SkipForward size={18} />
-        </button>
+        {/* 右侧按键：如果是正向计时专注中，显示“完成结算”；如果是倒计时，显示“跳过” */}
+        {isCountup ? (
+          <button
+            type="button"
+            onClick={onFinishCountup}
+            disabled={elapsedSeconds < 10}
+            className="nm-btn"
+            style={{
+              padding: '0 16px',
+              height: '46px',
+              borderRadius: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              color: elapsedSeconds >= 10 ? '#FFFFFF' : '#6A8A73',
+              backgroundColor: elapsedSeconds >= 10 ? '#10B981' : '#EDF5EE',
+              boxShadow: elapsedSeconds >= 10
+                ? '0 4px 12px rgba(16, 185, 129, 0.35)'
+                : '4px 4px 10px rgba(160, 185, 170, 0.5), -4px -4px 10px rgba(255, 255, 255, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.65)',
+              cursor: elapsedSeconds >= 10 ? 'pointer' : 'not-allowed',
+              opacity: elapsedSeconds >= 10 ? 1 : 0.6,
+              fontWeight: 800,
+              fontSize: '12px',
+            }}
+            title={elapsedSeconds >= 10 ? '完成当前正向专注并结算' : '请至少专注 10 秒后结算'}
+          >
+            <Check size={16} strokeWidth={2.8} />
+            <span>结算</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onSkip}
+            className="nm-btn"
+            style={{
+              width: '68px',
+              height: '46px',
+              borderRadius: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#6A8A73',
+              backgroundColor: '#EDF5EE',
+              border: '1px solid rgba(255, 255, 255, 0.65)',
+              cursor: 'pointer',
+            }}
+            title="跳过至下一阶段"
+          >
+            <SkipForward size={18} />
+          </button>
+        )}
       </div>
 
       {/* 4. 下一阶段预告 (Up next) */}
       <div
         style={{
-          marginTop: '10px',
+          marginTop: '8px',
           fontSize: '11px',
           color: '#718E7B',
           textAlign: 'center',
           lineHeight: 1.4,
         }}
       >
-        <span style={{ fontSize: '10px', opacity: 0.85 }}>下一阶段预告</span>
-        <div style={{ fontWeight: 700, fontSize: '13px', color: '#3A5A40' }}>
-          {nextStageText || (mode === 'focus' ? '05:00 短休息 (Short break)' : '25:00 深度专注 (Focus)')}
+        <span style={{ fontSize: '10px', opacity: 0.85 }}>
+          {isCountup ? '正向模式说明' : '下一阶段预告'}
+        </span>
+        <div style={{ fontWeight: 700, fontSize: '12px', color: '#3A5A40' }}>
+          {isCountup
+            ? `自由专注积累，建议达成 ${Math.round(targetDurationSeconds / 60)} 分钟后结算`
+            : nextStageText || (mode === 'focus' ? '05:00 短休息' : '25:00 深度专注')}
         </div>
       </div>
 
       {/* 5. 沉浸伴奏白噪音小面板 */}
       <div
         style={{
-          marginTop: '10px',
+          marginTop: '8px',
           padding: '6px 10px',
           borderRadius: '16px',
           backgroundColor: 'rgba(235, 245, 238, 0.75)',
@@ -304,7 +446,7 @@ export const PomodoroTimerTab: React.FC<PomodoroTimerTabProps> = ({
               onClick={() => onToggleNoise(item.key as typeof ambientNoise)}
               style={{
                 border: 'none',
-                background: isSelected ? '#3A5A40' : 'transparent',
+                background: isSelected ? '#3A8259' : 'transparent',
                 color: isSelected ? '#FFFFFF' : '#4E6655',
                 padding: '3px 7px',
                 borderRadius: '10px',

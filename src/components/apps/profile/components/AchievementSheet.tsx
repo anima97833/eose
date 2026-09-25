@@ -1,7 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, Lock, Check, Sparkles, Coins, Gift, ChevronRight } from 'lucide-react';
-import { RPGAchievement, DEFAULT_ACHIEVEMENTS } from '../../../../core/rpg/achievementTypes';
-import { loadAchievements, saveAchievements } from '../../../../core/rpg/achievementStorage';
+import {
+  RPGAchievement,
+  DEFAULT_ACHIEVEMENTS,
+  ACHIEVEMENT_CATEGORIES,
+  ACHIEVEMENT_CATEGORY_MAP,
+  AchievementCategoryKey,
+} from '../../../../core/rpg/achievementTypes';
+import {
+  loadAchievements,
+  saveAchievements,
+  loadShowcaseBadges,
+  saveShowcaseBadges,
+  SHOWCASE_SLOTS_COUNT,
+} from '../../../../core/rpg/achievementStorage';
+import { ShowcasePickerModal } from './ShowcasePickerModal';
 
 interface AchievementSheetProps {
   onClose: () => void;
@@ -13,15 +26,34 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
   onRewardCoins,
 }) => {
   const [achievements, setAchievements] = useState<RPGAchievement[]>(loadAchievements);
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'UNLOCKED' | 'DERIVED'>('ALL');
+  const [showcaseSlots, setShowcaseSlots] = useState<(string | null)[]>(loadShowcaseBadges);
+  const [pickerSlotIndex, setPickerSlotIndex] = useState<number | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'UNLOCKED' | 'DERIVED' | AchievementCategoryKey>('ALL');
   const [selectedAch, setSelectedAch] = useState<RPGAchievement | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // 监听外部成就解锁及展位变动事件实时刷新
+  useEffect(() => {
+    const handleUnlocked = () => {
+      setAchievements(loadAchievements());
+    };
+    const handleShowcaseChange = () => {
+      setShowcaseSlots(loadShowcaseBadges());
+    };
+    window.addEventListener('rpg_achievement_unlocked', handleUnlocked);
+    window.addEventListener('cloudfly_showcase_badges_changed', handleShowcaseChange);
+    return () => {
+      window.removeEventListener('rpg_achievement_unlocked', handleUnlocked);
+      window.removeEventListener('cloudfly_showcase_badges_changed', handleShowcaseChange);
+    };
+  }, []);
 
   // 新增表单状态
   const [newTitle, setNewTitle] = useState('');
   const [newStat, setNewStat] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [newCategory, setNewCategory] = useState<AchievementCategoryKey>('firmware');
   const [isDerivedNew, setIsDerivedNew] = useState(false);
   const [prereqTitle, setPrereqTitle] = useState('');
 
@@ -92,44 +124,6 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
     saveAchievements(nextList);
   };
 
-  // 切换解锁状态
-  const handleToggleUnlock = (id: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    const updated = achievements.map((item) => {
-      if (item.id === id) {
-        const nextUnlocked = !item.unlocked;
-        showToast(nextUnlocked ? '已达成' : '已重置');
-        return {
-          ...item,
-          unlocked: nextUnlocked,
-          claimed: nextUnlocked ? item.claimed : false,
-        };
-      }
-      return item;
-    });
-    updateAchievements(updated);
-    if (selectedAch?.id === id) {
-      setSelectedAch((prev) => (prev ? { ...prev, unlocked: !prev.unlocked } : null));
-    }
-  };
-
-  // 领取成就金币奖励
-  const handleClaimReward = (id: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    const target = achievements.find((a) => a.id === id);
-    if (!target || !target.unlocked || target.claimed) return;
-
-    const updated = achievements.map((item) =>
-      item.id === id ? { ...item, claimed: true } : item
-    );
-    updateAchievements(updated);
-    onRewardCoins?.(target.coinReward);
-    showToast('奖励已领');
-    if (selectedAch?.id === id) {
-      setSelectedAch((prev) => (prev ? { ...prev, claimed: true } : null));
-    }
-  };
-
   // 删除成就
   const handleDelete = (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -141,23 +135,21 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
     showToast('成就已删');
   };
 
-  // 新增成就
+  // 新增成就 (严格禁止与等级挂钩，必须由系统判定达成)
   const handleCreate = () => {
     if (!newTitle.trim()) return;
     const newId = `ach_${Date.now()}`;
     const newAch: RPGAchievement = {
       id: newId,
       title: newTitle.trim().slice(0, 5), // <= 5 字
-      tier: isDerivedNew ? 2 : 1,
-      category: 'focus',
-      statLabel: newStat.trim().slice(0, 6) || '专注 100',
-      desc: newDesc.trim() || '日常积累衍生解锁',
+      category: newCategory,
+      statLabel: newStat.trim().slice(0, 6) || '专属成就',
+      desc: newDesc.trim() || '地球 Online 专属自拟成就',
       iconType: isDerivedNew ? 'crit' : 'hp',
-      unlocked: false,
+      unlocked: false, // 铁律：只能系统判定达成，不可手动判定
       claimed: false,
       isDerived: isDerivedNew,
       prerequisiteTitle: isDerivedNew ? prereqTitle.trim().slice(0, 5) || '初阶前置' : undefined,
-      coinReward: isDerivedNew ? 300 : 100,
     };
     const nextList = [...achievements, newAch];
     updateAchievements(nextList);
@@ -174,15 +166,12 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
   const filteredList = achievements.filter((item) => {
     if (activeFilter === 'UNLOCKED') return item.unlocked;
     if (activeFilter === 'DERIVED') return item.isDerived;
+    if (activeFilter !== 'ALL') return item.category === activeFilter;
     return true;
   });
 
-  // 计算成就总评点数
+  // 统计成就总数（铁律：严禁与等级挂钩，纯系统判定达成数）
   const totalUnlockedCount = achievements.filter((a) => a.unlocked).length;
-  const totalScore = (
-    achievements.filter((a) => a.unlocked).reduce((sum, cur) => sum + (cur.tier * 20), 0) +
-    totalUnlockedCount * 5
-  ).toFixed(1);
 
   // 渲染参考图同款的徽章图案
   const renderCrestIcon = (type: RPGAchievement['iconType'], isDerived?: boolean) => {
@@ -473,86 +462,134 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
             <Lock size={10} color="#70604A" style={{ marginTop: '2px' }} />
           </button>
 
-          {/* 气泡徽章 1：已解锁天使喵 (参考图同款白光渐变气泡) */}
-          <div
-            onClick={() => setActiveFilter('UNLOCKED')}
-            title="已达成成就"
-            style={{
-              width: '46px',
-              height: '46px',
-              borderRadius: '16px',
-              background: 'radial-gradient(circle, #FFFFFF 40%, #D8EEF8 100%)',
-              border: '2px solid #94BFD1',
-              boxShadow: '0 2px 5px rgba(100, 160, 190, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '22px',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            🐱
-          </div>
+          {/* 自由荣誉展柜：自选固定 6 个展示席位 (可自由装配、替换、卸下) */}
+          {Array.from({ length: SHOWCASE_SLOTS_COUNT }).map((_, slotIdx) => {
+            const equippedId = showcaseSlots[slotIdx];
+            const ach = equippedId ? achievements.find((a) => a.id === equippedId) : null;
 
-          {/* 气泡徽章 2：高阶解锁猫 (参考图同款双耳饰品猫) */}
-          <div
-            onClick={() => setActiveFilter('UNLOCKED')}
-            title="高阶达成"
-            style={{
-              width: '46px',
-              height: '46px',
-              borderRadius: '16px',
-              background: 'radial-gradient(circle, #FFFFFF 40%, #E6F3FA 100%)',
-              border: '2px solid #94BFD1',
-              boxShadow: '0 2px 5px rgba(100, 160, 190, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '22px',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            🦊
-          </div>
+            if (ach) {
+              const isUnlocked = ach.unlocked;
+              const emoji = ach.badgeEmoji || (ach.iconType === 'atk' ? '⚔️' : ach.iconType === 'hp' ? '💖' : ach.iconType === 'heal' ? '🌿' : ach.iconType === 'book' ? '📖' : ach.iconType === 'star' ? '⭐' : '✨');
 
-          {/* 玻璃锁气泡序列（参考图右侧 4 个青色玻璃球带黑锁头：代表未来衍生成就位） */}
-          {[1, 2, 3, 4].map((slotIdx) => (
-            <div
-              key={slotIdx}
-              onClick={() => setActiveFilter('DERIVED')}
-              title="未来可能解锁的衍生成就位"
-              style={{
-                width: '46px',
-                height: '46px',
-                borderRadius: '50%',
-                // 深度还原参考图青蓝通透微反光玻璃球质感
-                background: 'radial-gradient(circle at 35% 30%, #76C8D8 10%, #3B8DA1 60%, #266978 100%)',
-                border: '2px solid #205966',
-                boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.6), 0 2px 4px rgba(0,0,0,0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                flexShrink: 0,
-                opacity: 0.9,
-              }}
-            >
+              if (isUnlocked) {
+                return (
+                  <div
+                    key={slotIdx}
+                    onClick={() => {
+                      if (!isDraggingOrbsRef.current) setSelectedAch(ach);
+                    }}
+                    title={`荣誉展位 ${slotIdx + 1}：${ach.title} (已达成 - 点击查看/更换)`}
+                    style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '16px',
+                      background: 'radial-gradient(circle, #FFFFFF 40%, #D8EEF8 100%)',
+                      border: '2.5px solid #94BFD1',
+                      boxShadow: '0 2px 5px rgba(100, 160, 190, 0.35)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '22px',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      position: 'relative',
+                      transition: 'transform 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                  >
+                    {emoji}
+                  </div>
+                );
+              }
+
+              // 未解锁但已被设为展示目标
+              return (
+                <div
+                  key={slotIdx}
+                  onClick={() => {
+                    if (!isDraggingOrbsRef.current) setSelectedAch(ach);
+                  }}
+                  title={`荣誉展位 ${slotIdx + 1}：${ach.title} (待解锁 - 点击查看)`}
+                  style={{
+                    width: '46px',
+                    height: '46px',
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle at 35% 30%, #76C8D8 10%, #3B8DA1 60%, #266978 100%)',
+                    border: '2px solid #205966',
+                    boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.6), 0 2px 4px rgba(0,0,0,0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    opacity: 0.88,
+                    position: 'relative',
+                    transition: 'transform 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                >
+                  <div
+                    style={{
+                      background: 'rgba(20, 52, 60, 0.55)',
+                      padding: '5px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Lock size={15} color="#D1F1F8" strokeWidth={2.5} />
+                  </div>
+                </div>
+              );
+            }
+
+            // 虚位以待的空展位 (轻拟物微凹槽 + 虚线/加号)
+            return (
               <div
+                key={slotIdx}
+                onClick={() => {
+                  if (!isDraggingOrbsRef.current) setPickerSlotIndex(slotIdx);
+                }}
+                title={`第 ${slotIdx + 1} 荣誉展位 (虚位以待，点击自选佩戴)`}
                 style={{
-                  background: 'rgba(20, 52, 60, 0.5)',
-                  padding: '5px',
-                  borderRadius: '6px',
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '16px',
+                  background: 'rgba(110, 70, 42, 0.06)',
+                  border: '2px dashed #9E8C76',
+                  boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.08)',
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                  color: '#7D6A53',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.08)';
+                  e.currentTarget.style.borderColor = '#059669';
+                  e.currentTarget.style.background = 'rgba(5, 150, 105, 0.08)';
+                  e.currentTarget.style.color = '#059669';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.borderColor = '#9E8C76';
+                  e.currentTarget.style.background = 'rgba(110, 70, 42, 0.06)';
+                  e.currentTarget.style.color = '#7D6A53';
                 }}
               >
-                <Lock size={15} color="#D1F1F8" strokeWidth={2.5} />
+                <Plus size={16} strokeWidth={2.5} />
+                <span style={{ fontSize: '9px', fontWeight: 900, marginTop: '1px' }}>
+                  展位{slotIdx + 1}
+                </span>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* ================= 新增自定义成就面板 ================= */}
@@ -749,9 +786,90 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
                 letterSpacing: '0.5px',
               }}
             >
-              成就 {totalScore}
+              达成 {totalUnlockedCount}/{achievements.length}
             </span>
           </div>
+        </div>
+
+        {/* ================= 地球Online六大分类导航栏 (<= 5 字) ================= */}
+        <div
+          className="no-scrollbar"
+          style={{
+            padding: '2px 14px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          <button
+            onClick={() => setActiveFilter('ALL')}
+            style={{
+              padding: '4px 10px',
+              borderRadius: '12px',
+              border: '1.5px solid #754F35',
+              background: activeFilter === 'ALL' ? '#754F35' : '#FAF4E4',
+              color: activeFilter === 'ALL' ? '#FFF' : '#6B4A34',
+              fontSize: '11px',
+              fontWeight: 900,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              boxShadow: activeFilter === 'ALL' ? 'inset 0 1px 2px rgba(0,0,0,0.3)' : '0 1px 2px rgba(0,0,0,0.06)',
+            }}
+          >
+            全部
+          </button>
+          <button
+            onClick={() => setActiveFilter('UNLOCKED')}
+            style={{
+              padding: '4px 10px',
+              borderRadius: '12px',
+              border: '1.5px solid #059669',
+              background: activeFilter === 'UNLOCKED' ? '#059669' : '#ECFDF5',
+              color: activeFilter === 'UNLOCKED' ? '#FFF' : '#047857',
+              fontSize: '11px',
+              fontWeight: 900,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              boxShadow: activeFilter === 'UNLOCKED' ? 'inset 0 1px 2px rgba(0,0,0,0.3)' : '0 1px 2px rgba(0,0,0,0.06)',
+            }}
+          >
+            已达成
+          </button>
+          {ACHIEVEMENT_CATEGORIES.map((cat) => {
+            const isSelected = activeFilter === cat.key;
+            return (
+              <button
+                key={cat.key}
+                onClick={() => setActiveFilter(cat.key)}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '12px',
+                  border: `1.5px solid ${cat.color}`,
+                  background: isSelected ? cat.color : cat.bg,
+                  color: isSelected ? '#FFFFFF' : cat.color,
+                  fontSize: '11px',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  boxShadow: isSelected ? 'inset 0 1px 2px rgba(0,0,0,0.3)' : '0 1px 2px rgba(0,0,0,0.06)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <span>{cat.icon}</span>
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* ================= 4. 核心木质挂牌卡片序列（横向滑动，深度还原参考图卡片） ================= */}
@@ -759,7 +877,7 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
           {...plaquesDragHandlers}
           className="no-scrollbar"
           style={{
-            padding: '8px 14px 24px',
+            padding: '4px 14px 24px',
             overflowX: 'auto',
             display: 'flex',
             gap: '12px',
@@ -775,6 +893,9 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
             const isDerived = !!ach.isDerived;
             const isUnlocked = ach.unlocked;
             const isClaimed = ach.claimed;
+            const catMeta = ach.category && (ach.category in ACHIEVEMENT_CATEGORY_MAP)
+              ? ACHIEVEMENT_CATEGORY_MAP[ach.category as AchievementCategoryKey]
+              : null;
 
             return (
               <div
@@ -830,17 +951,33 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
                     opacity: isDerived ? 0.78 : 1,
                   }}
                 >
-                  {/* 标牌顶部：Lv. 1 等级标 (参考图同款) */}
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 800,
-                      color: '#6B4A34',
-                      letterSpacing: '0.5px',
-                    }}
-                  >
-                    Lv. {ach.tier}
-                  </span>
+                  {/* 标牌顶部：地球Online分类小标 + 认证状态 (严禁与等级挂钩) */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 2px' }}>
+                    {catMeta ? (
+                      <span
+                        style={{
+                          fontSize: '9px',
+                          fontWeight: 800,
+                          color: catMeta.color,
+                          background: catMeta.bg,
+                          padding: '1px 5px',
+                          borderRadius: '6px',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {catMeta.icon} {catMeta.label}
+                      </span>
+                    ) : <span />}
+                    <span
+                      style={{
+                        fontSize: '9px',
+                        fontWeight: 800,
+                        color: isUnlocked ? '#059669' : '#94A3B8',
+                      }}
+                    >
+                      {isUnlocked ? '✓已达成' : '🔒待触发'}
+                    </span>
+                  </div>
 
                   {/* 标牌中央：专属萌系图腾插画 */}
                   <div
@@ -871,7 +1008,7 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
                     {ach.title}
                   </span>
 
-                  {/* 标牌指标数值 (对齐参考图中的 ATK 10 / HP 110) */}
+                  {/* 标牌指标数值 */}
                   <span
                     style={{
                       fontSize: '11px',
@@ -882,76 +1019,34 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
                     {ach.statLabel}
                   </span>
 
-                  {/* 标牌底部：参考图同款灰黑椭圆胶囊金币按键 */}
+                  {/* 标牌底部：系统判定状态条 (严禁手动判定，奖励待定) */}
                   <div
-                    onClick={(e) => {
-                      if (isUnlocked && !isClaimed) {
-                        handleClaimReward(ach.id, e);
-                      } else {
-                        handleToggleUnlock(ach.id, e);
-                      }
-                    }}
                     style={{
                       width: '100%',
                       marginTop: '4px',
                       padding: '4px 6px',
                       borderRadius: '16px',
-                      // 深度还原参考图深灰胶囊底色与内嵌高光
-                      background: isClaimed
-                        ? '#059669' // 已达成绿色
-                        : isUnlocked
-                        ? '#EAB308' // 可领奖金黄
-                        : '#475569', // 未解锁深灰 (参考图同款)
+                      background: isUnlocked
+                        ? '#059669'
+                        : '#475569',
                       border: '1.5px solid #1E293B',
-                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.4), 0 2px 0 #1E293B',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.3), 0 2px 0 #1E293B',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '4px',
-                      cursor: 'pointer',
+                      pointerEvents: 'none',
                     }}
                   >
-                    {/* 左侧金币图标 */}
-                    <div
-                      style={{
-                        width: '14px',
-                        height: '14px',
-                        borderRadius: '50%',
-                        background: '#FBBF24',
-                        border: '1px solid #78350F',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '9px',
-                        fontWeight: 900,
-                        color: '#78350F',
-                        flexShrink: 0,
-                      }}
-                    >
-                      $
-                    </div>
-
-                    {/* 中间状态/锁图标与文案 (<= 5 字) */}
-                    {isClaimed ? (
+                    {isUnlocked ? (
                       <span style={{ fontSize: '10px', fontWeight: 900, color: '#FFFFFF' }}>
-                        已达成
+                        ★ 系统已认证
                       </span>
-                    ) : isUnlocked ? (
-                      <span style={{ fontSize: '10px', fontWeight: 900, color: '#FFFFFF' }}>
-                        领奖励
-                      </span>
-                    ) : isDerived ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                        <Lock size={10} color="#CBD5E1" />
-                        <span style={{ fontSize: '10px', fontWeight: 800, color: '#CBD5E1' }}>
-                          待衍生
-                        </span>
-                      </div>
                     ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                         <Lock size={10} color="#CBD5E1" />
                         <span style={{ fontSize: '10px', fontWeight: 800, color: '#CBD5E1' }}>
-                          待达成
+                          待系统达成
                         </span>
                       </div>
                     )}
@@ -1026,12 +1121,34 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
                 {renderCrestIcon(selectedAch.iconType, selectedAch.isDerived)}
               </div>
 
-              {/* 成就标题与阶级 */}
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '17px', fontWeight: 900, color: '#422817' }}>
-                  {selectedAch.title} (Lv.{selectedAch.tier})
+              {/* 成就标题与分类 */}
+              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                  <span style={{ fontSize: '20px' }}>{selectedAch.badgeEmoji || '✨'}</span>
+                  <span style={{ fontSize: '17px', fontWeight: 900, color: '#422817' }}>
+                    {selectedAch.title}
+                  </span>
                 </div>
-                <div style={{ fontSize: '12px', color: '#8D4952', fontWeight: 800, marginTop: '2px' }}>
+                {selectedAch.category && (selectedAch.category in ACHIEVEMENT_CATEGORY_MAP) && (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      background: ACHIEVEMENT_CATEGORY_MAP[selectedAch.category as AchievementCategoryKey].bg,
+                      color: ACHIEVEMENT_CATEGORY_MAP[selectedAch.category as AchievementCategoryKey].color,
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      marginTop: '4px',
+                    }}
+                  >
+                    <span>{ACHIEVEMENT_CATEGORY_MAP[selectedAch.category as AchievementCategoryKey].icon}</span>
+                    <span>{ACHIEVEMENT_CATEGORY_MAP[selectedAch.category as AchievementCategoryKey].label}</span>
+                  </div>
+                )}
+                <div style={{ fontSize: '12px', color: '#8D4952', fontWeight: 800, marginTop: '4px' }}>
                   {selectedAch.statLabel}
                 </div>
                 <div style={{ fontSize: '11px', color: '#6B4A34', marginTop: '4px', lineHeight: 1.4 }}>
@@ -1057,45 +1174,156 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
                 )}
               </div>
 
-              {/* 操作按钮组 (<= 5 字) */}
-              <div style={{ width: '100%', display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => handleToggleUnlock(selectedAch.id)}
-                  style={{
-                    flex: 1,
-                    padding: '8px 0',
-                    borderRadius: '12px',
-                    background: selectedAch.unlocked ? '#D1FAE5' : '#FEF3C7',
-                    color: selectedAch.unlocked ? '#065F46' : '#92400E',
-                    border: '2px solid #6E462A',
-                    fontSize: '12px',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 0 #6E462A',
-                  }}
-                >
-                  {selectedAch.unlocked ? '已达成' : '标记达成'}
-                </button>
+              {/* 荣誉展柜佩戴快捷入口 */}
+              <div style={{ width: '100%' }}>
+                {showcaseSlots.includes(selectedAch.id) ? (
+                  <button
+                    onClick={() => {
+                      const slotIdx = showcaseSlots.indexOf(selectedAch.id);
+                      const updated = [...showcaseSlots];
+                      updated[slotIdx] = null;
+                      setShowcaseSlots(updated);
+                      saveShowcaseBadges(updated);
+                      setToastMsg(`已从荣誉展柜第 ${slotIdx + 1} 位卸下`);
+                      setTimeout(() => setToastMsg(null), 2000);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '7px 0',
+                      borderRadius: '12px',
+                      background: '#FEF3C7',
+                      color: '#92400E',
+                      border: '1.5px solid #D97706',
+                      fontSize: '11px',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ★ 已在荣誉展柜第 {showcaseSlots.indexOf(selectedAch.id) + 1} 位 (点击卸下)
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const firstEmptyIdx = showcaseSlots.findIndex((s) => s === null);
+                      if (firstEmptyIdx !== -1) {
+                        const updated = [...showcaseSlots];
+                        updated[firstEmptyIdx] = selectedAch.id;
+                        setShowcaseSlots(updated);
+                        saveShowcaseBadges(updated);
+                        setToastMsg(`已佩戴至荣誉展柜第 ${firstEmptyIdx + 1} 位！`);
+                        setTimeout(() => setToastMsg(null), 2500);
+                      } else {
+                        setPickerSlotIndex(0);
+                        setToastMsg('展柜 6 个展位已满，请选择替换槽位');
+                        setTimeout(() => setToastMsg(null), 2500);
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '7px 0',
+                      borderRadius: '12px',
+                      background: '#E0F2FE',
+                      color: '#0369A1',
+                      border: '1.5px solid #0284C7',
+                      fontSize: '11px',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    📌 佩戴到荣誉展柜 (自选展示)
+                  </button>
+                )}
+              </div>
 
+              {/* 系统判定认证状态 (严格禁止手动篡改，奖励待定) */}
+              <div
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '14px',
+                  background: selectedAch.unlocked ? '#ECFDF5' : '#F1F5F9',
+                  border: selectedAch.unlocked ? '2px solid #059669' : '1.5px solid #94A3B8',
+                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  fontSize: '11px',
+                  fontWeight: 900,
+                  color: selectedAch.unlocked ? '#065F46' : '#475569',
+                }}
+              >
+                {selectedAch.unlocked ? (
+                  <>
+                    <Check size={14} color="#059669" strokeWidth={3} />
+                    <span>系统认证：已达成 (地球Online触发)</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock size={14} color="#64748B" strokeWidth={2.5} />
+                    <span>系统判定：待达成 (仅系统自动触发)</span>
+                  </>
+                )}
+              </div>
+
+              {/* 操作按钮组 (删除自定义成就) */}
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   onClick={() => handleDelete(selectedAch.id)}
                   style={{
-                    padding: '8px 14px',
-                    borderRadius: '12px',
+                    padding: '6px 14px',
+                    borderRadius: '10px',
                     background: '#FEE2E2',
                     color: '#DC2626',
-                    border: '2px solid #6E462A',
-                    fontSize: '12px',
-                    fontWeight: 900,
+                    border: '1.5px solid #EF4444',
+                    fontSize: '11px',
+                    fontWeight: 800,
                     cursor: 'pointer',
-                    boxShadow: '0 2px 0 #6E462A',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
                   }}
                 >
-                  删除
+                  <Trash2 size={12} />
+                  删除成就
                 </button>
               </div>
             </div>
           </div>
+        )}
+
+        {/* ================= 自由展柜装配弹窗 ================= */}
+        {pickerSlotIndex !== null && (
+          <ShowcasePickerModal
+            slotIndex={pickerSlotIndex}
+            currentBadgeId={showcaseSlots[pickerSlotIndex]}
+            achievements={achievements}
+            showcaseSlots={showcaseSlots}
+            onSelectBadge={(badgeId) => {
+              const updated = [...showcaseSlots];
+              const existingIdx = updated.indexOf(badgeId);
+              if (existingIdx !== -1 && existingIdx !== pickerSlotIndex) {
+                updated[existingIdx] = null;
+              }
+              updated[pickerSlotIndex] = badgeId;
+              setShowcaseSlots(updated);
+              saveShowcaseBadges(updated);
+              const ach = achievements.find((a) => a.id === badgeId);
+              setToastMsg(`已将【${ach?.title || '徽章'}】佩戴至第 ${pickerSlotIndex + 1} 展位！`);
+              setTimeout(() => setToastMsg(null), 2500);
+              setPickerSlotIndex(null);
+            }}
+            onRemoveBadge={() => {
+              const updated = [...showcaseSlots];
+              updated[pickerSlotIndex] = null;
+              setShowcaseSlots(updated);
+              saveShowcaseBadges(updated);
+              setToastMsg(`已清空第 ${pickerSlotIndex + 1} 展位`);
+              setTimeout(() => setToastMsg(null), 2000);
+              setPickerSlotIndex(null);
+            }}
+            onClose={() => setPickerSlotIndex(null)}
+          />
         )}
       </div>
 

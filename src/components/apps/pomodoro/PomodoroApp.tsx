@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Clock, CheckSquare, BarChart3, Settings, ArrowLeft, Target, X, ChevronRight } from 'lucide-react';
-import { PomodoroTimerTab, PomodoroMode } from './PomodoroTimerTab';
+import { PomodoroTimerTab, PomodoroMode, TimerType } from './PomodoroTimerTab';
 import { PomodoroTasksTab } from './PomodoroTasksTab';
 import { PomodoroAnalyticsTab } from './PomodoroAnalyticsTab';
 import { PomodoroSettingsTab, PomodoroSettings } from './PomodoroSettingsTab';
@@ -15,6 +15,8 @@ import {
   recordPomodoroSession,
 } from './pomodoroStorage';
 import { settlePomodoroFocus, settlePomodoroBreak } from '../../../core/rpg/rpgStorage';
+import { unlockAchievementById } from '../../../core/rpg/achievementStorage';
+import { CelebrationModal } from '../../modals/CelebrationModal';
 import { db, PomodoroTaskRecord } from '../../../core/storage/db';
 
 interface PomodoroAppProps {
@@ -38,8 +40,11 @@ const DEFAULT_SETTINGS: PomodoroSettings = {
 export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState<TabType>('timer');
   const [mode, setMode] = useState<PomodoroMode>('focus');
+  const [timerType, setTimerType] = useState<TimerType>('countdown');
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [completedPomodorosInCycle, setCompletedPomodorosInCycle] = useState<number>(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  const [showCelebration, setShowCelebration] = useState<boolean>(false);
   
   // 任务管理与选择
   const [tasks, setTasks] = useState<PomodoroTaskRecord[]>([]);
@@ -164,6 +169,25 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
     setTimeout(() => setRpgNotice(null), 3000);
   };
 
+  // 检查并触发首次专注里程碑烟花与成就解锁
+  const checkFirstFocusMilestone = async () => {
+    try {
+      const hasCelebrated = localStorage.getItem('cloudfly_unlocked_first_focus');
+      if (!hasCelebrated) {
+        const count = await db.pomodoro_sessions
+          .filter((s) => s.mode === 'focus' && s.isCompleted)
+          .count();
+        if (count <= 1) {
+          localStorage.setItem('cloudfly_unlocked_first_focus', 'true');
+          unlockAchievementById('ach_first_focus');
+          setShowCelebration(true);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to check first focus milestone', err);
+    }
+  };
+
   // 阶段完成自动流转与 IndexedDB 保存
   const handleStageCompleted = useCallback(async () => {
     // 1. 感官反馈提示
@@ -189,6 +213,7 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
           completedAt: Date.now(),
         });
         await refreshTasks();
+        await checkFirstFocusMilestone();
       } catch (err) {
         console.error('Failed to record pomodoro session in IndexedDB', err);
       }
@@ -248,24 +273,28 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
     refreshTasks,
   ]);
 
-  // 核心计时 Interval
+  // 核心计时 Interval（支持倒计时递减 与 正向计时递增）
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
     if (isRunning) {
       timer = setInterval(() => {
-        setTimeLeftSeconds((prev) => {
-          if (prev <= 1) {
-            handleStageCompleted();
-            return 0;
-          }
-          return prev - 1;
-        });
+        if (mode === 'focus' && timerType === 'countup') {
+          setElapsedSeconds((prev) => prev + 1);
+        } else {
+          setTimeLeftSeconds((prev) => {
+            if (prev <= 1) {
+              handleStageCompleted();
+              return 0;
+            }
+            return prev - 1;
+          });
+        }
       }, 1000);
     }
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isRunning, handleStageCompleted]);
+  }, [isRunning, mode, timerType, handleStageCompleted]);
 
   // 控制按钮动作
   const handleStartPause = () => {
@@ -273,12 +302,108 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
     setIsRunning((prev) => !prev);
   };
 
+  // 正向计时主动完成结算
+  const handleFinishCountup = useCallback(async () => {
+    playClickSound();
+    if (elapsedSeconds < 10) return;
+
+    if (settings.soundEnabled) {
+      playCompletionChime();
+    }
+    if (settings.vibrationEnabled && typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([100, 50, 100, 50, 150]);
+    }
+
+    const actualMin = Math.max(1, Math.round(elapsedSeconds / 60));
+    const targetMin = Math.round(totalDurationSeconds / 60);
+
+    try {
+      await recordPomodoroSession({
+        taskId: activeTask?.id,
+        taskTitle: activeTask?.title,
+        category: activeTask?.category || 'work',
+        mode: 'focus',
+        durationMinutes: targetMin,
+        actualSeconds: elapsedSeconds,
+        isCompleted: true,
+        completedAt: Date.now(),
+      });
+      await refreshTasks();
+      await checkFirstFocusMilestone();
+    } catch (err) {
+      console.error('Failed to log countup session', err);
+    }
+
+    // 后台 RPG 区间奖励结算
+    try {
+      const settle = settlePomodoroFocus(activeTask?.difficulty, activeTask?.targetAttr);
+      if (settle.leveledUp) {
+        showRpgNotice('角色升级');
+      } else if (settle.clearedDebuff) {
+        showRpgNotice('拖延已破除');
+      } else {
+        const attrMap: Record<string, string> = {
+          STR: '力量', DEX: '敏捷', INT: '智力', SPI: '精神', CON: '体质', CHA: '魅力'
+        };
+        showRpgNotice(`${attrMap[settle.attrKey] || '属性'}+${settle.attrGain}`);
+      }
+    } catch (err) {
+      console.warn('RPG error', err);
+    }
+
+    setIsRunning(false);
+    setElapsedSeconds(0);
+
+    // 专注完成后切换至休息阶段
+    const nextCycleCount = completedPomodorosInCycle + 1;
+    setCompletedPomodorosInCycle(nextCycleCount);
+    const isLongBreak = nextCycleCount % settings.longBreakInterval === 0;
+    const nextMode: PomodoroMode = isLongBreak ? 'long_break' : 'short_break';
+    const nextSec = getModeDurationSeconds(nextMode);
+
+    setMode(nextMode);
+    setTotalDurationSeconds(nextSec);
+    setTimeLeftSeconds(nextSec);
+    setIsRunning(settings.autoStartBreak);
+  }, [
+    elapsedSeconds,
+    activeTask,
+    settings,
+    totalDurationSeconds,
+    refreshTasks,
+    completedPomodorosInCycle,
+    getModeDurationSeconds,
+  ]);
+
   const handleReset = async () => {
     playClickSound();
-    const elapsedSeconds = totalDurationSeconds - timeLeftSeconds;
+
+    if (mode === 'focus' && timerType === 'countup') {
+      if (elapsedSeconds >= 60) {
+        try {
+          await recordPomodoroSession({
+            taskId: activeTask?.id,
+            taskTitle: activeTask?.title,
+            category: activeTask?.category || 'work',
+            mode: 'focus',
+            durationMinutes: Math.round(totalDurationSeconds / 60),
+            actualSeconds: elapsedSeconds,
+            isCompleted: false,
+            completedAt: Date.now(),
+          });
+          await refreshTasks();
+        } catch (err) {
+          console.error('Failed to log abandoned countup session', err);
+        }
+      }
+      setIsRunning(false);
+      setElapsedSeconds(0);
+      return;
+    }
+
+    const elapsed = totalDurationSeconds - timeLeftSeconds;
     // 如果是专注阶段且已经坚持超过 1 分钟，记录为中途取消会话保存到 IndexedDB
-    if (mode === 'focus' && elapsedSeconds >= 60) {
-      const actualMin = Math.max(1, Math.round(elapsedSeconds / 60));
+    if (mode === 'focus' && elapsed >= 60) {
       try {
         await recordPomodoroSession({
           taskId: activeTask?.id,
@@ -286,7 +411,7 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
           category: activeTask?.category || 'work',
           mode: 'focus',
           durationMinutes: Math.round(totalDurationSeconds / 60),
-          actualSeconds: elapsedSeconds,
+          actualSeconds: elapsed,
           isCompleted: false,
           completedAt: Date.now(),
         });
@@ -318,9 +443,38 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
     }
   };
 
+  // 手动切换倒计时 / 正向计时
+  const handleToggleTimerType = (type: TimerType) => {
+    if (isRunning) return;
+    playClickSound();
+    setTimerType(type);
+    if (type === 'countup') {
+      setElapsedSeconds(0);
+    } else {
+      setTimeLeftSeconds(totalDurationSeconds);
+    }
+  };
+
+  // 从任务清单选择任务时，自动同步任务专属的时长与计时模式
   const handleSelectTaskFromList = (task: PomodoroTaskRecord | null) => {
     playClickSound();
     setActiveTask(task);
+    if (task && !isRunning) {
+      const taskMinutes = task.focusDurationMinutes || settings.focusDuration;
+      const sec = taskMinutes * 60;
+      setTotalDurationSeconds(sec);
+      if (task.timerType === 'countup') {
+        setTimerType('countup');
+        setElapsedSeconds(0);
+      } else {
+        setTimerType('countdown');
+        setTimeLeftSeconds(sec);
+      }
+    } else if (!task && !isRunning) {
+      const sec = settings.focusDuration * 60;
+      setTotalDurationSeconds(sec);
+      setTimeLeftSeconds(sec);
+    }
     setActiveTab('timer'); // 切换到主计时界面
   };
 
@@ -617,7 +771,9 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
         {activeTab === 'timer' && (
           <PomodoroTimerTab
             mode={mode}
+            timerType={timerType}
             timeLeftSeconds={timeLeftSeconds}
+            elapsedSeconds={elapsedSeconds}
             totalDurationSeconds={totalDurationSeconds}
             isRunning={isRunning}
             activeTask={activeTask}
@@ -632,6 +788,8 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
             onStartPause={handleStartPause}
             onReset={handleReset}
             onSkip={handleSkip}
+            onFinishCountup={handleFinishCountup}
+            onToggleTimerType={handleToggleTimerType}
             onToggleNoise={handleToggleNoise}
             onSelectTaskClick={() => {
               playClickSound();
@@ -806,6 +964,18 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
           <span style={{ fontSize: '10px' }}>设置</span>
         </button>
       </div>
+
+      {/* 首次专注达成：全屏烟花与地球Online徽章浮现弹窗 */}
+      <CelebrationModal
+        isOpen={showCelebration}
+        onClose={() => setShowCelebration(false)}
+        title="恭喜完成第一次专注！"
+        badgeTitle="新手教程通关"
+        badgeEmoji="👑"
+        categoryLabel="固件升级"
+        description="检测到玩家主动切断多巴胺闲散流，首次脱机运转25分钟。当前精神状态已优化，主频超频运转中。"
+        rewardText="精神 +1  ·  🪙 金币 +100"
+      />
     </div>
   );
 };

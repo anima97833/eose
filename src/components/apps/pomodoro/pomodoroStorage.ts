@@ -92,6 +92,7 @@ export interface PomodoroOverviewStats {
   todayPoms: number;
   weekMinutes: number;
   weekPoms: number;
+  totalMinutes: number;
   totalPoms: number;
   dailyTrend: DayFocusStat[];
   categoryBreakdown: CategoryStat[];
@@ -118,6 +119,7 @@ export async function calculatePomodoroStats(): Promise<PomodoroOverviewStats> {
   let todayPoms = 0;
   let weekMinutes = 0;
   let weekPoms = 0;
+  let totalMinutes = 0;
 
   // 初始化近7日数据
   const dayMap = new Map<string, { minutes: number; poms: number }>();
@@ -134,6 +136,8 @@ export async function calculatePomodoroStats(): Promise<PomodoroOverviewStats> {
 
   focusSessions.forEach((s) => {
     const min = Math.round(s.actualSeconds / 60);
+    totalMinutes += min;
+
     if (s.completedAt >= todayStart) {
       todayMinutes += min;
       if (s.isCompleted) todayPoms += 1;
@@ -182,6 +186,7 @@ export async function calculatePomodoroStats(): Promise<PomodoroOverviewStats> {
     todayPoms,
     weekMinutes,
     weekPoms,
+    totalMinutes,
     totalPoms: focusSessions.filter((s) => s.isCompleted).length,
     dailyTrend,
     categoryBreakdown,

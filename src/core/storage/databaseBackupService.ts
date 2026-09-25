@@ -151,6 +151,8 @@ export async function exportFullDatabase(): Promise<{
   let totalRecords = 0;
 
   for (const table of db.tables) {
+    // 排除电玩游戏表（避免超大 SWF 二进制撑爆全量备份与造成内存 OOM）
+    if (table.name === 'swf_games') continue;
     try {
       const records = await table.toArray();
       tablesData[table.name] = records;

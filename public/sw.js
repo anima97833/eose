@@ -1,5 +1,5 @@
 // 雀 (Que) PWA Service Worker
-const CACHE_NAME = 'que-pwa-v1';
+const CACHE_NAME = 'que-pwa-v2';
 
 const STATIC_ASSETS = [
   '/',
@@ -39,34 +39,36 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// 拦截请求：对静态资源和应用外壳采用缓存优先/回退网络，对音频流和外部API直接放行
+// 拦截请求：仅拦截本站同源静态资源与页面，所有第三方与跨域外部API直接放行，绝不拦截！
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // 跳过音频流、外部大模型 API、以及非 GET 请求
+  // 1. 严格跳过所有非同源外部请求（交给浏览器网络栈原生处理，防止拦截产生 CORS 或 undefined Response 报错）
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // 2. 跳过非 GET 请求、音频流、以及后端本地代理接口
   if (
     event.request.method !== 'GET' ||
     url.pathname.endsWith('.mp3') ||
     url.pathname.endsWith('.m3u8') ||
-    url.hostname.includes('googleapis') ||
-    url.hostname.includes('openai') ||
-    url.hostname.includes('radio-browser') ||
-    url.hostname.includes('colormind')
+    url.pathname.startsWith('/api/')
   ) {
     return;
   }
 
-  // 页面导航请求优先尝试网络，离线时回退到已缓存的 index.html
+  // 3. 页面导航请求优先尝试网络，离线时回退到已缓存的 index.html
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => {
-        return caches.match('/index.html') || caches.match('/');
+        return caches.match('/index.html').then((res) => res || new Response('Offline', { status: 503 }));
       })
     );
     return;
   }
 
-  // 其他静态静态文件与脚本：Stale-While-Revalidate
+  // 4. 本地静态文件与脚本：Stale-While-Revalidate，安全兜底绝不返回 undefined
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)
@@ -79,7 +81,9 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => cachedResponse);
+        .catch(() => {
+          return cachedResponse || new Response('Asset unavailable', { status: 404 });
+        });
 
       return cachedResponse || fetchPromise;
     })

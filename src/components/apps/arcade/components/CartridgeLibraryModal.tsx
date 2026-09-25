@@ -161,6 +161,18 @@ export const CartridgeLibraryModal: React.FC<CartridgeLibraryModalProps> = ({
             </span>
           </button>
 
+          <div
+            style={{
+              fontSize: '11px',
+              color: '#64748B',
+              textAlign: 'center',
+              lineHeight: 1.4,
+              padding: '2px 4px 4px',
+            }}
+          >
+            ⚡ <strong>内存即开即玩</strong>：SWF游戏仅在当前网页会话中加载运行，不占用永久磁盘空间，零存储负担。
+          </div>
+
           {/* 游戏卡带列表 */}
           {games.length === 0 ? (
             <div

@@ -4,41 +4,51 @@ import { SWFGame } from './arcadeTypes';
 const CARTRIDGE_COLORS = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#6366F1'];
 const CARTRIDGE_EMOJIS = ['🎮', '👾', '🕹️', '⚔️', '🚀', '🐱', '⭐', '💎', '🔥', '🏆'];
 
-export async function loadAllSWFGames(): Promise<SWFGame[]> {
+// 内存运行时卡带库（免持久化写入 IndexedDB，避免动辄几十 MB 的二进制大文件撑爆本地磁盘与全量备份）
+let inMemorySWFGames: SWFGame[] = [];
+
+/**
+ * 清理旧版可能遗留在 IndexedDB 中的超大 SWF 二进制数据，主动释放本地磁盘空间
+ */
+export async function cleanupLegacySWFStorage(): Promise<void> {
   try {
-    const list = await db.swf_games.toArray();
-    return list.sort((a, b) => (b.lastPlayedAt || b.createdAt) - (a.lastPlayedAt || a.createdAt));
+    if (db.isOpen() || (await db.open())) {
+      const count = await db.swf_games.count();
+      if (count > 0) {
+        await db.swf_games.clear();
+        console.log(`[Arcade] 已成功清理 IndexedDB 中残留的 ${count} 个 SWF 二进制缓存，彻底释放本地空间。`);
+      }
+    }
   } catch (err) {
-    console.warn('[ArcadeDB] 读取游戏列表失败:', err);
-    return [];
+    // 忽略异常
   }
 }
 
+export async function loadAllSWFGames(): Promise<SWFGame[]> {
+  // 启动时触发一次静默旧数据释放
+  cleanupLegacySWFStorage().catch(() => {});
+  return [...inMemorySWFGames].sort(
+    (a, b) => (b.lastPlayedAt || b.createdAt) - (a.lastPlayedAt || a.createdAt)
+  );
+}
+
 export async function saveSWFGame(game: SWFGame): Promise<void> {
-  try {
-    await db.swf_games.put(game);
-  } catch (err) {
-    console.warn('[ArcadeDB] 保存游戏失败:', err);
+  const index = inMemorySWFGames.findIndex((g) => g.id === game.id);
+  if (index >= 0) {
+    inMemorySWFGames[index] = game;
+  } else {
+    inMemorySWFGames.push(game);
   }
 }
 
 export async function deleteSWFGame(id: string): Promise<void> {
-  try {
-    await db.swf_games.delete(id);
-  } catch (err) {
-    console.warn('[ArcadeDB] 删除游戏失败:', err);
-  }
+  inMemorySWFGames = inMemorySWFGames.filter((g) => g.id !== id);
 }
 
 export async function updateGameLastPlayed(id: string): Promise<void> {
-  try {
-    const game = await db.swf_games.get(id);
-    if (game) {
-      game.lastPlayedAt = Date.now();
-      await db.swf_games.put(game);
-    }
-  } catch (err) {
-    console.warn('[ArcadeDB] 更新游玩时间失败:', err);
+  const game = inMemorySWFGames.find((g) => g.id === id);
+  if (game) {
+    game.lastPlayedAt = Date.now();
   }
 }
 

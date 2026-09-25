@@ -300,6 +300,18 @@ export const DEFAULT_STORE_CATALOG: AppStoreItem[] = [
     isSystem: false,
   },
   {
+    id: 'gamevault',
+    name: '游戏私藏',
+    version: '1.0.0',
+    category: 'media',
+    categoryLabel: '卡带',
+    iconName: 'Gamepad2',
+    description: '轻拟物复古卡带架，集成 Steam 与 App Store 双引擎搜索，随时记录与检视心动在玩/想玩/通关神作。',
+    features: ['复古拟物实体卡带质感', 'Steam 商店封面与 CDN 直连', 'App Store 移动手游搜索', '在玩/想玩/通关/封盘多维看板', '游玩时长与评分私藏手账'],
+    isInstalled: true,
+    isSystem: false,
+  },
+  {
     id: 'files',
     name: '文件管理',
     version: '1.0.0',
@@ -433,6 +445,22 @@ export function listStoreCatalog(): AppStoreItem[] {
         const pocketPadItem = parsed.find((item) => item.id === 'pocketpad');
         if (pocketPadItem && !pocketPadItem.isInstalled) {
           pocketPadItem.isInstalled = true;
+          hasNew = true;
+        }
+        const gachaItem = parsed.find((item) => item.id === 'gachapon');
+        if (gachaItem && !gachaItem.isInstalled) {
+          gachaItem.isInstalled = true;
+          hasNew = true;
+        }
+        let gameVaultItem = parsed.find((item) => item.id === 'gamevault');
+        if (!gameVaultItem) {
+          const defaultGameVault = DEFAULT_STORE_CATALOG.find((item) => item.id === 'gamevault');
+          if (defaultGameVault) {
+            parsed.push(defaultGameVault);
+            hasNew = true;
+          }
+        } else if (!gameVaultItem.isInstalled) {
+          gameVaultItem.isInstalled = true;
           hasNew = true;
         }
         if (hasNew) {

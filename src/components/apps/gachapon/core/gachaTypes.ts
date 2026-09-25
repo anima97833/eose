@@ -2,7 +2,24 @@ import { RGBColor, rgbToHex } from '../../../../core/theme/colormindService';
 
 export type CapsuleColorKey = 'pink' | 'blue' | 'yellow' | 'green' | 'purple' | 'orange';
 
-export type GachaMode = 'wish' | 'task';
+export type GachaMode = 'wish' | 'task' | 'entertainment';
+
+export type EntertainmentSubFilter = 'all' | 'book' | 'movie' | 'game';
+
+export interface EntertainmentItem {
+  id: string;
+  originalId: string;
+  type: 'book' | 'movie' | 'game';
+  typeLabel: string;
+  title: string;
+  subtitle?: string;
+  coverUrl?: string;
+  progressLabel?: string;
+  flavorQuote?: string;
+  colorKey: CapsuleColorKey;
+  icon: string;
+  createdAt: number;
+}
 
 export interface WishItem {
   id: string;

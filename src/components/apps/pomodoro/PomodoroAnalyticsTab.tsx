@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { calculatePomodoroStats, PomodoroOverviewStats } from './pomodoroStorage';
 import { Clock, Award, Calendar, BarChart3, TrendingUp } from 'lucide-react';
+import { playClickSound } from './soundSynthesizer';
 
 export const PomodoroAnalyticsTab: React.FC = () => {
   const [stats, setStats] = useState<PomodoroOverviewStats | null>(null);
+  const [timeScope, setTimeScope] = useState<'today' | 'total'>('today');
 
   const loadStats = async () => {
     const data = await calculatePomodoroStats();
@@ -36,21 +38,83 @@ export const PomodoroAnalyticsTab: React.FC = () => {
         overflowY: 'auto',
       }}
     >
-      {/* 标题 */}
-      <div>
-        <div style={{ fontSize: '16px', fontWeight: 800, color: '#2F614C' }}>
-          专注统计与复盘 (Analytics)
+      {/* 标题栏与切换纯按钮 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        <div>
+          <div style={{ fontSize: '16px', fontWeight: 800, color: '#2F614C' }}>
+            专注统计与复盘 (Analytics)
+          </div>
+          <div style={{ fontSize: '11px', color: '#6A8A73' }}>
+            {timeScope === 'today' ? '今日专注成果与节奏' : '历史留存全部累计数据'}
+          </div>
         </div>
-        <div style={{ fontSize: '11px', color: '#6A8A73' }}>
-          历史会话自动留存 IndexedDB，记录每一个努力的瞬间
+
+        {/* 纯按钮切换：今日 / 总计 */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: 'rgba(215, 235, 220, 0.65)',
+            borderRadius: '14px',
+            padding: '2px',
+            border: '1px solid rgba(160, 185, 170, 0.45)',
+            flexShrink: 0,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              playClickSound();
+              setTimeScope('today');
+            }}
+            style={{
+              padding: '3px 10px',
+              borderRadius: '11px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontWeight: 700,
+              backgroundColor: timeScope === 'today' ? '#3A5A40' : 'transparent',
+              color: timeScope === 'today' ? '#FFFFFF' : '#4E6655',
+              boxShadow: timeScope === 'today' ? '0 2px 5px rgba(58, 90, 64, 0.25)' : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            今日
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              playClickSound();
+              setTimeScope('total');
+            }}
+            style={{
+              padding: '3px 10px',
+              borderRadius: '11px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontWeight: 700,
+              backgroundColor: timeScope === 'total' ? '#3A5A40' : 'transparent',
+              color: timeScope === 'total' ? '#FFFFFF' : '#4E6655',
+              boxShadow: timeScope === 'total' ? '0 2px 5px rgba(58, 90, 64, 0.25)' : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            总计
+          </button>
         </div>
       </div>
 
       {/* 1. 三大指标卡 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-        {/* 今日时长 */}
+        {/* 专注时长卡片 */}
         <div
           className="nm-card-sm"
+          onClick={() => {
+            playClickSound();
+            setTimeScope((prev) => (prev === 'today' ? 'total' : 'today'));
+          }}
           style={{
             padding: '10px 8px',
             borderRadius: '16px',
@@ -58,19 +122,34 @@ export const PomodoroAnalyticsTab: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.18s ease',
           }}
+          title="点击可在今日与总计之间切换"
         >
           <Clock size={16} color="#4E937A" />
           <span style={{ fontSize: '16px', fontWeight: 800, color: '#283618', marginTop: '4px' }}>
-            {stats.todayMinutes}
-            <span style={{ fontSize: '10px', fontWeight: 500, color: '#6A8A73' }}>分</span>
+            {timeScope === 'today'
+              ? stats.todayMinutes
+              : stats.totalMinutes >= 60
+              ? (stats.totalMinutes / 60).toFixed(1)
+              : stats.totalMinutes}
+            <span style={{ fontSize: '10px', fontWeight: 500, color: '#6A8A73' }}>
+              {timeScope === 'today' ? '分' : stats.totalMinutes >= 60 ? '时' : '分'}
+            </span>
           </span>
-          <span style={{ fontSize: '10px', color: '#6A8A73' }}>今日专注</span>
+          <span style={{ fontSize: '10px', color: '#6A8A73' }}>
+            {timeScope === 'today' ? '今日专注' : '总专注'}
+          </span>
         </div>
 
-        {/* 今日番茄数 */}
+        {/* 番茄数卡片 */}
         <div
           className="nm-card-sm"
+          onClick={() => {
+            playClickSound();
+            setTimeScope((prev) => (prev === 'today' ? 'total' : 'today'));
+          }}
           style={{
             padding: '10px 8px',
             borderRadius: '16px',
@@ -78,17 +157,22 @@ export const PomodoroAnalyticsTab: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.18s ease',
           }}
+          title="点击可在今日与总计之间切换"
         >
           <Award size={16} color="#E07A5F" />
           <span style={{ fontSize: '16px', fontWeight: 800, color: '#283618', marginTop: '4px' }}>
-            {stats.todayPoms}
+            {timeScope === 'today' ? stats.todayPoms : stats.totalPoms}
             <span style={{ fontSize: '10px', fontWeight: 500, color: '#6A8A73' }}>个</span>
           </span>
-          <span style={{ fontSize: '10px', color: '#6A8A73' }}>今日番茄</span>
+          <span style={{ fontSize: '10px', color: '#6A8A73' }}>
+            {timeScope === 'today' ? '今日番茄' : '总番茄'}
+          </span>
         </div>
 
-        {/* 本周累计 */}
+        {/* 本周累计卡片 */}
         <div
           className="nm-card-sm"
           style={{

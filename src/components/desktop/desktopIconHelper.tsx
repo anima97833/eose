@@ -52,7 +52,8 @@ export function getAppIcon(appId: string, size = 24): React.ReactNode {
     case 'camera': return <Camera size={size} strokeWidth={2.2} />;
     case 'radio': return <Radio size={size} strokeWidth={2.2} />;
     case 'arcade':
-    case 'games': return <Gamepad2 size={size} strokeWidth={2.2} />;
+    case 'games':
+    case 'gamevault': return <Gamepad2 size={size} strokeWidth={2.2} />;
     case 'files': return <Folder size={size} strokeWidth={2.2} />;
     case 'compass': return <Compass size={size} strokeWidth={2.2} />;
     case 'security': return <ShieldCheck size={size} strokeWidth={2.2} />;
@@ -122,6 +123,7 @@ export function getAppTitle(appId: string): string {
     case 'storyword': return '爽文背词';
     case 'pocketpad': return 'Pocket Pad';
     case 'gachapon': return '扭蛋';
+    case 'gamevault': return '游戏私藏';
     default: {
       const storeItem = listStoreCatalog().find((item) => item.id === appId);
       if (storeItem) return storeItem.name;

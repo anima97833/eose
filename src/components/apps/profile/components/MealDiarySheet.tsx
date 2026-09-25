@@ -8,6 +8,7 @@ import {
   resetMealRecords,
   DEFAULT_MEALS,
 } from '../../../../core/rpg/mealStorage';
+import { compressImageFile } from '../../../../utils/imageCompressor';
 import {
   FlowerWagashiSVG,
   ManjuSVG,
@@ -20,6 +21,7 @@ import {
   WagashiShopSVG,
   StarredRibbonBowSVG,
 } from './WagashiIllustrations';
+import { MealRouletteView } from './MealRouletteView';
 
 interface MealDiarySheetProps {
   onClose: () => void;
@@ -60,6 +62,8 @@ const renderPresetIllustration = (badgeKey?: string, size = 66) => {
 
 export const MealDiarySheet: React.FC<MealDiarySheetProps> = ({ onClose }) => {
   const [records, setRecords] = useState<RPGMealRecord[]>([]);
+  // 视图模式：'sheet' (手账看板) | 'roulette' (大转盘今天吃什么)
+  const [currentView, setCurrentView] = useState<'sheet' | 'roulette'>('sheet');
   // 问题3：初始不选中任何特定食物，只有用户主动点击某个食物才出现上方横幅
   const [selectedMealId, setSelectedMealId] = useState<string | null>(null);
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
@@ -118,6 +122,27 @@ export const MealDiarySheet: React.FC<MealDiarySheetProps> = ({ onClose }) => {
     setIsEditing(true);
   };
 
+  // 从大转盘天选结果一键代入记一餐
+  const handleOpenAddFromRoulette = (dishName: string, mealType: RPGMealRecord['mealType']) => {
+    setCurrentView('sheet');
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(
+      today.getDate()
+    ).padStart(2, '0')}`;
+
+    const firstEmpty = slotList.findIndex((s) => s === null);
+    const targetSlot = firstEmpty >= 0 ? firstEmpty : 0;
+
+    setEditingSlotIndex(targetSlot);
+    setFormDate(dateStr);
+    setFormMealType(mealType);
+    setFormDishName(dishName.slice(0, 5));
+    setFormRating(3);
+    setFormReview('来自大转盘的天选美味！');
+    setFormImageData(null);
+    setIsEditing(true);
+  };
+
   // 打开编辑当前选中的菜式
   const handleOpenEditSelected = () => {
     if (!selectedRecord) return;
@@ -148,17 +173,21 @@ export const MealDiarySheet: React.FC<MealDiarySheetProps> = ({ onClose }) => {
     setIsEditing(true);
   };
 
-  // 处理图片文件上传至 IndexedDB
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 处理图片文件上传至 IndexedDB（强制客户端 WebP 高清压缩，避免原图撑爆存储）
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setFormImageData(result);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressedDataUrl = await compressImageFile(file, {
+        maxDimension: 1080,
+        quality: 0.82,
+        mimeType: 'image/webp',
+      });
+      setFormImageData(compressedDataUrl);
+    } catch (err) {
+      console.warn('[MealDiary] 图片压缩异常:', err);
+    }
   };
 
   // 保存记录（支持自定义日期、菜名、星级、一句话评价）
@@ -213,7 +242,7 @@ export const MealDiarySheet: React.FC<MealDiarySheetProps> = ({ onClose }) => {
         justifyContent: 'flex-start',
         background: 'rgba(25, 20, 20, 0.45)',
         backdropFilter: 'blur(5px)',
-        paddingTop: '16px', // 顶部预留安全距离，彻底避免遮挡移动端状态栏
+        paddingTop: '46px', // 顶部预留安全距离，彻底避免遮挡移动端状态栏与灵动岛通知
         paddingBottom: '16px',
         paddingLeft: '10px',
         paddingRight: '10px',
@@ -243,8 +272,29 @@ export const MealDiarySheet: React.FC<MealDiarySheetProps> = ({ onClose }) => {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ================= 1. 上方横条（问题3：只有点击某个特定食物才会出现） ================= */}
-        {selectedRecord ? (
+        {/* ================= 方案 A：平滑横向视口滑动容器 ================= */}
+        <div style={{ width: '100%', overflow: 'hidden' }}>
+          <div
+            style={{
+              display: 'flex',
+              width: '100%',
+              alignItems: 'flex-start',
+              transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+              transform: currentView === 'roulette' ? 'translateX(-100%)' : 'translateX(0%)',
+            }}
+          >
+            {/* ====== Page 1: 九宫格手账看板 ====== */}
+            <div
+              style={{
+                width: '100%',
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+              }}
+            >
+              {/* ================= 1. 上方横条（问题3：只有点击某个特定食物才会出现） ================= */}
+              {selectedRecord ? (
           <div
             style={{
               width: '100%',
@@ -439,27 +489,55 @@ export const MealDiarySheet: React.FC<MealDiarySheetProps> = ({ onClose }) => {
               padding: '2px 4px 6px',
             }}
           >
-            {/* 问题2：一键添加新食物按钮 */}
-            <button
-              onClick={handleOpenAddNewMeal}
-              style={{
-                background: '#FFF0F5',
-                border: '2px solid #502428',
-                borderRadius: '12px',
-                padding: '3px 9px',
-                fontSize: '11px',
-                fontWeight: 900,
-                color: '#DB2777',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '3px',
-                boxShadow: '0 2px 0 #502428',
-              }}
-            >
-              <Plus size={13} strokeWidth={3} />
-              <span>记一餐</span>
-            </button>
+            {/* 左侧按钮组：一键添加新食物 + 方案 A 轮盘今天吃什么 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <button
+                onClick={handleOpenAddNewMeal}
+                style={{
+                  background: '#FFF0F5',
+                  border: '2px solid #502428',
+                  borderRadius: '12px',
+                  padding: '3px 9px',
+                  fontSize: '11px',
+                  fontWeight: 900,
+                  color: '#DB2777',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  boxShadow: '0 2px 0 #502428',
+                }}
+              >
+                <Plus size={13} strokeWidth={3} />
+                <span>记一餐</span>
+              </button>
+
+              {/* 方案 A：轮盘图标按键，点击平滑滑入大转盘 */}
+              <button
+                onClick={() => setCurrentView('roulette')}
+                title="今天吃什么？大转盘决定"
+                style={{
+                  background: '#FFFBEB',
+                  border: '2px solid #502428',
+                  borderRadius: '12px',
+                  padding: '3px 8px',
+                  fontSize: '11px',
+                  fontWeight: 900,
+                  color: '#B45309',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  boxShadow: '0 2px 0 #502428',
+                  transition: 'transform 0.1s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+              >
+                <span style={{ fontSize: '13px', lineHeight: 1 }}>🎡</span>
+                <span>吃什么</span>
+              </button>
+            </div>
 
             {/* 关闭看板 */}
             <button
@@ -678,6 +756,26 @@ export const MealDiarySheet: React.FC<MealDiarySheetProps> = ({ onClose }) => {
             />
           ))}
         </div>
+      </div>
+
+      {/* ====== Page 2: 大转盘今天吃什么 ====== */}
+      <div
+        style={{
+          width: '100%',
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <MealRouletteView
+          records={records}
+          onBack={() => setCurrentView('sheet')}
+          onSelectMealToLog={handleOpenAddFromRoulette}
+        />
+      </div>
+    </div>
+  </div>
 
         {/* ================= 5. 编辑 / 新增菜品记录弹窗 ================= */}
         {isEditing && (

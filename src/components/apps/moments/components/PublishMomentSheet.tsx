@@ -8,6 +8,7 @@ import {
   deleteCustomTheme,
   MOMENT_ATTR_INFO,
 } from '../../../../core/moments/momentsStorage';
+import { compressImageFile } from '../../../../utils/imageCompressor';
 
 interface PublishMomentSheetProps {
   onPublish: (moment: MomentItem) => void;
@@ -63,26 +64,25 @@ export const PublishMomentSheet: React.FC<PublishMomentSheetProps> = ({
     }
   };
 
-  // 多图上传转 Base64，准备存入 IndexedDB
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 多图上传转 Base64（强制客户端 WebP 高清压缩，准备存入 IndexedDB）
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const readPromises: Promise<string>[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      readPromises.push(
-        new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
+    try {
+      const fileList = Array.from(files);
+      const compressPromises = fileList.map((file) =>
+        compressImageFile(file, {
+          maxDimension: 1200,
+          quality: 0.82,
+          mimeType: 'image/webp',
         })
       );
-    }
-
-    Promise.all(readPromises).then((results) => {
+      const results = await Promise.all(compressPromises);
       setImages((prev) => [...prev, ...results]);
-    });
+    } catch (err) {
+      console.warn('[PublishMoment] 多图压缩失败:', err);
+    }
   };
 
   const handleRemoveImage = (index: number) => {

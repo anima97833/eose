@@ -24,6 +24,7 @@ import {
   resetLifeStories,
   determineLifeStage,
 } from '../../../../core/rpg/lifeStorage';
+import { compressImageFile } from '../../../../utils/imageCompressor';
 import { LifeDaisyIcon } from './LifeDaisyIcon';
 import { PRESET_STICKERS, renderLifeIllustration } from './LifeIllustrations';
 
@@ -122,9 +123,12 @@ export const LifeJourneySheet: React.FC<LifeJourneySheetProps> = ({ onClose }) =
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = reader.result as string;
+    try {
+      const dataUrl = await compressImageFile(file, {
+        maxDimension: 1080,
+        quality: 0.82,
+        mimeType: 'image/webp',
+      });
       const targetId = activeUploadStoryIdRef.current;
       if (targetId) {
         // 直接针对列表中的卡片更换图片并持久化到 IndexedDB
@@ -133,15 +137,16 @@ export const LifeJourneySheet: React.FC<LifeJourneySheetProps> = ({ onClose }) =
           const updated: RPGLifeStoryRecord = { ...target, imageData: dataUrl, updatedAt: Date.now() };
           await saveLifeStory(updated);
           await refreshStories();
-          showToast('卡片照片已更换');
+          showToast('卡片照片已更换（已高清压缩）');
         }
       } else {
         // 在编辑/新增弹窗中更换照片
         setFormImageData(dataUrl);
-        showToast('照片已上传，点击下方保存');
+        showToast('照片已上传并优化，点击保存');
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('[LifeJourney] 图片压缩异常:', err);
+    }
     e.target.value = '';
   };
 

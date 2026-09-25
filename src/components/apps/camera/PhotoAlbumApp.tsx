@@ -33,6 +33,7 @@ import {
 } from '../../../core/poster/posterStorage';
 import { POSTER_TEMPLATES } from '../../../core/poster/posterTemplates';
 import { PosterCardView } from './PosterCardView';
+import { compressImageFile } from '../../../utils/imageCompressor';
 import { DailyPosterModal } from '../../modals/DailyPosterModal';
 import './posterAlbum.css';
 
@@ -464,7 +465,7 @@ const PosterEditorModal: React.FC<PosterEditorModalProps> = ({
   const [newChecklistText, setNewChecklistText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -473,15 +474,19 @@ const PosterEditorModal: React.FC<PosterEditorModalProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
+    try {
+      const compressed = await compressImageFile(file, {
+        maxDimension: 1280,
+        quality: 0.82,
+        mimeType: 'image/webp',
+      });
       setDraft((prev) => ({
         ...prev,
-        imageUrl: base64,
+        imageUrl: compressed,
       }));
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('[PhotoAlbum] 图片压缩异常:', err);
+    }
   };
 
   const handleAddChecklistItem = () => {

@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, Link, Check, RefreshCw, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { compressImageFile } from '../../../../utils/imageCompressor';
 
 interface AvatarUploadModalProps {
   currentUrl: string | null;
@@ -31,28 +32,36 @@ export const AvatarUploadModal: React.FC<AvatarUploadModalProps> = ({
   const [bgPreview, setBgPreview] = useState<string | null>(currentBgUrl);
   const bgFileRef = useRef<HTMLInputElement>(null);
 
-  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setAvatarPreview(result);
+    try {
+      const compressed = await compressImageFile(file, {
+        maxDimension: 1280,
+        quality: 0.85,
+        mimeType: 'image/webp',
+      });
+      setAvatarPreview(compressed);
       setAvatarInput('');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('[AvatarUpload] 立绘压缩异常:', err);
+    }
   };
 
-  const handleBgFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBgFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setBgPreview(result);
+    try {
+      const compressed = await compressImageFile(file, {
+        maxDimension: 1920,
+        quality: 0.82,
+        mimeType: 'image/webp',
+      });
+      setBgPreview(compressed);
       setBgInput('');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('[AvatarUpload] 背景压缩异常:', err);
+    }
   };
 
   const handleConfirm = async () => {

@@ -12,6 +12,8 @@ import {
   Sparkles,
   ChevronRight,
   FileJson,
+  HardDrive,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   getDatabaseStats,
@@ -22,6 +24,11 @@ import {
   DatabaseStats,
   FullBackupPayload,
 } from '../../../core/storage/databaseBackupService';
+import {
+  getStorageAudit,
+  requestStoragePersistence,
+  StorageAuditResult,
+} from '../../../core/storage/storagePersistence';
 
 interface SecurityAppProps {
   onBack: () => void;
@@ -29,9 +36,11 @@ interface SecurityAppProps {
 
 export const SecurityApp: React.FC<SecurityAppProps> = ({ onBack }) => {
   const [stats, setStats] = useState<DatabaseStats | null>(null);
+  const [storageAudit, setStorageAudit] = useState<StorageAuditResult | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [exporting, setExporting] = useState<boolean>(false);
   const [importing, setImporting] = useState<boolean>(false);
+  const [requestingPersist, setRequestingPersist] = useState<boolean>(false);
   const [showTablesDetail, setShowTablesDetail] = useState<boolean>(false);
 
   // 导入确认模态窗状态
@@ -53,12 +62,35 @@ export const SecurityApp: React.FC<SecurityAppProps> = ({ onBack }) => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const data = await getDatabaseStats();
-      setStats(data);
+      const [dbStats, audit] = await Promise.all([
+        getDatabaseStats(),
+        getStorageAudit(),
+      ]);
+      setStats(dbStats);
+      setStorageAudit(audit);
     } catch (err) {
       console.error('获取数据库统计失败:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRequestPersist = async () => {
+    if (requestingPersist) return;
+    setRequestingPersist(true);
+    try {
+      const success = await requestStoragePersistence();
+      if (success) {
+        showToast('永久存储保护已授权激活！');
+      } else {
+        showToast('浏览器暂未批准持久化（请检查是否在无痕模式）');
+      }
+      const updatedAudit = await getStorageAudit();
+      setStorageAudit(updatedAudit);
+    } catch (err: any) {
+      showToast(`申请异常: ${err?.message || err}`);
+    } finally {
+      setRequestingPersist(false);
     }
   };
 
@@ -357,6 +389,229 @@ export const SecurityApp: React.FC<SecurityAppProps> = ({ onBack }) => {
               上次全量备份时间：{stats.lastBackupDate}
             </div>
           )}
+        </div>
+
+        {/* 卡片 1.5：本地双轨存储配额与空间占比可视化 (LocalStorage vs IndexedDB) */}
+        <div
+          style={{
+            flexShrink: 0,
+            boxSizing: 'border-box',
+            borderRadius: '24px',
+            background: '#FFF5F7',
+            border: '1.5px solid rgba(255, 255, 255, 0.95)',
+            boxShadow:
+              '8px 8px 22px rgba(240, 185, 198, 0.45), -8px -8px 22px rgba(255, 255, 255, 0.95)',
+            padding: '18px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <HardDrive size={16} color="#D84A6E" />
+              <span style={{ fontSize: '14px', fontWeight: 800, color: '#4A2E35' }}>
+                存储配额与容量占比
+              </span>
+            </div>
+
+            {/* 持久化保护状态徽章 */}
+            {storageAudit && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {storageAudit.isPersisted ? (
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      color: '#2E7D52',
+                      background: '#E8F5E9',
+                      border: '1px solid #C8E6C9',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <CheckCircle2 size={11} />
+                    <span>永久保护中</span>
+                  </span>
+                ) : (
+                  <button
+                    onClick={handleRequestPersist}
+                    disabled={requestingPersist}
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      color: '#C2410C',
+                      background: '#FFF7ED',
+                      border: '1px solid #FFEDD5',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer',
+                    }}
+                    title="点击申请永久持久化授权，防止浏览器在磁盘不足时自动清理"
+                  >
+                    <ShieldAlert size={11} />
+                    <span>{requestingPersist ? '申请中...' : '点击申请永久保护'}</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={{ fontSize: '11px', color: '#8F5E6B', lineHeight: 1.5 }}>
+            系统采用<strong>「双轨存储引擎」</strong>：IndexedDB 承载 30+ 张应用表与高频多媒体；LocalStorage 仅存放核心路由与极简配置，实现零白屏与容量无忧。
+          </div>
+
+          {/* 进度条 1：LocalStorage */}
+          <div
+            style={{
+              padding: '12px 14px',
+              borderRadius: '16px',
+              background: '#FDF0F3',
+              boxShadow:
+                'inset 2px 2px 6px rgba(235, 180, 195, 0.35), inset -2px -2px 6px rgba(255, 255, 255, 0.95)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: '#4A2E35' }}>
+                LocalStorage（配置层）
+              </span>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#D84A6E' }}>
+                {storageAudit?.localStorageFormatted || '0 B'} / {storageAudit?.localStorageQuotaFormatted || '5 MB'}
+              </span>
+            </div>
+
+            {/* 槽体进度条 */}
+            <div
+              style={{
+                width: '100%',
+                height: '7px',
+                borderRadius: '6px',
+                background: '#F0DCE2',
+                overflow: 'hidden',
+                position: 'relative',
+              }}
+            >
+              <div
+                style={{
+                  width: `${Math.max(2, storageAudit?.localStoragePercent || 0)}%`,
+                  height: '100%',
+                  borderRadius: '6px',
+                  background:
+                    (storageAudit?.localStoragePercent || 0) > 80
+                      ? 'linear-gradient(90deg, #F87171, #EF4444)'
+                      : 'linear-gradient(90deg, #34D399, #10B981)',
+                  transition: 'width 0.4s ease',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#A06E7A' }}>
+              <span>安全使用率: {storageAudit?.localStoragePercent || 0}%</span>
+              <span>已受自动迁移守护（上限 5MB）</span>
+            </div>
+          </div>
+
+          {/* 进度条 2：IndexedDB */}
+          <div
+            style={{
+              padding: '12px 14px',
+              borderRadius: '16px',
+              background: '#FDF0F3',
+              boxShadow:
+                'inset 2px 2px 6px rgba(235, 180, 195, 0.35), inset -2px -2px 6px rgba(255, 255, 255, 0.95)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: '#4A2E35' }}>
+                IndexedDB（业务大库）
+              </span>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#D84A6E' }}>
+                {storageAudit?.indexedDBFormatted || '0 B'} / 预估配额 {storageAudit?.indexedDBQuotaFormatted || '动态分配'}
+              </span>
+            </div>
+
+            {/* 槽体进度条 */}
+            <div
+              style={{
+                width: '100%',
+                height: '7px',
+                borderRadius: '6px',
+                background: '#F0DCE2',
+                overflow: 'hidden',
+                position: 'relative',
+              }}
+            >
+              <div
+                style={{
+                  width: `${Math.max(2, Math.min(100, storageAudit?.indexedDBPercent || 0))}%`,
+                  height: '100%',
+                  borderRadius: '6px',
+                  background: 'linear-gradient(90deg, #FFB4C5, #FA86A0)',
+                  transition: 'width 0.4s ease',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#A06E7A' }}>
+              <span>当前占用配额比: {storageAudit?.indexedDBPercent || '<0.1'}%</span>
+              <span>海量本地离线空间（极充裕）</span>
+            </div>
+          </div>
+
+          {/* 双引擎数据量相对占比对比条 */}
+          {(() => {
+            const ls = storageAudit?.localStorageBytes || 0;
+            const idb = storageAudit?.indexedDBBytes || 0;
+            const total = ls + idb;
+            const idbRatio = total > 0 ? Math.max(5, Math.min(99, Math.round((idb / total) * 100))) : 95;
+            const lsRatio = 100 - idbRatio;
+            return (
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '14px',
+                  background: '#FFF5F7',
+                  border: '1px dashed rgba(248, 180, 196, 0.7)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#8F5E6B' }}>
+                  <span>
+                    IndexedDB 业务占 <strong>{idbRatio}%</strong>
+                  </span>
+                  <span>
+                    LocalStorage 启动占 <strong>{lsRatio}%</strong>
+                  </span>
+                </div>
+                <div
+                  style={{
+                    width: '100%',
+                    height: '6px',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div style={{ width: `${idbRatio}%`, background: '#FA86A0' }} title="IndexedDB 占比" />
+                  <div style={{ width: `${lsRatio}%`, background: '#34D399' }} title="LocalStorage 占比" />
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* 卡片 2：核心操作区（全量导入与导出按钮） */}
