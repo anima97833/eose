@@ -3,6 +3,7 @@ import { DateWidget } from './widgets/DateWidget';
 import { MusicWidget } from './widgets/MusicWidget';
 import { TaskDropWidget } from './widgets/TaskDropWidget';
 import { HoroscopeWidget } from './widgets/HoroscopeWidget';
+import { DuskParkScene } from './widgets/DuskParkScene';
 import { HoroscopeModal } from './widgets/HoroscopeModal';
 import { HoroscopeData } from '../../core/horoscope/horoscopeService';
 import {
@@ -501,8 +502,9 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
-              padding: '2px 2px 6px',
+              justifyContent: 'flex-start',
+              gap: '12px',
+              padding: '4px 2px 10px',
               boxSizing: 'border-box',
               overflowY: 'auto',
             }}
@@ -510,10 +512,12 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
             {/* 1. 顶部日期看板 */}
             <DateWidget />
 
-            {/* 2. 音乐组件（深蓝轻拟物胶囊，无缝同步声音电台流） */}
-            <MusicWidget onOpenApp={() => onOpenApp?.('radio')} />
+            {/* 2. 音乐播放器组件（位于日期正下方） */}
+            <div style={{ marginTop: '-4px' }}>
+              <MusicWidget onOpenApp={() => onOpenApp?.('radio')} />
+            </div>
 
-            {/* 3. 双列卡片：左侧今日星座运势卡 + 右侧奇遇任务掉落卡 */}
+            {/* 3. 双列卡片：位于音乐播放器正下方（左侧星座运势卡 + 右侧奇遇任务掉落卡） */}
             <div
               style={{
                 display: 'grid',
@@ -527,7 +531,10 @@ export const DesktopHome: React.FC<DesktopHomeProps> = ({ onOpenApp }) => {
               <TaskDropWidget />
             </div>
 
-
+            {/* 4. 纯粹街景拟物浮雕：左侧更偏左的路灯 + 正常静谧熄灭 + 点击开启黄昏暖光斜照在长椅上 */}
+            <div style={{ width: '100%', marginTop: '6px' }}>
+              <DuskParkScene />
+            </div>
           </div>
 
           {/* ================= 页面 1..N：应用主屏幕 (每页最多 16 个应用，横 4 竖 4) ================= */}

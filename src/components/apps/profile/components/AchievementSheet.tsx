@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Trash2, Lock, Check, Sparkles, Coins, Gift, ChevronRight } from 'lucide-react';
+import { X, Plus, Trash2, Lock, Check, Sparkles, Coins, Gift, ChevronRight, Search } from 'lucide-react';
 import {
   RPGAchievement,
   DEFAULT_ACHIEVEMENTS,
@@ -29,9 +29,11 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
   const [showcaseSlots, setShowcaseSlots] = useState<(string | null)[]>(loadShowcaseBadges);
   const [pickerSlotIndex, setPickerSlotIndex] = useState<number | null>(null);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'UNLOCKED' | 'DERIVED' | AchievementCategoryKey>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedAch, setSelectedAch] = useState<RPGAchievement | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
 
   // 监听外部成就解锁及展位变动事件实时刷新
   useEffect(() => {
@@ -164,11 +166,17 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
 
   // 筛选成就
   const filteredList = achievements.filter((item) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const matchText = `${item.title} ${item.desc} ${item.statLabel || ''}`.toLowerCase();
+      if (!matchText.includes(q)) return false;
+    }
     if (activeFilter === 'UNLOCKED') return item.unlocked;
     if (activeFilter === 'DERIVED') return item.isDerived;
     if (activeFilter !== 'ALL') return item.category === activeFilter;
     return true;
   });
+
 
   // 统计成就总数（铁律：严禁与等级挂钩，纯系统判定达成数）
   const totalUnlockedCount = achievements.filter((a) => a.unlocked).length;
@@ -725,7 +733,7 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
         <div
           style={{
             position: 'relative',
-            padding: '16px 0 6px',
+            padding: '12px 0 4px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -735,7 +743,7 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
           <div
             style={{
               position: 'absolute',
-              top: '25px',
+              top: '21px',
               left: 0,
               right: 0,
               height: '3px',
@@ -753,7 +761,7 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
               background: '#FDF3DF',
               border: '2px solid #785032',
               borderRadius: '8px',
-              padding: '3px 16px',
+              padding: '2px 14px',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
@@ -779,7 +787,7 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
             {/* 核心数值 */}
             <span
               style={{
-                fontSize: '15px',
+                fontSize: '14px',
                 fontWeight: 900,
                 color: '#422817',
                 fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", sans-serif',
@@ -791,11 +799,91 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
           </div>
         </div>
 
+        {/* ================= 搜索框与当前筛选统计 (略微上移，与下方分类保持舒适间距) ================= */}
+        <div
+          style={{
+            padding: '0 14px 8px',
+            marginTop: '-2px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px',
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              flex: 1,
+              maxWidth: '240px',
+            }}
+          >
+            <Search
+              size={12}
+              color="#8A684E"
+              style={{
+                position: 'absolute',
+                left: '9px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+              }}
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜索415个成就或触发条件..."
+              style={{
+                width: '100%',
+                padding: '4px 24px 4px 26px',
+                fontSize: '11px',
+                fontWeight: 700,
+                borderRadius: '12px',
+                border: '1.5px solid #8A684E',
+                background: '#FAF4E4',
+                color: '#422817',
+                outline: 'none',
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)',
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                style={{
+                  position: 'absolute',
+                  right: '6px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  color: '#8A684E',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+          <span
+            style={{
+              fontSize: '11px',
+              fontWeight: 800,
+              color: '#7D5E3C',
+              flexShrink: 0,
+            }}
+          >
+            显示 {filteredList.length} 项
+          </span>
+        </div>
+
         {/* ================= 地球Online六大分类导航栏 (<= 5 字) ================= */}
         <div
           className="no-scrollbar"
           style={{
-            padding: '2px 14px 10px',
+            padding: '6px 14px 10px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
@@ -808,7 +896,7 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
           <button
             onClick={() => setActiveFilter('ALL')}
             style={{
-              padding: '4px 10px',
+              padding: '5px 11px',
               borderRadius: '12px',
               border: '1.5px solid #754F35',
               background: activeFilter === 'ALL' ? '#754F35' : '#FAF4E4',
@@ -816,17 +904,21 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
               fontSize: '11px',
               fontWeight: 900,
               cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: '1.2',
               whiteSpace: 'nowrap',
               flexShrink: 0,
               boxShadow: activeFilter === 'ALL' ? 'inset 0 1px 2px rgba(0,0,0,0.3)' : '0 1px 2px rgba(0,0,0,0.06)',
             }}
           >
-            全部
+            全部 (415)
           </button>
           <button
             onClick={() => setActiveFilter('UNLOCKED')}
             style={{
-              padding: '4px 10px',
+              padding: '5px 11px',
               borderRadius: '12px',
               border: '1.5px solid #059669',
               background: activeFilter === 'UNLOCKED' ? '#059669' : '#ECFDF5',
@@ -834,6 +926,10 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
               fontSize: '11px',
               fontWeight: 900,
               cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: '1.2',
               whiteSpace: 'nowrap',
               flexShrink: 0,
               boxShadow: activeFilter === 'UNLOCKED' ? 'inset 0 1px 2px rgba(0,0,0,0.3)' : '0 1px 2px rgba(0,0,0,0.06)',
@@ -848,7 +944,7 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
                 key={cat.key}
                 onClick={() => setActiveFilter(cat.key)}
                 style={{
-                  padding: '4px 10px',
+                  padding: '5px 11px',
                   borderRadius: '12px',
                   border: `1.5px solid ${cat.color}`,
                   background: isSelected ? cat.color : cat.bg,
@@ -856,8 +952,10 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
                   fontSize: '11px',
                   fontWeight: 900,
                   cursor: 'pointer',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: '1.2',
                   gap: '3px',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
@@ -887,137 +985,171 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
             msOverflowStyle: 'none',
             cursor: 'grab',
             WebkitOverflowScrolling: 'touch',
+            minHeight: '230px',
           }}
         >
-          {filteredList.map((ach) => {
-            const isDerived = !!ach.isDerived;
-            const isUnlocked = ach.unlocked;
-            const isClaimed = ach.claimed;
-            const catMeta = ach.category && (ach.category in ACHIEVEMENT_CATEGORY_MAP)
-              ? ACHIEVEMENT_CATEGORY_MAP[ach.category as AchievementCategoryKey]
-              : null;
+          {filteredList.length === 0 ? (
+            <div
+              style={{
+                width: '100%',
+                padding: '40px 16px',
+                textAlign: 'center',
+                color: '#8A684E',
+                fontSize: '13px',
+                fontWeight: 800,
+              }}
+            >
+              未找到匹配成就，换个关键词试试~
+            </div>
+          ) : (
+            filteredList.map((ach) => {
+              const isDerived = !!ach.isDerived;
+              const isUnlocked = ach.unlocked;
+              const isClaimed = ach.claimed;
+              const catMeta =
+                ach.category && ach.category in ACHIEVEMENT_CATEGORY_MAP
+                  ? ACHIEVEMENT_CATEGORY_MAP[ach.category as AchievementCategoryKey]
+                  : null;
 
-            return (
-              <div
-                key={ach.id}
-                onClick={() => {
-                  if (!isDraggingPlaquesRef.current) {
-                    setSelectedAch(ach);
-                  }
-                }}
-                style={{
-                  width: '136px',
-                  flexShrink: 0,
-                  scrollSnapAlign: 'center',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  position: 'relative',
-                  cursor: 'pointer',
-                  transition: 'transform 0.1s ease',
-                }}
-              >
-                {/* 顶部挂绳木环 / 夹扣 (对齐参考图每个木牌顶部的细绳扣圈) */}
+              return (
                 <div
-                  style={{
-                    width: '14px',
-                    height: '14px',
-                    borderRadius: '50%',
-                    border: '2.5px solid #6E462A',
-                    background: '#DFEBD2',
-                    marginBottom: '-4px',
-                    zIndex: 4,
+                  key={ach.id}
+                  onClick={() => {
+                    if (!isDraggingPlaquesRef.current) {
+                      setSelectedAch(ach);
+                    }
                   }}
-                />
-
-                {/* 木质标牌卡身 (深度还原参考图中的圆角温润木板) */}
-                <div
                   style={{
-                    width: '100%',
-                    background: isDerived
-                      ? '#EBE3D0'
-                      : isUnlocked
-                      ? '#FAF4E4'
-                      : '#F5ECE0',
-                    borderRadius: '20px',
-                    border: '2.5px solid #754F35',
-                    boxShadow: '0 4px 0 #5E3E28, 0 6px 12px rgba(60, 40, 20, 0.18)',
-                    padding: '8px 8px 10px',
+                    width: '136px',
+                    flexShrink: 0,
+                    scrollSnapAlign: 'center',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '4px',
                     position: 'relative',
-                    opacity: isDerived ? 0.78 : 1,
+                    cursor: 'pointer',
+                    transition: 'transform 0.1s ease',
                   }}
                 >
-                  {/* 标牌顶部：地球Online分类小标 + 认证状态 (严禁与等级挂钩) */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 2px' }}>
-                    {catMeta ? (
+                  {/* 顶部挂绳木环 / 夹扣 */}
+                  <div
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                      borderRadius: '50%',
+                      border: '2.5px solid #6E462A',
+                      background: '#DFEBD2',
+                      marginBottom: '-4px',
+                      zIndex: 4,
+                    }}
+                  />
+
+                  {/* 木质标牌卡身 */}
+                  <div
+                    style={{
+                      width: '100%',
+                      background: isDerived
+                        ? '#EBE3D0'
+                        : isUnlocked
+                        ? '#FAF4E4'
+                        : '#F5ECE0',
+                      borderRadius: '20px',
+                      border: '2.5px solid #754F35',
+                      boxShadow: '0 4px 0 #5E3E28, 0 6px 12px rgba(60, 40, 20, 0.18)',
+                      padding: '8px 8px 10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px',
+                      position: 'relative',
+                      opacity: isDerived ? 0.78 : 1,
+                    }}
+                  >
+                    {/* 标牌顶部：分类小标 + 认证状态 */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        padding: '0 2px',
+                      }}
+                    >
+                      {catMeta ? (
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            fontWeight: 800,
+                            color: catMeta.color,
+                            background: catMeta.bg,
+                            padding: '1px 5px',
+                            borderRadius: '6px',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {catMeta.icon} {catMeta.label}
+                        </span>
+                      ) : (
+                        <span />
+                      )}
                       <span
                         style={{
                           fontSize: '9px',
                           fontWeight: 800,
-                          color: catMeta.color,
-                          background: catMeta.bg,
-                          padding: '1px 5px',
-                          borderRadius: '6px',
-                          whiteSpace: 'nowrap',
+                          color: isUnlocked ? '#059669' : '#94A3B8',
                         }}
                       >
-                        {catMeta.icon} {catMeta.label}
+                        {isUnlocked ? '✓已达成' : '🔒待触发'}
                       </span>
-                    ) : <span />}
-                    <span
+                    </div>
+
+                    {/* 标牌中央：专属萌系图腾插画 */}
+                    <div
                       style={{
-                        fontSize: '9px',
-                        fontWeight: 800,
-                        color: isUnlocked ? '#059669' : '#94A3B8',
+                        height: '52px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '2px 0',
                       }}
                     >
-                      {isUnlocked ? '✓已达成' : '🔒待触发'}
+                      {renderCrestIcon(ach.iconType, isDerived)}
+                    </div>
+
+                    {/* 标牌标题 */}
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: 900,
+                        color: '#422817',
+                        fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", sans-serif',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        lineHeight: '1.25',
+                        height: '30px',
+                        textAlign: 'center',
+                        maxWidth: '100%',
+                        wordBreak: 'break-all',
+                      }}
+                      title={ach.title}
+                    >
+                      {ach.title}
                     </span>
-                  </div>
 
-                  {/* 标牌中央：专属萌系图腾插画 */}
-                  <div
-                    style={{
-                      height: '52px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '2px 0',
-                    }}
-                  >
-                    {renderCrestIcon(ach.iconType, isDerived)}
-                  </div>
+                    {/* 标牌指标数值 */}
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        color: '#6E4931',
+                      }}
+                    >
+                      {ach.statLabel}
+                    </span>
 
-                  {/* 标牌标题 (严格 <= 5 字) */}
-                  <span
-                    style={{
-                      fontSize: '13px',
-                      fontWeight: 900,
-                      color: '#422817',
-                      fontFamily: '"ZCOOL KuaiLe", "Yuanti SC", "YouYuan", sans-serif',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      maxWidth: '100%',
-                    }}
-                  >
-                    {ach.title}
-                  </span>
-
-                  {/* 标牌指标数值 */}
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 800,
-                      color: '#6E4931',
-                    }}
-                  >
-                    {ach.statLabel}
-                  </span>
 
                   {/* 标牌底部：系统判定状态条 (严禁手动判定，奖励待定) */}
                   <div
@@ -1054,7 +1186,7 @@ export const AchievementSheet: React.FC<AchievementSheetProps> = ({
                 </div>
               </div>
             );
-          })}
+          }))}
         </div>
 
         {/* ================= 5. 成就详情与衍生说明弹窗 ================= */}

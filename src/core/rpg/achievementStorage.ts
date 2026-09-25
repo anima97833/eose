@@ -1,6 +1,21 @@
 import { RPGAchievement, DEFAULT_ACHIEVEMENTS } from './achievementTypes';
 
-const STORAGE_KEY = 'cloudfly_user_achievements_v1';
+const STORAGE_KEY = 'cloudfly_user_achievements_v2';
+const LEGACY_STORAGE_KEY = 'cloudfly_user_achievements_v1';
+
+const LEGACY_PRESET_IDS = new Set([
+  'ach_first_focus',
+  'ach_firmware_1',
+  'ach_firmware_2',
+  'ach_body_1',
+  'ach_body_2',
+  'ach_npc_1',
+  'ach_pathway_1',
+  'ach_pathway_2',
+  'ach_resilience_1',
+  'ach_resilience_2',
+  'ach_easter_1',
+]);
 
 export function loadAchievements(): RPGAchievement[] {
   try {
@@ -8,7 +23,7 @@ export function loadAchievements(): RPGAchievement[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // 合并新预设成就，避免版本迭代丢失新类别成就
+        // 合并新预设成就
         const existingIds = new Set(parsed.map((a: RPGAchievement) => a.id));
         const merged = [...parsed];
         for (const def of DEFAULT_ACHIEVEMENTS) {
@@ -16,6 +31,34 @@ export function loadAchievements(): RPGAchievement[] {
             merged.push(def);
           }
         }
+        return merged;
+      }
+    }
+
+    // 检查是否存在 v1 旧数据迁移
+    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacyRaw) {
+      const legacyParsed = JSON.parse(legacyRaw);
+      if (Array.isArray(legacyParsed)) {
+        // 提取用户自定义创建的成就 (非旧版11个预设)
+        const customUserAchievements = legacyParsed.filter(
+          (item: RPGAchievement) => !LEGACY_PRESET_IDS.has(item.id)
+        );
+
+        // 如果旧版解锁了新手专注，迁移解锁第一条成就
+        const hadFirstFocusUnlocked = legacyParsed.some(
+          (item: RPGAchievement) => item.id === 'ach_first_focus' && item.unlocked
+        );
+
+        const initialList = DEFAULT_ACHIEVEMENTS.map((item) => {
+          if (item.id === 'ach_firmware_1' && hadFirstFocusUnlocked) {
+            return { ...item, unlocked: true };
+          }
+          return item;
+        });
+
+        const merged = [...initialList, ...customUserAchievements];
+        saveAchievements(merged);
         return merged;
       }
     }
@@ -37,10 +80,12 @@ export function saveAchievements(achievements: RPGAchievement[]): void {
  * 解锁指定成就并派发实时事件
  */
 export function unlockAchievementById(id: string): RPGAchievement | null {
+  // 兼容旧调用 ID
+  const effectiveId = id === 'ach_first_focus' ? 'ach_firmware_1' : id;
   const list = loadAchievements();
   let target: RPGAchievement | null = null;
   const updated = list.map((item) => {
-    if (item.id === id) {
+    if (item.id === effectiveId) {
       target = { ...item, unlocked: true };
       return target;
     }
@@ -57,6 +102,7 @@ export function unlockAchievementById(id: string): RPGAchievement | null {
   }
   return target;
 }
+
 
 /**
  * 检查指定成就是否已解锁
