@@ -140,7 +140,7 @@ export const DogCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
 };
 
 /**
- * 2. 🐱 猫猫角色（具备修长优雅的猫脖子、红项圈小金铃、立体猫耳、微翘下巴、纤巧小猫爪与灵动问号尾）
+ * 2. 🐱 猫猫角色（与狗狗同画风的圆润萌猫：浑然一体的胸颈身躯、绝无突兀断层、珊瑚粉项圈金铃铛、灵动三角耳与前屈软肉爪）
  */
 export const CatCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
   const duration = isAccelerating ? 0.32 : 0.6;
@@ -158,118 +158,127 @@ export const CatCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
       <defs>
         <style>{`
           @keyframes catBob {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-5px) rotate(-1deg); }
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-4px); }
           }
           @keyframes catTailWave {
-            0%, 100% { transform: rotate(-8deg); }
-            50% { transform: rotate(14deg); }
+            0%, 100% { transform: rotate(-6deg); }
+            50% { transform: rotate(12deg); }
           }
           @keyframes catLegSwingA {
-            0% { transform: rotate(-24deg); }
-            50% { transform: rotate(22deg); }
-            100% { transform: rotate(-24deg); }
+            0% { transform: rotate(-22deg); }
+            50% { transform: rotate(20deg); }
+            100% { transform: rotate(-22deg); }
           }
           @keyframes catLegSwingB {
-            0% { transform: rotate(22deg); }
-            50% { transform: rotate(-24deg); }
-            100% { transform: rotate(22deg); }
+            0% { transform: rotate(20deg); }
+            50% { transform: rotate(-22deg); }
+            100% { transform: rotate(20deg); }
+          }
+          @keyframes shadowPulseCat {
+            0%, 100% { transform: scaleX(1); opacity: 0.6; }
+            50% { transform: scaleX(0.88); opacity: 0.42; }
           }
         `}</style>
       </defs>
 
-      {/* 地面阴影 */}
-      <ellipse cx="110" cy="158" rx="48" ry="6" fill="#D4C5B5" opacity="0.6" />
+      {/* 地面胶囊阴影 */}
+      <ellipse
+        cx="110"
+        cy="158"
+        rx="48"
+        ry="6"
+        fill="#D4C5B5"
+        style={{
+          transformOrigin: '110px 158px',
+          animation: `shadowPulseCat ${speed} ease-in-out infinite`,
+        }}
+      />
 
-      {/* 后排猫爪（颜色稍暗） */}
-      <g style={{ fill: '#EAB308' }}>
+      {/* 后排腿（深暖金黄，前屈小猫爪） */}
+      <g style={{ fill: '#E6A700' }}>
         {/* 后右腿 */}
-        <g style={{ transformOrigin: '74px 124px', animation: `catLegSwingB ${speed} ease-in-out infinite` }}>
-          <path d="M 72 124 L 72 144 C 72 148, 74 151, 78 151 L 84 151 C 87 151, 88 147, 86 144 C 84 140, 79 141, 79 124 Z" />
+        <g style={{ transformOrigin: '72px 124px', animation: `catLegSwingB ${speed} ease-in-out infinite` }}>
+          <path d="M 69 124 L 69 142 C 69 146, 71 149, 75 149 L 81 149 C 84 149, 85 146, 84 142 C 82 138, 77 139, 77 124 Z" />
         </g>
         {/* 前右腿 */}
-        <g style={{ transformOrigin: '136px 124px', animation: `catLegSwingA ${speed} ease-in-out infinite` }}>
-          <path d="M 134 124 L 134 144 C 134 148, 136 151, 140 151 L 146 151 C 149 151, 150 147, 148 144 C 146 140, 141 141, 141 124 Z" />
+        <g style={{ transformOrigin: '134px 124px', animation: `catLegSwingA ${speed} ease-in-out infinite` }}>
+          <path d="M 131 124 L 131 142 C 131 146, 133 149, 137 149 L 143 149 C 146 149, 147 146, 146 142 C 144 138, 139 139, 139 124 Z" />
         </g>
       </g>
 
-      {/* 躯干、头部、脖子主容器 */}
+      {/* 躯干、头部、脖子、尾巴整体容器（自然颠簸起伏） */}
       <g
         style={{
           transformOrigin: '110px 100px',
           animation: `catBob ${speed} ease-in-out infinite`,
         }}
       >
-        {/* 优雅问号型长尾巴（自然波浪摆动） */}
-        <g style={{ transformOrigin: '56px 105px', animation: `catTailWave ${speed} ease-in-out infinite` }}>
+        {/* 优雅高挺的 S 型波浪长猫尾巴 */}
+        <g style={{ transformOrigin: '56px 98px', animation: `catTailWave ${speed} ease-in-out infinite` }}>
           <path
-            d="M 56 105 C 40 100, 32 72, 44 52 C 50 44, 56 46, 54 54 C 48 64, 46 88, 64 96 Z"
+            d="M 56 98 C 42 92, 34 74, 42 56 C 46 48, 54 50, 52 58 C 46 70, 48 84, 62 90 Z"
             fill="#FACC15"
           />
         </g>
 
-        {/* 柔软微弓猫身 */}
+        {/* 浑然一体的猫身与坚实胸颈（连贯无断层、无白色缝隙） */}
         <path
-          d="M 56 94 
-             C 56 86, 70 84, 88 84 
-             C 106 84, 120 86, 126 94 
-             L 126 116 C 126 124, 120 126, 114 126 
-             L 68 126 C 60 126, 56 122, 56 114 Z"
+          d="M 54 88
+             C 54 84, 68 84, 88 84
+             L 116 84
+             C 120 74, 126 64, 134 58
+             L 146 58
+             C 152 66, 150 78, 146 90
+             L 146 114
+             C 146 122, 140 126, 132 126
+             L 66 126
+             C 58 126, 54 120, 54 112 Z"
           fill="#FACC15"
         />
 
-        {/* 明显的猫脖子（连接躯干与头颈） */}
+        {/* 可爱猫头（自然覆于胸颈上方，位置和谐端正） */}
+        <circle cx="140" cy="56" r="21" fill="#FACC15" />
+
+        {/* 尖尖立体三角猫耳（外黄内粉） */}
+        {/* 左耳 */}
+        <path d="M 125 44 L 131 22 L 141 38 Z" fill="#FACC15" />
+        <path d="M 128 40 L 132 27 L 138 36 Z" fill="#F472B6" />
+        {/* 右耳 */}
+        <path d="M 143 38 L 152 22 L 158 42 Z" fill="#FACC15" />
+        <path d="M 146 36 L 152 27 L 156 39 Z" fill="#F472B6" />
+
+        {/* 优雅珊瑚粉红项圈与金黄色小铃铛 */}
+        <rect x="122" y="70" width="28" height="8" rx="4" fill="#FB7185" />
+        <circle cx="148" cy="82" r="4" fill="#F59E0B" />
+        <circle cx="148" cy="82" r="1.3" fill="#78350F" />
+
+        {/* 闭目微笑治愈系猫眼 */}
         <path
-          d="M 118 96 
-             C 120 84, 124 76, 128 66 
-             L 142 66 
-             C 144 76, 142 86, 138 96 Z"
-          fill="#FACC15"
-        />
-
-        {/* 可爱小颈圈（珊瑚粉红）与晃荡的小金铃铛 */}
-        <rect x="120" y="75" width="23" height="7" rx="3.5" fill="#FB7185" />
-        <circle cx="138" cy="85" r="3.5" fill="#F59E0B" />
-        <circle cx="138" cy="85" r="1.2" fill="#78350F" />
-
-        {/* 尖尖猫耳朵 */}
-        <path d="M 125 44 L 132 20 L 140 40 Z" fill="#FACC15" />
-        <path d="M 128 38 L 132 26 L 137 36 Z" fill="#F472B6" />
-
-        <path d="M 144 42 L 153 20 L 160 38 Z" fill="#FACC15" />
-        <path d="M 147 38 L 153 26 L 157 36 Z" fill="#F472B6" />
-
-        {/* 软萌猫猫圆头与微俏下巴 */}
-        <ellipse cx="143" cy="52" rx="19" ry="17" fill="#FACC15" />
-
-        {/* 高冷 serence 闭目猫眼 */}
-        <path
-          d="M 137 50 Q 142 56 148 50"
-          stroke="#2E241E"
-          strokeWidth="2.6"
+          d="M 134 54 Q 140 60 146 54"
+          stroke="#241B15"
+          strokeWidth="2.8"
           strokeLinecap="round"
           fill="none"
         />
 
-        {/* 娇小粉嫩三角形鼻头 */}
-        <polygon points="152,55 157,55 154.5,58.5" fill="#F43F5E" />
+        {/* 小巧粉嫩倒三角鼻子 */}
+        <polygon points="152,58 157,58 154.5,61.5" fill="#F43F5E" />
 
-        {/* 灵动小胡须 */}
-        <line x1="156" y1="53" x2="168" y2="50" stroke="#2E241E" strokeWidth="1.4" strokeLinecap="round" />
-        <line x1="156" y1="57" x2="169" y2="59" stroke="#2E241E" strokeWidth="1.4" strokeLinecap="round" />
+        {/* 治愈小猫须 */}
+        <line x1="156" y1="56" x2="169" y2="54" stroke="#241B15" strokeWidth="1.6" strokeLinecap="round" />
+        <line x1="156" y1="60" x2="170" y2="63" stroke="#241B15" strokeWidth="1.6" strokeLinecap="round" />
       </g>
 
-      {/* 前排猫爪（亮黄色配白色软肉爪垫，前屈踱步） */}
+      {/* 前排腿（亮黄前躯，前屈可爱软爪） */}
       <g style={{ fill: '#FACC15' }}>
         {/* 前左后腿 */}
-        <g style={{ transformOrigin: '82px 124px', animation: `catLegSwingA ${speed} ease-in-out infinite` }}>
-          <path d="M 80 124 L 80 144 C 80 148, 82 151, 86 151 L 92 151 C 95 151, 96 147, 94 144 C 92 140, 87 141, 87 124 Z" />
-          <circle cx="89" cy="148" r="3.2" fill="#FEF9C3" />
+        <g style={{ transformOrigin: '78px 124px', animation: `catLegSwingA ${speed} ease-in-out infinite` }}>
+          <path d="M 75 124 L 75 142 C 75 146, 77 149, 81 149 L 87 149 C 90 149, 91 146, 90 142 C 88 138, 83 139, 83 124 Z" />
         </g>
         {/* 前左前腿 */}
         <g style={{ transformOrigin: '128px 124px', animation: `catLegSwingB ${speed} ease-in-out infinite` }}>
-          <path d="M 126 124 L 126 144 C 126 148, 128 151, 132 151 L 138 151 C 141 151, 142 147, 140 144 C 138 140, 133 141, 133 124 Z" />
-          <circle cx="135" cy="148" r="3.2" fill="#FEF9C3" />
+          <path d="M 125 124 L 125 142 C 125 146, 127 149, 131 149 L 137 149 C 140 149, 141 146, 140 142 C 138 138, 133 139, 133 124 Z" />
         </g>
       </g>
     </svg>
