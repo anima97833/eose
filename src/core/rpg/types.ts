@@ -28,6 +28,17 @@ export interface RPGDebuff {
   active: boolean;
 }
 
+export interface LifeStatus {
+  id: string;
+  name: string; // 如：碳水昏迷
+  icon: string; // 如：🍔
+  type: 'buff' | 'debuff' | 'protect';
+  effectText: string; // 简短一句话：血液流向胃部，脑力暂时挂机
+  systemAdvice: string; // 简短一句话：建议浅睡20分钟，切勿高强度思考
+  active: boolean;
+  isCustom?: boolean;
+}
+
 export interface RPGItem {
   id: string;
   name: string; // 如：降噪耳机
@@ -103,6 +114,7 @@ export interface RPGProfile {
   classes: RPGClass[];
   skills: RPGSkillNode[];
   debuffs: RPGDebuff[];
+  lifeStatuses?: LifeStatus[];
   items: RPGItem[];
   dailyCost?: number; // 每日基础生活成本 (默认 100，用于换算自由天数)
   savingGoalDays?: number; // 自由天数目标 (如 365 天)

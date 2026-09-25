@@ -13,16 +13,16 @@ import {
   Heart,
   ChevronDown,
 } from 'lucide-react';
-import { RPGProfile } from '../../../core/rpg/types';
+import { RPGProfile, LifeStatus } from '../../../core/rpg/types';
 import {
   loadRPGProfile,
   saveRPGProfile,
   RPG_CLASSES,
+  DEFAULT_LIFE_STATUSES,
   getBeijingDateString,
 } from '../../../core/rpg/rpgStorage';
 import { AttributesSheet } from './components/AttributesSheet';
-import { SkillTreeSheet } from './components/SkillTreeSheet';
-import { StatusDebuffSheet } from './components/StatusDebuffSheet';
+import { LifeStatusSheet } from './components/LifeStatusSheet';
 import { AchievementSheet } from './components/AchievementSheet';
 import { InventorySheet } from './components/InventorySheet';
 import { WishWandIcon } from './components/WishWandIcon';
@@ -593,30 +593,36 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
     showToast('职业已保存');
   };
 
-  // 技能增删与切换
-  const handleAddSkill = (skill: any) => {
-    setProfile((prev) => ({
-      ...prev,
-      skills: [...prev.skills, skill],
-    }));
-    showToast('技能已新增');
+  // 身心状态增删与切换
+  const handleToggleStatus = (id: string) => {
+    setProfile((prev) => {
+      const list: LifeStatus[] = prev.lifeStatuses || DEFAULT_LIFE_STATUSES;
+      const target = list.find((s: LifeStatus) => s.id === id);
+      const willBeActive = !target?.active;
+      const updated = list.map((s: LifeStatus) => (s.id === id ? { ...s, active: willBeActive } : s));
+      if (willBeActive && target) {
+        showToast(`✨「${target.name}」已挂载 · 任务已减负`);
+      } else if (target) {
+        showToast(`已解除「${target.name}」`);
+      }
+      return { ...prev, lifeStatuses: updated };
+    });
   };
 
-  const handleDeleteSkill = (id: string) => {
+  const handleAddStatus = (newStatus: LifeStatus) => {
     setProfile((prev) => ({
       ...prev,
-      skills: prev.skills.filter((s) => s.id !== id),
+      lifeStatuses: [...(prev.lifeStatuses || DEFAULT_LIFE_STATUSES), newStatus],
     }));
-    showToast('技能已删除');
+    showToast('✨ 状态已加入生活库');
   };
 
-  const handleToggleUnlockSkill = (id: string) => {
+  const handleDeleteStatus = (id: string) => {
     setProfile((prev) => ({
       ...prev,
-      skills: prev.skills.map((s) =>
-        s.id === id ? { ...s, unlocked: !s.unlocked } : s
-      ),
+      lifeStatuses: (prev.lifeStatuses || DEFAULT_LIFE_STATUSES).filter((s: LifeStatus) => s.id !== id),
     }));
+    showToast('状态已删除');
   };
 
   // 物品增删
@@ -636,8 +642,9 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
     showToast('物品已删除');
   };
 
-  // 检查是否有活跃的 Debuff
-  const activeDebuffCount = profile.debuffs.filter((d) => d.active).length;
+  // 活跃身心状态
+  const activeStatuses = (profile.lifeStatuses || DEFAULT_LIFE_STATUSES).filter((s: LifeStatus) => s.active);
+  const activeDebuffCount = activeStatuses.length;
   const isFatigued = profile.hp < 20;
 
   // 道具使用：回复体力或精力
@@ -1275,6 +1282,33 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
           </div>
         )}
 
+        {/* 当前活跃状态小药丸浮标：简洁明了，点击直达状态抽屉 */}
+        {activeStatuses.length > 0 && (
+          <button
+            onClick={() => setActiveSheet('status')}
+            style={{
+              position: 'absolute',
+              bottom: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              background: 'rgba(255, 253, 249, 0.95)',
+              border: '1.5px solid #502428',
+              boxShadow: '0 3px 8px rgba(80, 36, 40, 0.15)',
+              cursor: 'pointer',
+              zIndex: 10,
+            }}
+          >
+            <span style={{ fontSize: '15px' }}>{activeStatuses[0].icon}</span>
+            <span style={{ fontSize: '12px', fontWeight: 800, color: '#502428' }}>
+              {activeStatuses[0].name}
+              {activeStatuses.length > 1 ? ` · +${activeStatuses.length - 1}` : ''}
+            </span>
+          </button>
+        )}
+
         {/* 左上悬浮：更换立绘按钮（小白人偶+蓝色加号形态） */}
         <button
           onClick={() => setShowAvatarModal(true)}
@@ -1488,11 +1522,38 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
           onClick={() => setActiveSheet(activeSheet === 'attributes' ? null : 'attributes')}
         />
 
-        {/* 2. 技能 */}
+        {/* 2. 状态 */}
         <ClipboardTabButton
-          label="技能"
-          isActive={activeSheet === 'skills'}
-          onClick={() => setActiveSheet(activeSheet === 'skills' ? null : 'skills')}
+          label="状态"
+          isActive={activeSheet === 'status'}
+          badge={
+            activeDebuffCount > 0 ? (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  minWidth: '18px',
+                  height: '18px',
+                  borderRadius: '9px',
+                  background: '#EF4444',
+                  color: '#FFFFFF',
+                  fontSize: '10px',
+                  fontWeight: 900,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 4px',
+                  border: '1.5px solid #FFFFFF',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  zIndex: 2,
+                }}
+              >
+                {activeDebuffCount}
+              </span>
+            ) : undefined
+          }
+          onClick={() => setActiveSheet(activeSheet === 'status' ? null : 'status')}
         />
 
         {/* 3. 背包 */}
@@ -1525,12 +1586,12 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
         />
       )}
 
-      {activeSheet === 'skills' && (
-        <SkillTreeSheet
-          skills={profile.skills}
-          onToggleUnlock={handleToggleUnlockSkill}
-          onAddSkill={handleAddSkill}
-          onDeleteSkill={handleDeleteSkill}
+      {activeSheet === 'status' && (
+        <LifeStatusSheet
+          statuses={profile.lifeStatuses || DEFAULT_LIFE_STATUSES}
+          onToggleStatus={handleToggleStatus}
+          onAddStatus={handleAddStatus}
+          onDeleteStatus={handleDeleteStatus}
           onClose={() => setActiveSheet(null)}
         />
       )}

@@ -1,4 +1,4 @@
-import { RPGProfile, RPGClass } from './types';
+import { RPGProfile, RPGClass, LifeStatus } from './types';
 import { calculateDailySettlement, getMaxExpForLevel } from './dailySettlementEngine';
 import { saveCustomAvatar } from './avatarImageStorage';
 import { saveCustomBackground } from './backgroundImageStorage';
@@ -46,6 +46,63 @@ export const RPG_CLASSES: RPGClass[] = [
     salary: '35K - 65K',
     location: '北京 · 海淀',
     icon: '📖',
+  },
+];
+
+export const DEFAULT_LIFE_STATUSES: LifeStatus[] = [
+  {
+    id: 'status_food_coma',
+    name: '碳水昏迷',
+    icon: '🍔',
+    type: 'debuff',
+    effectText: '血液涌向胃部，脑力挂机',
+    systemAdvice: '宜浅睡20分钟或躺平休息',
+    active: false,
+  },
+  {
+    id: 'status_caffeine_boost',
+    name: '咖啡因高能',
+    icon: '☕',
+    type: 'buff',
+    effectText: '心流涌动，注意力暴击',
+    systemAdvice: '宜借势推进核心要务，适度补水',
+    active: false,
+  },
+  {
+    id: 'status_bed_gravity',
+    name: '阴雨被窝重力场',
+    icon: '🌧️',
+    type: 'debuff',
+    effectText: '床垫强力吸附，行动力受阻',
+    systemAdvice: '宜听雨声看闲书，顺应节奏',
+    active: false,
+  },
+  {
+    id: 'status_energy_zero',
+    name: '精力见底·摆烂结界',
+    icon: '🔋',
+    type: 'protect',
+    effectText: '合法防护盾，屏蔽催促与内耗',
+    systemAdvice: '主线自动降级为“活着并呼吸”',
+    active: false,
+  },
+  {
+    id: 'status_digital_overload',
+    name: '数字信息过载',
+    icon: '📱',
+    type: 'debuff',
+    effectText: '信息拥堵脑雾，思维缓存满载',
+    systemAdvice: '宜远眺 5 分钟或出门放空',
+    active: false,
+  },
+  {
+    id: 'status_fluffy_healing',
+    name: '毛绒生物治愈',
+    icon: '🐈',
+    type: 'buff',
+    effectText: '萌宠互动，精神治愈力拉满',
+    systemAdvice: '享受当下温存，汲取安宁能量',
+    active: false,
   },
 ];
 
@@ -240,6 +297,7 @@ export const DEFAULT_RPG_PROFILE: RPGProfile = {
       active: false,
     },
   ],
+  lifeStatuses: DEFAULT_LIFE_STATUSES,
   items: [
     {
       id: 'item_headphone',
@@ -420,6 +478,9 @@ export function loadRPGProfile(): RPGProfile {
         gender: parsed.gender || DEFAULT_RPG_PROFILE.gender,
         storyPages: parsed.storyPages && parsed.storyPages.length > 0 ? parsed.storyPages : DEFAULT_RPG_PROFILE.storyPages,
         classes: parsed.classes && parsed.classes.length > 0 ? parsed.classes : RPG_CLASSES,
+        lifeStatuses: Array.isArray(parsed.lifeStatuses) && parsed.lifeStatuses.length > 0
+          ? parsed.lifeStatuses
+          : (DEFAULT_RPG_PROFILE.lifeStatuses || []),
       };
 
       merged.maxExp = getMaxExpForLevel(merged.level || 1);
