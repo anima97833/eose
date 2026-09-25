@@ -59,16 +59,10 @@ export const App: React.FC = () => {
     }, 300);
   };
 
-  const handleHomeClick = () => {
-    // 底部 Home 条手势：退出当前应用，平滑返回主屏幕
-    setActiveApp(null);
-  };
-
   const isCustomApp = activeApp ? !!getCustomAppById(activeApp) : false;
 
   return (
     <PhoneFrame
-      onHomeClick={handleHomeClick}
       isOnDesktop={activeApp === null}
       onOpenApp={handleOpenApp}
     >

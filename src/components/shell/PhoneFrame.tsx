@@ -6,14 +6,12 @@ import { DynamicIslandBanner } from './DynamicIslandBanner';
 
 interface PhoneFrameProps {
   children: React.ReactNode;
-  onHomeClick?: () => void;
   isOnDesktop?: boolean;
   onOpenApp?: (appId: string) => void;
 }
 
 export const PhoneFrame: React.FC<PhoneFrameProps> = ({ 
   children, 
-  onHomeClick,
   isOnDesktop = true,
   onOpenApp = () => {},
 }) => {
@@ -38,7 +36,7 @@ export const PhoneFrame: React.FC<PhoneFrameProps> = ({
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {children}
         </div>
-        <HomeBar onClick={onHomeClick} />
+        <HomeBar />
       </main>
     );
   }
@@ -129,7 +127,7 @@ export const PhoneFrame: React.FC<PhoneFrameProps> = ({
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {children}
           </div>
-          <HomeBar onClick={onHomeClick} />
+          <HomeBar />
         </div>
       </div>
     </div>
