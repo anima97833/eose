@@ -17,6 +17,7 @@ import { ContinuousScannerModal } from './components/ContinuousScannerModal';
 import { BookDetailModal } from './components/BookDetailModal';
 import { LocationManagerModal } from './components/LocationManagerModal';
 import { ManualBookModal } from './components/ManualBookModal';
+import { BookApiSettingsModal } from './components/BookApiSettingsModal';
 import { Settings } from 'lucide-react';
 
 interface BookVaultAppProps {
@@ -37,6 +38,7 @@ export const BookVaultApp: React.FC<BookVaultAppProps> = ({ onBack }) => {
   // 模态框控制
   const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
   const [isManualAddOpen, setIsManualAddOpen] = useState<boolean>(false);
+  const [isApiSettingsOpen, setIsApiSettingsOpen] = useState<boolean>(false);
   const [isLocationManagerOpen, setIsLocationManagerOpen] = useState<boolean>(false);
   const [locationsVersion, setLocationsVersion] = useState<number>(0);
   const [selectedBook, setSelectedBook] = useState<PhysicalBookRecord | null>(null);
@@ -246,6 +248,32 @@ export const BookVaultApp: React.FC<BookVaultAppProps> = ({ onBack }) => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* 图书 API 数据源设置入口 */}
+          <button
+            type="button"
+            onClick={() => setIsApiSettingsOpen(true)}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              border: NM.borderLight,
+              backgroundColor: NM.cardBg,
+              color: NM.textSub,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: NM.convexSm,
+              transition: 'transform 0.15s ease',
+              padding: 0,
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.95)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform = 'none')}
+            title="配置中文图书 API 数据源"
+          >
+            <Settings size={17} strokeWidth={2.2} />
+          </button>
+
           {/* 手动录书按键（纯图标轻拟物圆键） */}
           <button
             type="button"
@@ -725,6 +753,13 @@ export const BookVaultApp: React.FC<BookVaultAppProps> = ({ onBack }) => {
           onDeleteLocation={handleDeleteLocation}
         />
       )}
+
+      {/* 图书 API 数据源配置模态框 */}
+      <BookApiSettingsModal
+        isOpen={isApiSettingsOpen}
+        onClose={() => setIsApiSettingsOpen(false)}
+        onSavedToast={showToast}
+      />
 
       {/* 浮动 Toast 提示（<=5字轻拟物气泡） */}
       {toastMsg && (

@@ -67,8 +67,24 @@ const WELL_KNOWN_BOOKS: Record<string, Partial<PhysicalBookRecord>> = {
   },
 };
 
+export function getCustomBookApiEndpoint(): string {
+  return localStorage.getItem('cloudfly_book_api_endpoint') || '';
+}
+
+export function setCustomBookApiEndpoint(url: string): void {
+  const clean = url.trim();
+  if (!clean) {
+    localStorage.removeItem('cloudfly_book_api_endpoint');
+  } else {
+    localStorage.setItem('cloudfly_book_api_endpoint', clean);
+  }
+}
+
 /**
- * 根据 13 位 ISBN 码从 Open Library 或知名书籍库检索图书信息
+ * 根据 13 位 ISBN 码检索图书信息
+ * 1. 优先尝试内置高频图书表
+ * 2. 优先请求用户配置的专属 Cloudflare Worker 接口（秒级识别全网中文图书）
+ * 3. 兜底请求国际 Open Library 开放接口
  */
 export async function fetchBookByISBN(rawIsbn: string): Promise<Partial<PhysicalBookRecord>> {
   const cleanIsbn = normalizeISBN(rawIsbn);
@@ -84,7 +100,41 @@ export async function fetchBookByISBN(rawIsbn: string): Promise<Partial<Physical
     };
   }
 
-  // 2. 联网请求 Open Library API
+  // 2. 优先尝试用户配置的专属 Cloudflare Worker 接口
+  const customEndpoint = getCustomBookApiEndpoint();
+  if (customEndpoint) {
+    try {
+      const separator = customEndpoint.includes('?') ? '&' : '?';
+      const targetUrl = `${customEndpoint.replace(/\/+$/, '')}${separator}isbn=${cleanIsbn}`;
+      const controller = new AbortController();
+      const tId = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch(targetUrl, { signal: controller.signal });
+      clearTimeout(tId);
+
+      if (res.ok) {
+        const json = await res.json();
+        const b = json.data || json;
+        if (b && (b.title || b.name)) {
+          return {
+            isbn: cleanIsbn,
+            title: b.title || b.name,
+            subtitle: b.subtitle || '',
+            author: b.author || '未知作者',
+            publisher: b.publisher || '待补充出版社',
+            pubDate: b.pubDate || b.pubdate || '',
+            pageCount: Number(b.pageCount || b.pages) || 280,
+            price: b.price ? (b.price.startsWith('¥') ? b.price : `¥${b.price}`) : '¥39.00',
+            coverUrl: b.coverUrl || b.image || `https://covers.openlibrary.org/b/isbn/${cleanIsbn}-M.jpg`,
+            category: '藏书',
+          };
+        }
+      }
+    } catch (err: any) {
+      console.warn('[BookApi] 自定义 Worker 接口请求失败，回退到公共源:', err?.message);
+    }
+  }
+
+  // 3. 联网请求 Open Library API 国际库
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 6500);
 
