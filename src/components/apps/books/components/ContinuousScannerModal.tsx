@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Camera, Zap, Check, MapPin, Plus, AlertCircle } from 'lucide-react';
+import { X, Camera, Zap, Check, MapPin, Plus, AlertCircle, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { IScannerControls } from '@zxing/browser';
 import { PhysicalBookRecord } from '../../../../core/books/bookTypes';
 import {
   startCameraStream,
   stopCameraStream,
   playScannerBeep,
-  isBarcodeDetectorSupported,
+  createZXingReader,
+  decodeBarcodeFromFile,
   normalizeISBN,
 } from '../../../../core/books/scannerEngine';
 import { fetchBookByISBN } from '../../../../core/books/bookApi';
@@ -41,12 +43,14 @@ export const ContinuousScannerModal: React.FC<ContinuousScannerModalProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const scanLoopRef = useRef<number | null>(null);
+  const controlsRef = useRef<IScannerControls | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [hasCamera, setHasCamera] = useState<boolean>(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [scannedQueue, setScannedQueue] = useState<PhysicalBookRecord[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isDecodingPhoto, setIsDecodingPhoto] = useState<boolean>(false);
 
   // 物理书架位置
   const [locations, setLocations] = useState<string[]>(getSavedPhysicalLocations());
@@ -129,7 +133,29 @@ export const ContinuousScannerModal: React.FC<ContinuousScannerModalProps> = ({
     }
   };
 
-  // 启动原生硬件连续扫码检测器
+  // 拍照 / 相册选图识别条形码
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsDecodingPhoto(true);
+    try {
+      const barcode = await decodeBarcodeFromFile(file);
+      if (barcode) {
+        await handleProcessISBN(barcode);
+      } else {
+        alert('未能从该照片中识别到清晰的图书条形码。\n\n💡 扫码技巧：\n1. 请对准图书背面的条形码（以 978 或 979 开头的 13 位数字）\n2. 拍摄时光线充足，尽量避免反光或折角\n3. 如果图书条码受损，可直接在下方输入框键入 13 位数字');
+      }
+    } catch (err) {
+      console.warn('[Scanner] 照片识别异常:', err);
+      alert('条形码识别处理失败，请重试');
+    } finally {
+      setIsDecodingPhoto(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  // 启动高精度 ZXing 条形码连续扫描引擎
   useEffect(() => {
     let isActive = true;
 
@@ -138,47 +164,37 @@ export const ContinuousScannerModal: React.FC<ContinuousScannerModalProps> = ({
 
       try {
         const stream = await startCameraStream(videoRef.current);
+        if (!isActive) {
+          stopCameraStream(stream);
+          return;
+        }
         streamRef.current = stream;
         setHasCamera(true);
 
-        // 如果浏览器支持原生 BarcodeDetector
-        if (isBarcodeDetectorSupported()) {
-          const barcodeDetector = new (window as any).BarcodeDetector({
-            formats: ['ean_13', 'ean_8', 'code_128'],
-          });
-
-          const scanLoop = async () => {
-            if (!isActive || !videoRef.current) return;
-
-            try {
-              if (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-                const barcodes = await barcodeDetector.detect(videoRef.current);
-                if (barcodes && barcodes.length > 0) {
-                  for (const b of barcodes) {
-                    if (b.rawValue) {
-                      handleProcessISBN(b.rawValue);
-                      break;
-                    }
-                  }
-                }
+        // 初始化专业 ZXing 解码器（聚焦中国图书常见的 EAN-13、EAN-8、Code-128）
+        const reader = createZXingReader();
+        const controls = await reader.decodeFromVideoElement(
+          videoRef.current,
+          (result, error) => {
+            if (!isActive) return;
+            if (result) {
+              const text = result.getText();
+              if (text) {
+                handleProcessISBN(text);
               }
-            } catch {
-              // ignore frame detect error
             }
+          }
+        );
 
-            if (isActive) {
-              scanLoopRef.current = window.setTimeout(scanLoop, 150);
-            }
-          };
-
-          scanLoop();
+        if (!isActive) {
+          controls.stop();
         } else {
-          console.warn('[Scanner] 浏览器不支持原生 BarcodeDetector，提供模拟/手动模式');
+          controlsRef.current = controls;
         }
       } catch (err: any) {
-        console.warn('[Scanner] 启动摄像头失败:', err);
+        console.warn('[Scanner] 启动摄像头或扫码引擎失败:', err);
         setHasCamera(false);
-        setCameraError('未获得摄像头权限或设备无后置相机，可点击下方仿真样本体验“哔哔”连续录入');
+        setCameraError('未获得摄像头权限或设备无可用相机。您可点击“传图识码”上传条码照片，或直接手动输入 ISBN。');
       }
     }
 
@@ -186,8 +202,18 @@ export const ContinuousScannerModal: React.FC<ContinuousScannerModalProps> = ({
 
     return () => {
       isActive = false;
-      if (scanLoopRef.current) clearTimeout(scanLoopRef.current);
-      stopCameraStream(streamRef.current);
+      if (controlsRef.current) {
+        try {
+          controlsRef.current.stop();
+        } catch {
+          // ignore
+        }
+        controlsRef.current = null;
+      }
+      if (streamRef.current) {
+        stopCameraStream(streamRef.current);
+        streamRef.current = null;
+      }
     };
   }, []);
 
@@ -277,6 +303,44 @@ export const ContinuousScannerModal: React.FC<ContinuousScannerModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* 隐藏的图片文件上传 input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleFileSelect}
+            />
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isDecodingPhoto}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                color: NM.primaryDark,
+                backgroundColor: NM.cardBg,
+                boxShadow: NM.convexSm,
+                border: NM.borderLight,
+                padding: '6px 11px',
+                borderRadius: 14,
+                cursor: isDecodingPhoto ? 'wait' : 'pointer',
+                opacity: isDecodingPhoto ? 0.7 : 1,
+              }}
+              title="从相册选图或直接拍照识别图书条形码"
+            >
+              {isDecodingPhoto ? (
+                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <ImageIcon size={14} />
+              )}
+              <span>{isDecodingPhoto ? '识别中…' : '传图识码'}</span>
+            </button>
+
             {scannedQueue.length > 0 && (
               <span
                 style={{

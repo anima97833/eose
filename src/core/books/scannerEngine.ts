@@ -1,6 +1,5 @@
-/**
- * 纸质书条形码连续扫描引擎与 Web Audio 合成器音效
- */
+import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
+import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 
 let audioContext: AudioContext | null = null;
 
@@ -42,10 +41,36 @@ export function playScannerBeep(): void {
 }
 
 /**
- * 检查当前浏览器是否原生支持 BarcodeDetector
+ * 创建针对纸质图书条形码优化的专业 ZXing 解码器
+ * 针对中国大陆常见的 EAN-13, EAN-8, CODE-128, UPC 进行格式聚焦
  */
-export function isBarcodeDetectorSupported(): boolean {
-  return typeof window !== 'undefined' && 'BarcodeDetector' in window;
+export function createZXingReader(): BrowserMultiFormatReader {
+  const hints = new Map();
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+    BarcodeFormat.EAN_13,
+    BarcodeFormat.EAN_8,
+    BarcodeFormat.CODE_128,
+    BarcodeFormat.UPC_A,
+    BarcodeFormat.UPC_E,
+  ]);
+  hints.set(DecodeHintType.TRY_HARDER, true);
+  return new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 100 });
+}
+
+/**
+ * 从本地选择的图片文件中解码条形码
+ */
+export async function decodeBarcodeFromFile(file: File): Promise<string | null> {
+  const reader = createZXingReader();
+  const blobUrl = URL.createObjectURL(file);
+  try {
+    const result = await reader.decodeFromImageUrl(blobUrl);
+    return result ? result.getText() : null;
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
 }
 
 /**
