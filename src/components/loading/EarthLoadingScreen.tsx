@@ -335,55 +335,36 @@ export const EarthLoadingScreen: React.FC<EarthLoadingScreenProps> = ({ onFinish
         }
       `}</style>
 
-      {/* 顶部状态栏与跳过胶囊 */}
+      {/* 顶部仅保留纯文字“跳过”，移除左侧胶囊按钮 */}
       <div
         style={{
           width: '100%',
           display: 'flex',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           alignItems: 'center',
-          marginTop: 8,
+          marginTop: 6,
+          paddingRight: 6,
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            backgroundColor: 'rgba(255, 255, 255, 0.75)',
-            backdropFilter: 'blur(6px)',
-            padding: '5px 12px',
-            borderRadius: 20,
-            boxShadow: '0 2px 8px rgba(180, 160, 140, 0.2)',
-          }}
-        >
-          <Sparkles size={13} color="#D97706" />
-          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#451A03', letterSpacing: '0.5px' }}>
-            地球 Online 客户端
-          </span>
-        </div>
-
-        {/* 跳过按钮 */}
         <button
           type="button"
           onClick={handleSkip}
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '5px 12px',
-            borderRadius: 20,
+            background: 'none',
             border: 'none',
-            backgroundColor: 'rgba(255, 255, 255, 0.85)',
-            boxShadow: '2px 2px 6px rgba(190, 170, 150, 0.35)',
-            color: '#78350F',
-            fontSize: '0.72rem',
-            fontWeight: 700,
+            padding: '4px 6px',
+            color: '#A8A29E',
+            fontSize: '0.82rem',
+            fontWeight: 600,
             cursor: 'pointer',
+            letterSpacing: '1px',
+            outline: 'none',
+            transition: 'color 0.15s ease',
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = '#78350F')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = '#A8A29E')}
         >
-          <span>跳过</span>
-          <ArrowRight size={12} />
+          跳过
         </button>
       </div>
 

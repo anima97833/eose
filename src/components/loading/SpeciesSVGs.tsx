@@ -5,10 +5,11 @@ interface CharacterProps {
 }
 
 /**
- * 1. 🐶 狗狗角色（忠实还原参考图：暖黄几何身形、圆黑鼻、闭眼微笑、黑项圈小绿牌、四足原地踱步）
+ * 1. 🐶 狗狗角色（极致还原参考图：平背平腹、正规转折脖子、圆黑鼻、闭眼微笑、黑项圈小绿挂牌、向前弯折可爱小狗爪）
  */
 export const DogCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
-  const speed = isAccelerating ? '0.35s' : '0.65s';
+  const duration = isAccelerating ? 0.35 : 0.65;
+  const speed = `${duration}s`;
 
   return (
     <svg
@@ -26,31 +27,31 @@ export const DogCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
             50% { transform: translateY(-4px); }
           }
           @keyframes dogTail {
-            0%, 100% { transform: rotate(-5deg); }
-            50% { transform: rotate(15deg); }
+            0%, 100% { transform: rotate(-6deg); }
+            50% { transform: rotate(16deg); }
           }
-          @keyframes legFrontA {
-            0% { transform: rotate(-22deg); }
-            50% { transform: rotate(20deg); }
-            100% { transform: rotate(-22deg); }
+          @keyframes dogLegSwingA {
+            0% { transform: rotate(-24deg); }
+            50% { transform: rotate(22deg); }
+            100% { transform: rotate(-24deg); }
           }
-          @keyframes legFrontB {
-            0% { transform: rotate(20deg); }
-            50% { transform: rotate(-22deg); }
-            100% { transform: rotate(20deg); }
+          @keyframes dogLegSwingB {
+            0% { transform: rotate(22deg); }
+            50% { transform: rotate(-24deg); }
+            100% { transform: rotate(22deg); }
           }
           @keyframes shadowPulse {
-            0%, 100% { transform: scaleX(1); opacity: 0.65; }
-            50% { transform: scaleX(0.88); opacity: 0.45; }
+            0%, 100% { transform: scaleX(1); opacity: 0.6; }
+            50% { transform: scaleX(0.86); opacity: 0.4; }
           }
         `}</style>
       </defs>
 
-      {/* 地面椭圆胶囊阴影 */}
+      {/* 地面胶囊阴影（与参考图一致的柔和灰棕色） */}
       <ellipse
         cx="110"
         cy="158"
-        rx="50"
+        rx="52"
         ry="6"
         fill="#D4C5B5"
         style={{
@@ -59,74 +60,79 @@ export const DogCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
         }}
       />
 
-      {/* 后排腿（右前腿、右后腿，颜色略暗制造景深） */}
+      {/* 后排腿（右后腿、右前腿，颜色稍深产生光影空间感） */}
       <g style={{ fill: '#E6942C' }}>
         {/* 后排右后腿 */}
-        <g style={{ transformOrigin: '70px 125px', animation: `legFrontB ${speed} ease-in-out infinite` }}>
-          <path d="M 66 125 C 66 125, 60 142, 63 150 C 64 153, 72 153, 75 149 C 78 144, 76 125, 76 125 Z" />
+        <g style={{ transformOrigin: '72px 124px', animation: `dogLegSwingB ${speed} ease-in-out infinite` }}>
+          <path d="M 68 124 L 68 142 C 68 147, 70 150, 75 150 L 82 150 C 86 150, 88 146, 86 142 C 84 138, 77 139, 77 124 Z" />
         </g>
         {/* 后排右前腿 */}
-        <g style={{ transformOrigin: '142px 125px', animation: `legFrontA ${speed} ease-in-out infinite` }}>
-          <path d="M 138 125 C 138 125, 133 142, 136 150 C 138 153, 146 153, 149 149 C 151 144, 147 125, 147 125 Z" />
+        <g style={{ transformOrigin: '138px 124px', animation: `dogLegSwingA ${speed} ease-in-out infinite` }}>
+          <path d="M 134 124 L 134 142 C 134 147, 136 150, 141 150 L 148 150 C 152 150, 154 146, 152 142 C 150 138, 143 139, 143 124 Z" />
         </g>
       </g>
 
-      {/* 主躯干与头部（带微幅上下颠簸） */}
+      {/* 躯干、头部、脖子、尾巴一体（上下轻快颠簸） */}
       <g
         style={{
           transformOrigin: '110px 100px',
           animation: `dogBob ${speed} ease-in-out infinite`,
         }}
       >
-        {/* 尾巴（欢快摇晃） */}
+        {/* 向上俏皮竖起的小尾巴 */}
         <g style={{ transformOrigin: '54px 92px', animation: `dogTail ${speed} ease-in-out infinite` }}>
           <path
-            d="M 54 92 C 50 82, 45 74, 52 70 C 58 66, 61 78, 62 86 Z"
+            d="M 54 94 C 48 84, 42 74, 50 68 C 55 64, 58 74, 60 88 Z"
             fill="#F9A436"
           />
         </g>
 
-        {/* 身体主轮廓（圆角几何长条） */}
-        <rect x="52" y="86" width="94" height="42" rx="14" fill="#F9A436" />
-
-        {/* 脖子与头部 */}
+        {/* 身体主轮廓：圆角平直躯干与连贯直角脖颈 */}
         <path
-          d="M 118 100 L 118 48 C 118 42, 124 38, 130 38 L 138 38 C 142 38, 144 42, 144 48 L 144 62 L 172 62 C 180 62, 184 68, 182 76 C 180 84, 172 88, 164 88 L 146 88 L 146 100 Z"
+          d="M 52 86 
+             L 116 86 
+             L 116 46 C 116 40, 122 36, 128 36 
+             L 138 36 C 142 36, 144 40, 144 46 
+             L 144 58 
+             L 174 58 C 182 58, 184 66, 182 74 C 180 82, 172 86, 162 86 
+             L 146 86 
+             L 146 114 C 146 122, 140 126, 132 126 
+             L 66 126 C 58 126, 52 120, 52 112 Z"
           fill="#F9A436"
         />
 
-        {/* 耷拉的小圆耳 */}
+        {/* 耷拉在脑袋一侧的萌萌小圆耳 */}
         <path
-          d="M 128 38 C 122 36, 120 46, 120 54 C 120 62, 126 64, 130 62 C 134 60, 133 42, 128 38 Z"
+          d="M 122 36 C 114 34, 112 46, 114 56 C 116 66, 122 68, 126 66 C 130 64, 128 40, 122 36 Z"
           fill="#E6942C"
         />
 
-        {/* 项圈（深黑褐色）与小绿坠 */}
-        <rect x="117" y="74" width="29" height="10" rx="3" fill="#2E241E" />
-        <circle cx="150" cy="85" r="4.5" fill="#65A30D" />
+        {/* 黑色项圈与小绿吊牌 */}
+        <rect x="114" y="74" width="32" height="10" rx="3" fill="#241B15" />
+        <circle cx="148" cy="86" r="4.5" fill="#5B9A42" />
 
-        {/* 黑色大圆按钮鼻子 */}
-        <circle cx="178" cy="69" r="7.5" fill="#2E241E" />
+        {/* 标志性大黑圆按钮鼻 */}
+        <circle cx="175" cy="67" r="7.5" fill="#241B15" />
 
-        {/* 闭眼陶醉微笑眼弧 */}
+        {/* 闭目享受的弯弯笑眼弧 */}
         <path
-          d="M 141 54 Q 147 62 153 54"
-          stroke="#2E241E"
+          d="M 138 52 Q 144 60 150 52"
+          stroke="#241B15"
           strokeWidth="3.2"
           strokeLinecap="round"
           fill="none"
         />
       </g>
 
-      {/* 前排腿（左前腿、左后腿，亮色） */}
+      {/* 前排腿（左后腿、左前腿，明亮暖黄，自然前屈小肉垫足部） */}
       <g style={{ fill: '#F9A436' }}>
         {/* 前排左后腿 */}
-        <g style={{ transformOrigin: '76px 125px', animation: `legFrontA ${speed} ease-in-out infinite` }}>
-          <path d="M 72 125 C 72 125, 66 142, 69 150 C 71 153, 79 153, 82 149 C 84 144, 82 125, 82 125 Z" />
+        <g style={{ transformOrigin: '78px 124px', animation: `dogLegSwingA ${speed} ease-in-out infinite` }}>
+          <path d="M 74 124 L 74 142 C 74 147, 76 150, 81 150 L 88 150 C 92 150, 94 146, 92 142 C 90 138, 83 139, 83 124 Z" />
         </g>
         {/* 前排左前腿 */}
-        <g style={{ transformOrigin: '132px 125px', animation: `legFrontB ${speed} ease-in-out infinite` }}>
-          <path d="M 128 125 C 128 125, 123 142, 126 150 C 128 153, 136 153, 139 149 C 141 144, 138 125, 138 125 Z" />
+        <g style={{ transformOrigin: '132px 124px', animation: `dogLegSwingB ${speed} ease-in-out infinite` }}>
+          <path d="M 128 124 L 128 142 C 128 147, 130 150, 135 150 L 142 150 C 146 150, 148 146, 146 142 C 144 138, 137 139, 137 124 Z" />
         </g>
       </g>
     </svg>
@@ -134,10 +140,11 @@ export const DogCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
 };
 
 /**
- * 2. 🐱 猫猫角色（轻盈奶油橘猫、尖尖三角耳、优雅问号尾、高冷闭眼）
+ * 2. 🐱 猫猫角色（具备修长优雅的猫脖子、红项圈小金铃、立体猫耳、微翘下巴、纤巧小猫爪与灵动问号尾）
  */
 export const CatCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
-  const speed = isAccelerating ? '0.32s' : '0.6s';
+  const duration = isAccelerating ? 0.32 : 0.6;
+  const speed = `${duration}s`;
 
   return (
     <svg
@@ -151,19 +158,19 @@ export const CatCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
       <defs>
         <style>{`
           @keyframes catBob {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-5px); }
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-5px) rotate(-1deg); }
           }
-          @keyframes catTail {
+          @keyframes catTailWave {
             0%, 100% { transform: rotate(-8deg); }
-            50% { transform: rotate(12deg); }
+            50% { transform: rotate(14deg); }
           }
-          @keyframes catLegA {
+          @keyframes catLegSwingA {
             0% { transform: rotate(-24deg); }
             50% { transform: rotate(22deg); }
             100% { transform: rotate(-24deg); }
           }
-          @keyframes catLegB {
+          @keyframes catLegSwingB {
             0% { transform: rotate(22deg); }
             50% { transform: rotate(-24deg); }
             100% { transform: rotate(22deg); }
@@ -171,59 +178,98 @@ export const CatCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
         `}</style>
       </defs>
 
-      <ellipse cx="110" cy="158" rx="46" ry="6" fill="#D4C5B5" opacity="0.6" />
+      {/* 地面阴影 */}
+      <ellipse cx="110" cy="158" rx="48" ry="6" fill="#D4C5B5" opacity="0.6" />
 
-      {/* 后排腿 */}
+      {/* 后排猫爪（颜色稍暗） */}
       <g style={{ fill: '#EAB308' }}>
-        <g style={{ transformOrigin: '76px 125px', animation: `catLegB ${speed} ease-in-out infinite` }}>
-          <rect x="73" y="125" width="8" height="26" rx="4" />
+        {/* 后右腿 */}
+        <g style={{ transformOrigin: '74px 124px', animation: `catLegSwingB ${speed} ease-in-out infinite` }}>
+          <path d="M 72 124 L 72 144 C 72 148, 74 151, 78 151 L 84 151 C 87 151, 88 147, 86 144 C 84 140, 79 141, 79 124 Z" />
         </g>
-        <g style={{ transformOrigin: '136px 125px', animation: `catLegA ${speed} ease-in-out infinite` }}>
-          <rect x="133" y="125" width="8" height="26" rx="4" />
+        {/* 前右腿 */}
+        <g style={{ transformOrigin: '136px 124px', animation: `catLegSwingA ${speed} ease-in-out infinite` }}>
+          <path d="M 134 124 L 134 144 C 134 148, 136 151, 140 151 L 146 151 C 149 151, 150 147, 148 144 C 146 140, 141 141, 141 124 Z" />
         </g>
       </g>
 
-      {/* 主躯干与头部 */}
-      <g style={{ transformOrigin: '110px 100px', animation: `catBob ${speed} ease-in-out infinite` }}>
-        {/* 优雅高挑波浪猫尾巴 */}
-        <g style={{ transformOrigin: '58px 105px', animation: `catTail ${speed} ease-in-out infinite` }}>
+      {/* 躯干、头部、脖子主容器 */}
+      <g
+        style={{
+          transformOrigin: '110px 100px',
+          animation: `catBob ${speed} ease-in-out infinite`,
+        }}
+      >
+        {/* 优雅问号型长尾巴（自然波浪摆动） */}
+        <g style={{ transformOrigin: '56px 105px', animation: `catTailWave ${speed} ease-in-out infinite` }}>
           <path
-            d="M 58 105 C 42 100, 36 75, 45 58 C 49 50, 56 50, 54 58 C 50 68, 48 90, 64 96 Z"
+            d="M 56 105 C 40 100, 32 72, 44 52 C 50 44, 56 46, 54 54 C 48 64, 46 88, 64 96 Z"
             fill="#FACC15"
           />
         </g>
 
-        {/* 猫身 */}
-        <rect x="58" y="90" width="84" height="38" rx="16" fill="#FACC15" />
+        {/* 柔软微弓猫身 */}
+        <path
+          d="M 56 94 
+             C 56 86, 70 84, 88 84 
+             C 106 84, 120 86, 126 94 
+             L 126 116 C 126 124, 120 126, 114 126 
+             L 68 126 C 60 126, 56 122, 56 114 Z"
+          fill="#FACC15"
+        />
+
+        {/* 明显的猫脖子（连接躯干与头颈） */}
+        <path
+          d="M 118 96 
+             C 120 84, 124 76, 128 66 
+             L 142 66 
+             C 144 76, 142 86, 138 96 Z"
+          fill="#FACC15"
+        />
+
+        {/* 可爱小颈圈（珊瑚粉红）与晃荡的小金铃铛 */}
+        <rect x="120" y="75" width="23" height="7" rx="3.5" fill="#FB7185" />
+        <circle cx="138" cy="85" r="3.5" fill="#F59E0B" />
+        <circle cx="138" cy="85" r="1.2" fill="#78350F" />
 
         {/* 尖尖猫耳朵 */}
-        <path d="M 124 50 L 132 30 L 140 48 Z" fill="#FACC15" />
-        <path d="M 127 48 L 132 35 L 137 47 Z" fill="#F472B6" />
+        <path d="M 125 44 L 132 20 L 140 40 Z" fill="#FACC15" />
+        <path d="M 128 38 L 132 26 L 137 36 Z" fill="#F472B6" />
 
-        <path d="M 144 50 L 152 30 L 160 48 Z" fill="#FACC15" />
-        <path d="M 147 48 L 152 35 L 157 47 Z" fill="#F472B6" />
+        <path d="M 144 42 L 153 20 L 160 38 Z" fill="#FACC15" />
+        <path d="M 147 38 L 153 26 L 157 36 Z" fill="#F472B6" />
 
-        {/* 圆圆猫头 */}
-        <circle cx="142" cy="65" r="22" fill="#FACC15" />
+        {/* 软萌猫猫圆头与微俏下巴 */}
+        <ellipse cx="143" cy="52" rx="19" ry="17" fill="#FACC15" />
 
-        {/* 猫眼睛：弯月微笑弧 */}
-        <path d="M 140 64 Q 146 70 152 64" stroke="#2E241E" strokeWidth="2.8" strokeLinecap="round" fill="none" />
+        {/* 高冷 serence 闭目猫眼 */}
+        <path
+          d="M 137 50 Q 142 56 148 50"
+          stroke="#2E241E"
+          strokeWidth="2.6"
+          strokeLinecap="round"
+          fill="none"
+        />
 
-        {/* 小粉鼻 */}
-        <polygon points="156,69 161,69 158.5,73" fill="#F43F5E" />
+        {/* 娇小粉嫩三角形鼻头 */}
+        <polygon points="152,55 157,55 154.5,58.5" fill="#F43F5E" />
 
-        {/* 胡须 */}
-        <line x1="162" y1="67" x2="175" y2="65" stroke="#2E241E" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="162" y1="71" x2="176" y2="73" stroke="#2E241E" strokeWidth="1.5" strokeLinecap="round" />
+        {/* 灵动小胡须 */}
+        <line x1="156" y1="53" x2="168" y2="50" stroke="#2E241E" strokeWidth="1.4" strokeLinecap="round" />
+        <line x1="156" y1="57" x2="169" y2="59" stroke="#2E241E" strokeWidth="1.4" strokeLinecap="round" />
       </g>
 
-      {/* 前排腿 */}
+      {/* 前排猫爪（亮黄色配白色软肉爪垫，前屈踱步） */}
       <g style={{ fill: '#FACC15' }}>
-        <g style={{ transformOrigin: '84px 125px', animation: `catLegA ${speed} ease-in-out infinite` }}>
-          <rect x="80" y="125" width="8" height="26" rx="4" />
+        {/* 前左后腿 */}
+        <g style={{ transformOrigin: '82px 124px', animation: `catLegSwingA ${speed} ease-in-out infinite` }}>
+          <path d="M 80 124 L 80 144 C 80 148, 82 151, 86 151 L 92 151 C 95 151, 96 147, 94 144 C 92 140, 87 141, 87 124 Z" />
+          <circle cx="89" cy="148" r="3.2" fill="#FEF9C3" />
         </g>
-        <g style={{ transformOrigin: '128px 125px', animation: `catLegB ${speed} ease-in-out infinite` }}>
-          <rect x="124" y="125" width="8" height="26" rx="4" />
+        {/* 前左前腿 */}
+        <g style={{ transformOrigin: '128px 124px', animation: `catLegSwingB ${speed} ease-in-out infinite` }}>
+          <path d="M 126 124 L 126 144 C 126 148, 128 151, 132 151 L 138 151 C 141 151, 142 147, 140 144 C 138 140, 133 141, 133 124 Z" />
+          <circle cx="135" cy="148" r="3.2" fill="#FEF9C3" />
         </g>
       </g>
     </svg>
@@ -265,7 +311,6 @@ export const StoneCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => 
         `}</style>
       </defs>
 
-      {/* 地面阴影 */}
       <ellipse cx="110" cy="156" rx="42" ry="7" fill="#D4C5B5" opacity="0.7" />
 
       {/* 滚动扬尘效果 */}
@@ -283,7 +328,7 @@ export const StoneCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => 
           {/* 石头表面浅色高光斑 */}
           <ellipse cx="120" cy="94" rx="16" ry="8" fill="#D6D3D1" opacity="0.6" transform="rotate(-15, 120, 94)" />
 
-          {/* 可爱豆豆眼与微笑 (即使倒立也有一种憨态) */}
+          {/* 可爱豆豆眼与微笑 */}
           <circle cx="102" cy="116" r="3.5" fill="#292524" />
           <circle cx="126" cy="116" r="3.5" fill="#292524" />
           <path d="M 111 125 Q 114 129 118 125" stroke="#292524" strokeWidth="2.5" strokeLinecap="round" fill="none" />
@@ -292,7 +337,7 @@ export const StoneCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => 
           <circle cx="133" cy="123" r="3.5" fill="#F472B6" opacity="0.65" />
         </g>
 
-        {/* 头顶顽强生长的小草双叶（固定在顶部，随跳跃微晃） */}
+        {/* 头顶小草双叶 */}
         <g style={{ transformOrigin: '110px 78px' }}>
           <path d="M 110 78 Q 110 65 102 60 Q 112 66 110 78" fill="#84CC16" />
           <path d="M 110 78 Q 112 62 122 62 Q 112 68 110 78" fill="#65A30D" />
@@ -466,10 +511,11 @@ export const WhaleCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => 
 };
 
 /**
- * 6. 🚶 人类服 · 地球玩家（昂首阔步、双手微摆、终点站定、展开光环）
+ * 6. 🚶 人类服 · 地球玩家（大师级现代极简矢量插画：清晰修长颈部、连帽风衣、斜挎小包、卷边裤、经典白底复古球鞋）
  */
 export const HumanCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => {
-  const speed = isAccelerating ? '0.35s' : '0.65s';
+  const duration = isAccelerating ? 0.35 : 0.65;
+  const speed = `${duration}s`;
 
   return (
     <svg
@@ -482,74 +528,140 @@ export const HumanCharacter: React.FC<CharacterProps> = ({ isAccelerating }) => 
     >
       <defs>
         <style>{`
-          @keyframes humanBob {
+          @keyframes humanWalkBob {
             0%, 100% { transform: translateY(0px); }
             50% { transform: translateY(-4px); }
           }
-          @keyframes humanLegL {
+          @keyframes humanLegA {
             0% { transform: rotate(-26deg); }
             50% { transform: rotate(26deg); }
             100% { transform: rotate(-26deg); }
           }
-          @keyframes humanLegR {
+          @keyframes humanLegB {
             0% { transform: rotate(26deg); }
             50% { transform: rotate(-26deg); }
             100% { transform: rotate(26deg); }
           }
-          @keyframes humanArmL {
+          @keyframes humanArmSwingA {
             0% { transform: rotate(28deg); }
-            50% { transform: rotate(-28deg); }
+            50% { transform: rotate(-26deg); }
             100% { transform: rotate(28deg); }
           }
-          @keyframes humanArmR {
-            0% { transform: rotate(-28deg); }
+          @keyframes humanArmSwingB {
+            0% { transform: rotate(-26deg); }
             50% { transform: rotate(28deg); }
-            100% { transform: rotate(-28deg); }
+            100% { transform: rotate(-26deg); }
           }
         `}</style>
       </defs>
 
       {/* 地面阴影 */}
-      <ellipse cx="110" cy="158" rx="36" ry="6" fill="#D4C5B5" opacity="0.65" />
+      <ellipse cx="110" cy="158" rx="38" ry="6" fill="#D4C5B5" opacity="0.65" />
 
-      {/* 后手臂（右臂） */}
-      <g style={{ transformOrigin: '110px 82px', animation: `humanArmR ${speed} ease-in-out infinite` }}>
-        <rect x="106" y="80" width="8" height="32" rx="4" fill="#D97706" />
+      {/* 后手臂（右臂，随左腿向前而向后摆动） */}
+      <g style={{ transformOrigin: '110px 84px', animation: `humanArmSwingB ${speed} ease-in-out infinite` }}>
+        {/* 暖棕深袖管 */}
+        <path d="M 106 82 L 102 108 C 101 113, 105 116, 110 116 C 114 116, 117 112, 116 107 L 114 82 Z" fill="#D97706" />
+        {/* 露出的右手 */}
+        <circle cx="106" cy="116" r="4.5" fill="#FED7AA" />
       </g>
 
-      {/* 后腿（右腿） */}
-      <g style={{ transformOrigin: '110px 115px', animation: `humanLegR ${speed} ease-in-out infinite` }}>
-        <rect x="106" y="112" width="9" height="38" rx="4.5" fill="#334155" />
-        <ellipse cx="114" cy="150" rx="7" ry="4" fill="#1E293B" />
+      {/* 后腿（右腿，带时尚卷边裤与复古运动鞋） */}
+      <g style={{ transformOrigin: '110px 116px', animation: `humanLegB ${speed} ease-in-out infinite` }}>
+        {/* 深炭灰裤腿 */}
+        <path d="M 107 114 L 105 142 L 115 142 L 117 114 Z" fill="#334155" />
+        {/* 卷边裤口 */}
+        <rect x="104" y="140" width="12" height="3" rx="1.5" fill="#475569" />
+        {/* 右脚球鞋：白色橡胶鞋头与鞋底、深色鞋身 */}
+        <g transform="translate(103, 143)">
+          {/* 鞋身 */}
+          <path d="M 2 4 L 2 11 L 18 11 C 21 11, 23 9, 21 5 L 14 3 Z" fill="#1E293B" />
+          {/* 白色鞋头防护罩 */}
+          <path d="M 14 3 C 17 3, 22 7, 21 11 L 15 11 Z" fill="#F8FAFC" />
+          {/* 白色厚底 */}
+          <rect x="1" y="11" width="21" height="3" rx="1.5" fill="#F8FAFC" />
+          {/* 鞋底防滑黑线 */}
+          <rect x="2" y="13" width="19" height="1" fill="#0F172A" />
+        </g>
       </g>
 
-      {/* 头部与身体 */}
-      <g style={{ transformOrigin: '110px 90px', animation: `humanBob ${speed} ease-in-out infinite` }}>
-        {/* 温暖亮黄风衣/卫衣躯干 */}
-        <rect x="98" y="74" width="24" height="42" rx="8" fill="#F59E0B" />
+      {/* 头部、脖子、上身驱干主容器（有节律上下浮动） */}
+      <g style={{ transformOrigin: '110px 92px', animation: `humanWalkBob ${speed} ease-in-out infinite` }}>
+        {/* 1. 清晰修长、比例协调的脖子！连接下颌与衣领 */}
+        <rect x="106" y="62" width="10" height="13" rx="3" fill="#FDBA74" />
 
-        {/* 头部 */}
-        <circle cx="110" cy="52" r="15" fill="#FDE68A" />
+        {/* 2. 温暖姜黄风衣 / 连帽卫衣躯干 */}
+        <path
+          d="M 96 74 
+             C 96 70, 102 68, 111 68 
+             C 120 68, 126 70, 126 74 
+             L 128 114 C 128 118, 124 120, 119 120 
+             L 103 120 C 98 120, 94 118, 94 114 Z"
+          fill="#F59E0B"
+        />
 
-        {/* 呆萌头发/毛线帽 */}
-        <path d="M 96 50 C 96 38, 124 38, 124 50 Z" fill="#78350F" />
-        <circle cx="110" cy="36" r="3.5" fill="#F59E0B" />
+        {/* 卫衣罗纹领口细节 */}
+        <path d="M 103 72 Q 111 77 119 72" stroke="#B45309" strokeWidth="2.5" strokeLinecap="round" fill="none" />
 
-        {/* 侧脸闭眼微笑 */}
-        <circle cx="116" cy="52" r="2" fill="#78350F" />
-        <path d="M 115 57 Q 118 60 122 57" stroke="#78350F" strokeWidth="2" strokeLinecap="round" fill="none" />
+        {/* 潮酷深色斜挎包肩带 */}
+        <line x1="98" y1="74" x2="124" y2="108" stroke="#1E293B" strokeWidth="3" strokeLinecap="round" opacity="0.8" />
+        {/* 腰间小挎包 */}
+        <rect x="118" y="100" width="12" height="15" rx="3" fill="#334155" />
+        <rect x="120" y="104" width="8" height="2" fill="#E2E8F0" />
+
+        {/* 3. 头部造型：暖杏色皮肤、蓬松有型的发丝 */}
+        {/* 脸部基底 */}
+        <ellipse cx="111" cy="48" rx="14" ry="16" fill="#FED7AA" />
+
+        {/* 层次感短发（深暖黑褐色，侧面蓬松刘海弧度） */}
+        <path
+          d="M 97 46 
+             C 96 32, 110 24, 124 28 
+             C 128 30, 130 36, 128 42 
+             C 126 40, 122 38, 116 38 
+             C 106 38, 101 44, 99 50 Z"
+          fill="#3B1F0A"
+        />
+        {/* 额头前微卷的可爱小碎发 */}
+        <path d="M 118 36 Q 124 40 122 46" stroke="#3B1F0A" strokeWidth="3.2" strokeLinecap="round" fill="none" />
+
+        {/* 侧脸清秀可人的闭目微笑弧（呼应狗狗与猫猫的自得神态） */}
+        <path
+          d="M 116 48 Q 121 54 126 48"
+          stroke="#451A03"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          fill="none"
+        />
+
+        {/* 柔嫩腮红 */}
+        <circle cx="119" cy="54" r="3.2" fill="#FB7185" opacity="0.65" />
+
+        {/* 嘴角微微扬起的治愈微笑 */}
+        <path d="M 124 56 Q 126 58 128 55" stroke="#451A03" strokeWidth="1.8" strokeLinecap="round" fill="none" />
       </g>
 
-      {/* 前腿（左腿） */}
-      <g style={{ transformOrigin: '110px 115px', animation: `humanLegL ${speed} ease-in-out infinite` }}>
-        <rect x="105" y="112" width="10" height="38" rx="5" fill="#475569" />
-        <ellipse cx="115" cy="150" rx="8" ry="4.5" fill="#0F172A" />
+      {/* 前腿（左腿，步伐自信向前迈步） */}
+      <g style={{ transformOrigin: '110px 116px', animation: `humanLegA ${speed} ease-in-out infinite` }}>
+        {/* 深炭灰修身裤腿 */}
+        <path d="M 106 114 L 104 142 L 115 142 L 117 114 Z" fill="#1E293B" />
+        {/* 卷边裤口 */}
+        <rect x="103" y="140" width="13" height="3" rx="1.5" fill="#475569" />
+        {/* 左脚球鞋 */}
+        <g transform="translate(104, 143)">
+          <path d="M 2 4 L 2 11 L 18 11 C 21 11, 23 9, 21 5 L 14 3 Z" fill="#334155" />
+          <path d="M 14 3 C 17 3, 22 7, 21 11 L 15 11 Z" fill="#F8FAFC" />
+          <rect x="1" y="11" width="21" height="3" rx="1.5" fill="#F8FAFC" />
+          <rect x="2" y="13" width="19" height="1" fill="#0F172A" />
+        </g>
       </g>
 
-      {/* 前手臂（左臂） */}
-      <g style={{ transformOrigin: '110px 82px', animation: `humanArmL ${speed} ease-in-out infinite` }}>
-        <rect x="106" y="80" width="9" height="32" rx="4.5" fill="#F59E0B" />
-        <circle cx="110" cy="112" r="5" fill="#FDE68A" />
+      {/* 前手臂（左臂，前向大方摆动） */}
+      <g style={{ transformOrigin: '110px 84px', animation: `humanArmSwingA ${speed} ease-in-out infinite` }}>
+        {/* 亮橙黄卫衣外袖 */}
+        <path d="M 106 82 L 104 108 C 103 113, 107 116, 112 116 C 116 116, 119 112, 118 107 L 115 82 Z" fill="#F59E0B" />
+        {/* 前端露出的小圆手 */}
+        <circle cx="108" cy="116" r="4.5" fill="#FED7AA" />
       </g>
     </svg>
   );
