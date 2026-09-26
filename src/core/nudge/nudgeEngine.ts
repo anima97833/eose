@@ -285,7 +285,7 @@ function extractMindmapFocusNode(item: StoryInsightHistoryItem): string {
 
 /**
  * 智能嗅探所有待提醒事项池，采用【防重复·真随机开盲盒算法】
- * 涵盖：课程技能树、诗阁在背诗词、书藏在读/未读书目、爽文背词错题、番茄专注、日记手账
+ * 涵盖：课程技能树、诗阁在背诗词、书藏在读/未读书目、爽文背词错题、世界线手账
  * 真正的随机抽取，越随机越好；绝不连续抽中相同的大类！
  */
 export async function detectEarthOnlineNudge(force: boolean = false): Promise<NudgeNotification | null> {

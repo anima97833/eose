@@ -41,34 +41,7 @@ export interface MemoryBookRecord {
   messages: MemoryBookMessage[];
 }
 
-export interface PomodoroSessionRecord {
-  id: string;
-  taskId?: string;
-  taskTitle?: string;
-  category: string;
-  mode: 'focus' | 'short_break' | 'long_break';
-  durationMinutes: number;
-  actualSeconds: number;
-  isCompleted: boolean;
-  completedAt: number;
-}
 
-export interface PomodoroTaskRecord {
-  id: string;
-  title: string;
-  category: 'work' | 'study' | 'read' | 'fitness' | 'life';
-  categoryLabel: string;
-  estimatedPoms: number;
-  completedPoms: number;
-  isCompleted: boolean;
-  createdAt: number;
-  targetAttr?: 'STR' | 'DEX' | 'INT' | 'SPI' | 'CON' | 'CHA';
-  difficulty?: 'easy' | 'normal' | 'hard' | 'expert';
-  focusDurationMinutes?: number; // 任务专属单次专注时长 (分钟)
-  timerType?: 'countdown' | 'countup'; // 计时模式：倒计时 或 正向计时
-  groupId?: string; // 任务大类（任务集）ID
-  groupTitle?: string; // 任务大类名称
-}
 
 export interface BrowserHistoryRecord {
   id: string;
@@ -188,8 +161,6 @@ export class NeumorphicPhoneDatabase extends Dexie {
   messages!: Table<ChatMessageItem, string>;
   settings!: Table<StoredSettingsEntity, string>;
   memory_books!: Table<MemoryBookRecord, string>;
-  pomodoro_sessions!: Table<PomodoroSessionRecord, string>;
-  pomodoro_tasks!: Table<PomodoroTaskRecord, string>;
   browser_history!: Table<BrowserHistoryRecord, string>;
   browser_bookmarks!: Table<BrowserBookmarkRecord, string>;
   browser_shortcuts!: Table<BrowserShortcutRecord, string>;
@@ -746,23 +717,26 @@ export class NeumorphicPhoneDatabase extends Dexie {
       poster_records: 'id, category, startDate, endDate, repeatMode, isArchived, createdAt',
       games: 'id, title, platform, status, createdAt',
     });
+
+    // 版本 26: 彻底从数据库物理删除已废弃下架的番茄钟会话与任务表
+    this.version(26).stores({
+      pomodoro_sessions: null,
+      pomodoro_tasks: null,
+    });
   }
 }
 
 export const db = new NeumorphicPhoneDatabase();
 
-// 自动清理已卸载番茄钟的任务历史与白噪音/分组设置缓存
+// 彻底清理番茄钟相关的本地配置与存储
 if (typeof window !== 'undefined') {
   try {
     localStorage.removeItem('cloudfly_pomodoro_settings_v1');
     localStorage.removeItem('cloudfly_pomodoro_groups_v1');
-    db.open()
-      .then(() => {
-        if (db.pomodoro_sessions) db.pomodoro_sessions.clear().catch(() => {});
-        if (db.pomodoro_tasks) db.pomodoro_tasks.clear().catch(() => {});
-      })
-      .catch(() => {});
+    localStorage.removeItem('cloudfly_pomodoro_tasks_v1');
+    localStorage.removeItem('cloudfly_pomodoro_history_v1');
   } catch {
     // ignore
   }
 }
+

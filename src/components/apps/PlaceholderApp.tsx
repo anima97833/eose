@@ -50,7 +50,7 @@ const APP_TITLES: Record<string, { title: string; step: string; desc: string }> 
   clock: {
     title: '时钟闹铃',
     step: '待建设',
-    desc: '专属伴侣叫醒闹钟、世界时钟与专注番茄钟即将上线。',
+    desc: '专属伴侣叫醒闹钟与世界时钟即将上线。',
   },
   theme: {
     title: '拟物主题馆',

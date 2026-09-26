@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   Globe, 
   BookOpen, 
-  Clock, 
   Save, 
   ArrowRight, 
   X,
@@ -190,8 +189,6 @@ export const DynamicIslandBanner: React.FC<DynamicIslandBannerProps> = ({
     switch (activeNudge.icon) {
       case 'skill':
         return <BookOpen size={16} color="#38bdf8" />;
-      case 'focus':
-        return <Clock size={16} color="#f59e0b" />;
       case 'save':
         return <Save size={16} color="#10b981" />;
       case 'poetry':

@@ -51,7 +51,7 @@ export const GachaponApp: React.FC<GachaponAppProps> = ({ onBack, onOpenApp }) =
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [showArchiveModal, setShowArchiveModal] = useState<boolean>(false);
 
-  // 2. 待办决断池状态 (Task Pool - 专属于日记与番茄钟未打钩任务)
+  // 2. 待办决断池状态 (Task Pool - 专属于世界线未打钩任务)
   const [decisionTasks, setDecisionTasks] = useState<DecisionTaskItem[]>([]);
   const [droppedDecisionTask, setDroppedDecisionTask] = useState<DecisionTaskItem | null>(null);
   const [openingDecisionTask, setOpeningDecisionTask] = useState<DecisionTaskItem | null>(null);
@@ -73,7 +73,7 @@ export const GachaponApp: React.FC<GachaponAppProps> = ({ onBack, onOpenApp }) =
     setTimeout(() => setToastText(null), 1800);
   };
 
-  // 加载日记与番茄钟中未打钩的待办任务
+  // 加载世界线中未打钩的待办任务
   const loadTasks = async () => {
     const list = await fetchUncompletedDecisionTasks();
     setDecisionTasks(list);
@@ -92,7 +92,7 @@ export const GachaponApp: React.FC<GachaponAppProps> = ({ onBack, onOpenApp }) =
     loadTasks();
     loadEntertainment();
 
-    // 监听任务更新（外部番茄钟或日记打钩时自动同步）
+    // 监听任务更新（外部世界线打钩时自动同步）
     const handleSyncTasks = () => {
       loadTasks();
     };
@@ -101,14 +101,12 @@ export const GachaponApp: React.FC<GachaponAppProps> = ({ onBack, onOpenApp }) =
       loadEntertainment();
     };
 
-    window.addEventListener('cloudfly_pomodoro_tasks_updated', handleSyncTasks);
     window.addEventListener('cloudfly_quests_updated', handleSyncTasks);
     window.addEventListener('cloudfly_books_updated', handleSyncEntertainment);
     window.addEventListener('cloudfly_movies_updated', handleSyncEntertainment);
     window.addEventListener('cloudfly_games_updated', handleSyncEntertainment);
 
     return () => {
-      window.removeEventListener('cloudfly_pomodoro_tasks_updated', handleSyncTasks);
       window.removeEventListener('cloudfly_quests_updated', handleSyncTasks);
       window.removeEventListener('cloudfly_books_updated', handleSyncEntertainment);
       window.removeEventListener('cloudfly_movies_updated', handleSyncEntertainment);
@@ -159,7 +157,7 @@ export const GachaponApp: React.FC<GachaponAppProps> = ({ onBack, onOpenApp }) =
     } else if (activeMode === 'task') {
       // 待办决断池
       if (decisionTasks.length === 0) {
-        showToast('🎯 当前世界线与番茄钟无未完成任务');
+        showToast('🎯 当前世界线无未完成任务');
         setShowTaskSyncModal(true);
         return;
       }

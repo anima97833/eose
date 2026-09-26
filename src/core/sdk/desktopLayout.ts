@@ -17,6 +17,33 @@ export interface DesktopLayout {
 const LAYOUT_STORAGE_KEY = 'neumorphic_phone_desktop_layout_v2';
 const ARCADE_INIT_PAGE2_KEY = 'neumorphic_arcade_initial_page2_v1';
 
+// 立即彻底清理桌面布局缓存中残留的 pomodoro 图标
+if (typeof window !== 'undefined') {
+  try {
+    const rawLayout = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    if (rawLayout && rawLayout.includes('pomodoro')) {
+      const parsed = JSON.parse(rawLayout);
+      if (Array.isArray(parsed.pages)) {
+        parsed.pages = parsed.pages.map((p: any) =>
+          Array.isArray(p) ? p.filter((id: string) => id && id !== 'pomodoro') : []
+        );
+      }
+      if (Array.isArray(parsed.page1)) {
+        parsed.page1 = parsed.page1.filter((id: string) => id && id !== 'pomodoro');
+      }
+      if (Array.isArray(parsed.page2)) {
+        parsed.page2 = parsed.page2.filter((id: string) => id && id !== 'pomodoro');
+      }
+      if (Array.isArray(parsed.dock)) {
+        parsed.dock = parsed.dock.filter((id: string) => id && id !== 'pomodoro');
+      }
+      localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(parsed));
+    }
+  } catch {
+    // ignore
+  }
+}
+
 // 默认首屏应用：精心排布的 16 个核心高频轻拟物应用 (4x4 铺满)
 export const DEFAULT_PAGE1_APPS = [
   'phone', 'assistant', 'diary', 'profile',
@@ -38,7 +65,7 @@ export function rebalancePages(rawPages: string[][]): string[][] {
   for (const page of rawPages) {
     if (Array.isArray(page)) {
       for (const appId of page) {
-        if (appId && !seen.has(appId)) {
+        if (appId && appId !== 'pomodoro' && !seen.has(appId)) {
           seen.add(appId);
           allApps.push(appId);
         }
@@ -70,13 +97,13 @@ export function parseZone(zone: DesktopZone): { type: 'dock' } | { type: 'page';
 }
 
 export function loadDesktopLayout(): DesktopLayout {
-  const installedStoreApps = listDesktopInstalledApps();
+  const installedStoreApps = listDesktopInstalledApps().filter((a) => a.id !== 'pomodoro');
   const installedStoreAppIds = installedStoreApps.map((a) => a.id);
-  const isAppValid = (id: string) => id === 'appstore' || installedStoreAppIds.includes(id);
+  const isAppValid = (id: string) => id !== 'pomodoro' && (id === 'appstore' || installedStoreAppIds.includes(id));
 
   // 默认第二页应用：除去在第一页和 dock 的所有已安装应用
   const initialPage2 = installedStoreAppIds.filter(
-    (id) => !DEFAULT_PAGE1_APPS.includes(id) && !DEFAULT_DOCK_APPS.includes(id)
+    (id) => !DEFAULT_PAGE1_APPS.includes(id) && !DEFAULT_DOCK_APPS.includes(id) && id !== 'pomodoro'
   );
 
   const buildDefault = (): DesktopLayout => {
@@ -116,7 +143,7 @@ export function loadDesktopLayout(): DesktopLayout {
       }
       for (const id of dock) allPresent.add(id);
 
-      const missingFromStore = installedStoreAppIds.filter((id) => !allPresent.has(id));
+      const missingFromStore = installedStoreAppIds.filter((id) => id !== 'pomodoro' && !allPresent.has(id));
       if (missingFromStore.length > 0) {
         if (rawPages.length === 0) rawPages.push([]);
         rawPages[rawPages.length - 1].push(...missingFromStore);

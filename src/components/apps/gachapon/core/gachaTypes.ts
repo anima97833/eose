@@ -34,13 +34,12 @@ export interface WishItem {
 export interface DecisionTaskItem {
   id: string;
   originalId: string;
-  source: 'pomodoro' | 'diary';
+  source: 'diary';
   sourceLabel: string;
   title: string;
   desc?: string;
   icon: string;
   colorKey: CapsuleColorKey;
-  estimatedPoms?: number;
   tag?: string;
   createdAt: number;
 }

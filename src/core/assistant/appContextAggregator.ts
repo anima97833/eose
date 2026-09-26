@@ -11,17 +11,22 @@ import { loadMomentsFromDB } from '../moments/momentsStorage';
 import { loadWishes } from '../../components/apps/gachapon/core/gachaStorage';
 import { loadAllMovies, calculateCinemaStats } from '../cinema/cinemaStorage';
 import { loadCheckInSpots, getExplorationStats } from '../compass/compassStorage';
-import { loadRPGProfile } from '../rpg/rpgStorage';
+import { loadRPGProfile, loadRelationshipData } from '../rpg/rpgStorage';
+import { loadDossierFromDB } from '../rpg/dossierStorage';
+import { getAllMealRecords } from '../rpg/mealStorage';
+import { getAllLifeStories } from '../rpg/lifeStorage';
+import { loadAllGames, calculateGameStats } from '../games/gameStorage';
+import { PLATFORM_NAMES, STATUS_NAMES } from '../games/gameTypes';
 
 /**
- * 星空全星宿矩阵 (15 颗核心轻拟物应用星星)
- * 采用银河三星团错落分布算法：左翼灵感学识、中央生活羁绊、右翼光影探索
+ * 星空全星宿矩阵 (16 颗核心轻拟物应用星星)
+ * 采用银河三星团错落分布算法：左翼灵感学识、中央生活羁绊、右翼光影探索与游戏
  */
 export const ALL_STAR_APPS: StarAppMeta[] = [
   // === 左翼星宿群【学识·灵感·沉思】 ===
   {
     id: 'course_kanban',
-    name: '技能树',
+    name: '学习看板',
     iconName: 'BookOpen',
     themeColor: '#38bdf8',
     glowColor: 'rgba(56, 189, 248, 0.65)',
@@ -112,7 +117,7 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
     y: 54,
   },
 
-  // === 右翼星宿群【放映·探险·专注】 ===
+  // === 右翼星宿群【放映·探险·游戏·光影】 ===
   {
     id: 'books',
     name: '书藏',
@@ -120,7 +125,7 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
     themeColor: '#c084fc',
     glowColor: 'rgba(192, 132, 252, 0.65)',
     x: 74,
-    y: 18,
+    y: 16,
   },
   {
     id: 'compass',
@@ -129,7 +134,16 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
     themeColor: '#06b6d4',
     glowColor: 'rgba(6, 182, 212, 0.65)',
     x: 88,
-    y: 20,
+    y: 18,
+  },
+  {
+    id: 'gamevault',
+    name: '游戏仓',
+    iconName: 'Joystick',
+    themeColor: '#10b981',
+    glowColor: 'rgba(16, 185, 129, 0.65)',
+    x: 72,
+    y: 36,
   },
   {
     id: 'cinema',
@@ -138,7 +152,7 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
     themeColor: '#8b5cf6',
     glowColor: 'rgba(139, 92, 246, 0.65)',
     x: 88,
-    y: 42,
+    y: 36,
   },
   {
     id: 'camera',
@@ -146,7 +160,7 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
     iconName: 'Aperture',
     themeColor: '#a78bfa',
     glowColor: 'rgba(167, 139, 250, 0.65)',
-    x: 76,
+    x: 80,
     y: 56,
   },
 ];
@@ -173,7 +187,7 @@ export async function aggregateSelectedStarsFacts(selectedStarIds: string[]): Pr
             const nextCh = c.chapters.find((ch) => !ch.isCompleted);
             allFacts.push({
               sourceAppId: 'course_kanban',
-              sourceAppName: '技能树课程',
+              sourceAppName: '学习看板',
               category: '课程进度',
               title: c.title,
               detail: `总章节 ${c.totalChapters}，已完成 ${c.completedChapters} (${pct}%)。下节待学：${nextCh ? nextCh.title : '已通关'}`,
@@ -319,17 +333,70 @@ export async function aggregateSelectedStarsFacts(selectedStarIds: string[]): Pr
           break;
         }
 
-        // ================= 新增 5 大核心萃取器 =================
+        // ================= 朋友圈动态 (全局内容萃取) =================
         case 'moments': {
           const moments = await loadMomentsFromDB();
-          for (const m of moments.slice(0, quotaPerApp)) {
+          const starredMoments = moments.filter((m) => m.isStarred);
+          const totalAttrGains = moments.reduce((acc, m) => acc + (m.attributeGain || 0), 0);
+          const totalCoins = moments.reduce((acc, m) => acc + (m.rewardCoins || 0), 0);
+
+          // 1. 动态全局大盘统计
+          allFacts.push({
+            sourceAppId: 'moments',
+            sourceAppName: '朋友圈动态',
+            category: '动态全局大盘',
+            title: `生活动态全记录 (${moments.length} 条瞬间)`,
+            detail: `累计发布日常动态 ${moments.length} 条，其中星标珍藏 ${starredMoments.length} 篇。动态日常修行累计汲取六维属性 +${totalAttrGains} 点，收获金币 +${totalCoins} 枚。`,
+          });
+
+          // 2. 读取全局动态内容明细
+          for (const m of moments.slice(0, quotaPerApp - 1)) {
+            const starTag = m.isStarred ? '★已珍藏' : '日常';
+            const attrText = m.attributeTag ? `[${m.attributeTag} +${m.attributeGain || 2}]` : '';
+            const imgCountText = m.images && m.images.length > 0 ? `(附带 ${m.images.length} 张生活配图)` : '';
             allFacts.push({
               sourceAppId: 'moments',
               sourceAppName: '朋友圈动态',
-              category: m.themeTitle || '日常碎碎念',
-              title: m.themeTitle || '生活瞬间',
-              detail: `【${m.dateStr || '近期'}】“${m.content}”（获得属性：${m.attributeTag || 'SPI'} +${m.attributeGain || 2}，金币：+${m.rewardCoins || 50}，${m.isStarred ? '已珍藏' : '日常'}）`,
+              category: m.themeTitle || '日常动态',
+              title: `【${m.dateStr || '近期'}】${m.themeTitle || '生活瞬间'} (${starTag})`,
+              detail: `正文：“${m.content}” ${imgCountText}。奖励结算：属性收益 ${attrText}，金币奖励 +${m.rewardCoins || 50}。`,
               timestamp: m.createdAt,
+            });
+          }
+          break;
+        }
+
+        // ================= 游戏仓 (全局内容萃取) =================
+        case 'gamevault': {
+          const games = await loadAllGames();
+          const stats = calculateGameStats(games);
+
+          // 1. 游戏仓全局大盘总览
+          allFacts.push({
+            sourceAppId: 'gamevault',
+            sourceAppName: '游戏仓',
+            category: '游戏大盘总览',
+            title: `游戏库全览 (${stats.totalCount} 款典藏)`,
+            detail: `总收录游戏 ${stats.totalCount} 款，累计通关 ${stats.clearedCount} 款，正在游玩 ${stats.playingCount} 款，心愿想玩 ${stats.wishlistCount} 款，封盘 ${stats.droppedCount} 款。累计总游玩投入时间 ${stats.totalPlaytimeHours} 小时。`,
+          });
+
+          // 2. 读取全局游戏内容明细
+          for (const g of games.slice(0, quotaPerApp - 1)) {
+            const platformLabel = PLATFORM_NAMES[g.platform] || g.platform;
+            const statusLabel = STATUS_NAMES[g.status] || g.status;
+            const stars = g.rating ? `${g.rating} 星` : '未评分';
+            const commentText = g.comment ? `玩家评语：“${g.comment}”` : '暂无评测';
+            const tagsText = g.tags && g.tags.length > 0 ? `标签：${g.tags.join('/')}` : '';
+            const timeText = g.playtimeHours > 0 ? `累计游玩 ${g.playtimeHours} 小时` : '尚未记录时长';
+            const clearedInfo = g.clearedDate ? `，于 ${g.clearedDate} 通关` : '';
+
+            allFacts.push({
+              sourceAppId: 'gamevault',
+              sourceAppName: '游戏仓',
+              category: `游戏明细·${statusLabel}`,
+              title: `${g.title} (${platformLabel})`,
+              detail: `【${statusLabel}】${timeText}${clearedInfo}，个人评分：${stars}。${tagsText}。${commentText}`,
+              timestamp: g.updatedAt || g.createdAt,
             });
           }
           break;
@@ -403,15 +470,134 @@ export async function aggregateSelectedStarsFacts(selectedStarIds: string[]): Pr
           break;
         }
 
+        // ================= 我的 (个人档案/亲缘图谱/美食手账/半生手账/背包/职业) =================
         case 'profile': {
           const profile = loadRPGProfile();
+          const [dossier, meals, lifeStories] = await Promise.all([
+            loadDossierFromDB(),
+            getAllMealRecords(),
+            getAllLifeStories(),
+          ]);
+          const relationshipData = loadRelationshipData();
+
+          const charName = dossier.name || profile.name || '旅行者';
+          const charTitle = dossier.title || profile.title || '初醒之人';
+          const zodiac = dossier.zodiac || profile.zodiac || '双鱼座';
+          const mbti = dossier.mbti || profile.mbti || 'INFP';
+          const gender = dossier.gender || profile.gender || '保密';
+
+          // 1. 个人档案与属性大盘
           allFacts.push({
             sourceAppId: 'profile',
-            sourceAppName: '我的·角色档案',
-            category: '身份与属性',
-            title: `${profile.name} · ${profile.title} (Lv.${profile.level})`,
-            detail: `当前经验：${profile.currentExp}/${profile.maxExp}，生命值：${profile.hp}/${profile.maxHp}，法力值：${profile.mp}/${profile.maxMp}，拥有金币：${profile.gold || 0} 枚，今日心情值：${profile.mood ?? 100} 分。六维战力：精神(SPI) ${profile.attributes?.SPI?.value || 0}，魅力(CHA) ${profile.attributes?.CHA?.value || 0}，智力(INT) ${profile.attributes?.INT?.value || 0}，体质(CON) ${profile.attributes?.CON?.value || 0}，敏捷(DEX) ${profile.attributes?.DEX?.value || 0}，力量(STR) ${profile.attributes?.STR?.value || 0}。`,
+            sourceAppName: '我的·角色与档案',
+            category: '个人档案',
+            title: `${charName} · ${charTitle} (Lv.${profile.level})`,
+            detail: `姓名：${charName}，称号：${charTitle}，星座：${zodiac}，MBTI：${mbti}，性别：${gender}。当前经验：${profile.currentExp}/${profile.maxExp}，生命值：${profile.hp}/${profile.maxHp}，法力值：${profile.mp}/${profile.maxMp}，拥有金币：${profile.gold || 0} 枚，今日心情值：${profile.mood ?? 100} 分。六维战力：精神(SPI) ${profile.attributes?.SPI?.value || 0}，魅力(CHA) ${profile.attributes?.CHA?.value || 0}，智力(INT) ${profile.attributes?.INT?.value || 0}，体质(CON) ${profile.attributes?.CON?.value || 0}，敏捷(DEX) ${profile.attributes?.DEX?.value || 0}，力量(STR) ${profile.attributes?.STR?.value || 0}。`,
           });
+
+          // 2. 职业体系
+          const currentClass = profile.classes?.find((c) => c.id === profile.currentClassId) || profile.classes?.[0];
+          const allClassTitles = profile.classes?.map((c) => `${c.title}(${c.job})`).join('、') || '暂无';
+          allFacts.push({
+            sourceAppId: 'profile',
+            sourceAppName: '我的·就职生涯',
+            category: '职业',
+            title: `当前就任职业：${currentClass ? currentClass.title : '冒险家'}`,
+            detail: currentClass
+              ? `正式职位：${currentClass.job}，核心主属性：${currentClass.mainAttr}，期望薪资：${currentClass.salary || '未设'}，期望工作地：${currentClass.location || '自由'}。职业信条：“${currentClass.desc}”。已兼修/可选职业库：${allClassTitles}。`
+              : '尚未就职特定流派。',
+          });
+
+          // 3. 我的故事 (个人手账活页本)
+          const stories = (dossier.storyPages && dossier.storyPages.length > 0)
+            ? dossier.storyPages
+            : (profile.storyPages && profile.storyPages.length > 0 ? profile.storyPages : []);
+          for (const sp of stories.slice(0, 5)) {
+            allFacts.push({
+              sourceAppId: 'profile',
+              sourceAppName: '我的·个人故事',
+              category: '我的故事',
+              title: `手账随笔 第 ${sp.pageIndex + 1} 页 (${sp.date || '未知日期'})`,
+              detail: `故事正文：“${sp.content}”`,
+              timestamp: sp.updatedAt,
+            });
+          }
+
+          // 4. 亲缘图谱
+          const nodes = relationshipData.nodes || [];
+          const otherNodes = nodes.filter((n) => !n.isCenter);
+          allFacts.push({
+            sourceAppId: 'profile',
+            sourceAppName: '我的·亲缘图谱',
+            category: '亲缘图谱',
+            title: `羁绊星网 (${nodes.length} 位生命伙伴)`,
+            detail: `图谱核心为【${charName}】，已缔结羁绊的伙伴共 ${otherNodes.length} 位：${otherNodes.map((n) => `${n.name}【${n.relation}·${n.category}】`).join('，') || '暂无其他伙伴'}。`,
+          });
+          for (const n of otherNodes.slice(0, 4)) {
+            allFacts.push({
+              sourceAppId: 'profile',
+              sourceAppName: '我的·亲缘图谱',
+              category: '羁绊伙伴',
+              title: `${n.name} (${n.relation})`,
+              detail: `分类：${n.category}，随笔寄语：“${n.desc || '同路前行的重要之人'}”`,
+            });
+          }
+
+          // 5. 美食手账
+          if (meals && meals.length > 0) {
+            allFacts.push({
+              sourceAppId: 'profile',
+              sourceAppName: '我的·美食手账',
+              category: '美食手账',
+              title: `寻味记录 (${meals.length} 道珍味)`,
+              detail: `最近记录美食包含：${meals.slice(0, 3).map((m) => `${m.dishName}（${'⭐'.repeat(m.rating || 1)}）`).join('、')}。`,
+            });
+            for (const m of meals.slice(0, 4)) {
+              const typeLabel = m.mealType === 'breakfast' ? '早餐' : m.mealType === 'lunch' ? '午餐' : m.mealType === 'dinner' ? '晚餐' : '茶点小食';
+              allFacts.push({
+                sourceAppId: 'profile',
+                sourceAppName: '我的·美食手账',
+                category: '赏味日志',
+                title: `${m.dishName} [${typeLabel}]`,
+                detail: `记录日期：${m.date}，美味星级：${'⭐'.repeat(m.rating || 1)}，品评体会：“${m.review}”`,
+                timestamp: m.updatedAt,
+              });
+            }
+          }
+
+          // 6. 半生手账状态
+          if (lifeStories && lifeStories.length > 0) {
+            allFacts.push({
+              sourceAppId: 'profile',
+              sourceAppName: '我的·半生手账',
+              category: '半生手账状态',
+              title: `人生轨迹记忆簿 (${lifeStories.length} 篇岁月篇章)`,
+              detail: `涵盖从童年到当下的关键转折与回忆，包括：${lifeStories.map((s) => `${s.age}岁【${s.tag}】`).join('、')}。`,
+            });
+            for (const s of lifeStories.slice(0, 4)) {
+              allFacts.push({
+                sourceAppId: 'profile',
+                sourceAppName: '我的·半生手账',
+                category: '人生足迹',
+                title: s.title,
+                detail: `年份地点：${s.year} ${s.location}，生活阶段：${s.stage}，心境标识：【${s.moodTag}】。记忆原貌：“${s.content}”`,
+                timestamp: s.createdAt,
+              });
+            }
+          }
+
+          // 7. 背包与装备
+          const items = profile.items || [];
+          const equippedGears = items.filter((i) => i.equipped);
+          const bagItems = items.filter((i) => !i.equipped);
+          allFacts.push({
+            sourceAppId: 'profile',
+            sourceAppName: '我的·背包装备',
+            category: '背包',
+            title: `行囊与神装 (${equippedGears.length} 件穿戴 / ${bagItems.length} 件藏品)`,
+            detail: `已穿戴装备：${equippedGears.map((g) => `${g.name}[${g.slot || '装备'}](${g.effect})`).join('；') || '未佩戴装备'}。背包内物品/愿望单：${bagItems.map((b) => `${b.name}(${b.type === 'wish' ? '心愿单' : '道具'})`).join('、') || '背包空空'}。`,
+          });
+
           break;
         }
       }

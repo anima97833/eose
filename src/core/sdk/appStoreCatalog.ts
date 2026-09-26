@@ -19,6 +19,22 @@ export interface AppStoreItem {
 
 const STORE_STORAGE_KEY = 'neumorphic_phone_app_store_catalog';
 
+// 立即彻底清理已废弃下架的番茄钟应用与角色工坊缓存
+if (typeof window !== 'undefined') {
+  try {
+    const raw = localStorage.getItem(STORE_STORAGE_KEY);
+    if (raw && (raw.includes('pomodoro') || raw.includes('character_studio'))) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.filter((item: any) => item.id !== 'pomodoro' && item.id !== 'character_studio');
+        localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify(cleaned));
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export const DEFAULT_STORE_CATALOG: AppStoreItem[] = [
   {
     id: 'appstore',
@@ -367,9 +383,9 @@ export function listStoreCatalog(): AppStoreItem[] {
     if (raw) {
       let parsed: AppStoreItem[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // 彻底清除已废弃下架的角色工坊 (character_studio)
+        // 彻底清除已废弃下架的角色工坊 (character_studio) 与番茄钟 (pomodoro)
         const initialCount = parsed.length;
-        parsed = parsed.filter((item) => item.id !== 'character_studio');
+        parsed = parsed.filter((item) => item.id !== 'character_studio' && item.id !== 'pomodoro');
         let hasNew = parsed.length !== initialCount;
 
         // 自动合并系统新上架的默认应用

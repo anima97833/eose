@@ -1,6 +1,6 @@
 /**
  * 浅黄色轻拟物设计系统代币 (Pale-Yellow Neumorphism Design Tokens)
- * 深度对标番茄钟的双向漫反射光影与触觉回弹质感
+ * 深度轻拟物的双向漫反射光影与触觉回弹质感
  */
 
 export const NM = {

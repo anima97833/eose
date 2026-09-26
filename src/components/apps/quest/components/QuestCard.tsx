@@ -7,6 +7,7 @@ interface QuestCardProps {
   palette: string[]; // 5 色 Colormind 调色盘
   onDone: (questId: string) => void;
   onDelete?: (questId: string) => void;
+  onOpenDetail?: (quest: QuestItem) => void;
 }
 
 export const QuestCard: React.FC<QuestCardProps> = ({
@@ -14,6 +15,7 @@ export const QuestCard: React.FC<QuestCardProps> = ({
   palette,
   onDone,
   onDelete,
+  onOpenDetail,
 }) => {
   const isEasterEggLocked = quest.category === 'easter_egg' && quest.status === 'in_progress';
 
@@ -49,7 +51,13 @@ export const QuestCard: React.FC<QuestCardProps> = ({
 
     return (
       <div
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenDetail?.(quest);
+        }}
+        className="nm-rebound-btn"
         style={{
+          cursor: 'pointer',
           position: 'relative',
           width: '52px',
           height: '52px',
@@ -64,7 +72,9 @@ export const QuestCard: React.FC<QuestCardProps> = ({
           border: '2px solid rgba(255, 255, 255, 0.95)',
           boxShadow: '0 3px 10px rgba(0, 0, 0, 0.07), inset 0 2px 4px rgba(255, 255, 255, 0.85)',
           flexShrink: 0,
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
         }}
+        title="点击查看详细信息、配置六维或删除任务"
       >
         {/* 背景光芒射线纹理（复刻我的-背包 SVG 装饰） */}
         <svg

@@ -17,6 +17,7 @@ import {
   Gift,
   Compass,
   Aperture,
+  Joystick,
 } from 'lucide-react';
 import { ALL_STAR_APPS } from '../../../../core/assistant/appContextAggregator';
 import { StarAppMeta } from '../../../../core/assistant/assistantTypes';
@@ -65,6 +66,7 @@ export const NightSkyCanvas: React.FC<NightSkyCanvasProps> = ({
       case 'Film': return <Film size={size} color={color} />;
       case 'Gift': return <Gift size={size} color={color} />;
       case 'Compass': return <Compass size={size} color={color} />;
+      case 'Joystick': return <Joystick size={size} color={color} />;
       default: return <Sparkles size={size} color={color} />;
     }
   };

@@ -155,12 +155,12 @@ export const DecisionTaskOpenModal: React.FC<DecisionTaskOpenModalProps> = ({
               gap: 4,
               padding: '3px 10px',
               borderRadius: 12,
-              background: task.source === 'pomodoro' ? '#FEE2E2' : '#E0F2FE',
-              color: task.source === 'pomodoro' ? '#B91C1C' : '#0369A1',
+              background: '#E0F2FE',
+              color: '#0369A1',
               fontSize: 11,
               fontWeight: 800,
               marginBottom: 10,
-              border: `1px solid ${task.source === 'pomodoro' ? '#FCA5A5' : '#BAE6FD'}`,
+              border: '1px solid #BAE6FD',
             }}
           >
             <span>{task.sourceLabel}</span>

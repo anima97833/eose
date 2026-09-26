@@ -5,6 +5,22 @@ import { CALCULATOR_APP_HTML } from './presetApps/builtinApps';
 
 const STORAGE_KEY = 'neumorphic_phone_installed_custom_apps';
 
+// 立即清理已下架的番茄钟
+if (typeof window !== 'undefined') {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw && raw.includes('pomodoro')) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const cleanList = parsed.filter((a: any) => a.id !== 'pomodoro');
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanList));
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export const PRESET_CUSTOM_APPS: CustomAppMeta[] = [
   {
     id: 'mood_fortune',

@@ -15,6 +15,28 @@ import { loadRPGProfile, saveRPGProfile } from '../rpg/rpgStorage';
 const QUEST_STORAGE_KEY = 'cloudfly_quest_journal_v2';
 const QUEST_PALETTE_KEY = 'cloudfly_quest_palette_v1';
 
+// 立即清理已下架的番茄钟路由跳转引用
+if (typeof window !== 'undefined') {
+  try {
+    const rawQuest = localStorage.getItem(QUEST_STORAGE_KEY);
+    if (rawQuest && rawQuest.includes('pomodoro')) {
+      const parsed = JSON.parse(rawQuest);
+      if (parsed && Array.isArray(parsed.items)) {
+        parsed.items = parsed.items.map((item: any) => {
+          if (item && item.routeAppId === 'pomodoro') {
+            const { routeAppId, ...rest } = item;
+            return rest;
+          }
+          return item;
+        });
+        localStorage.setItem(QUEST_STORAGE_KEY, JSON.stringify(parsed));
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 // 默认 Colormind 柔和协调五色调色盘 (底色、卡片、主强调、文本、辅助点缀)
 export const DEFAULT_QUEST_PALETTE = ['#F0FDF4', '#E0F2FE', '#38BDF8', '#334155', '#F59E0B'];
 
@@ -285,6 +307,9 @@ export function loadQuestJournal(): QuestItem[] {
       const presetMap = new Map(DEFAULT_PRESET_QUESTS.map((p) => [p.id, p]));
 
       let items = (state.items || []).map((q) => {
+        if (q.routeAppId === 'pomodoro') {
+          delete q.routeAppId;
+        }
         // 同步补全预设任务的 statKey / statGain / tag
         const preset = presetMap.get(q.id);
         if (preset) {
@@ -293,6 +318,7 @@ export function loadQuestJournal(): QuestItem[] {
             statKey: preset.statKey,
             statGain: preset.statGain,
             tag: preset.tag,
+            routeAppId: preset.routeAppId,
           };
         }
         return q;
@@ -440,13 +466,51 @@ export function addCustomQuest(
 }
 
 /**
- * 删除自定义任务
+ * 批量用户自定义导入任务
  */
-export function deleteCustomQuest(questId: string): QuestItem[] {
+export function batchAddCustomQuests(
+  quests: Omit<QuestItem, 'id' | 'currentProgress' | 'status' | 'isCustom'>[]
+): QuestItem[] {
+  if (!quests || quests.length === 0) return loadQuestJournal();
+  const current = loadQuestJournal();
+  const baseTime = Date.now();
+  const newQuests: QuestItem[] = quests.map((q, idx) => ({
+    ...q,
+    id: `custom_${baseTime}_${idx}_${Math.random().toString(36).slice(2, 5)}`,
+    currentProgress: 0,
+    status: 'in_progress',
+    isCustom: true,
+  }));
+  const updated = [...newQuests, ...current];
+  saveQuestJournal(updated);
+  return updated;
+}
+
+/**
+ * 更新或编辑任务
+ */
+export function updateQuestItem(updatedQuest: QuestItem): QuestItem[] {
+  const current = loadQuestJournal();
+  const updated = current.map((q) => (q.id === updatedQuest.id ? { ...q, ...updatedQuest } : q));
+  saveQuestJournal(updated);
+  return updated;
+}
+
+/**
+ * 删除任务 (通用)
+ */
+export function deleteQuest(questId: string): QuestItem[] {
   const current = loadQuestJournal();
   const updated = current.filter((q) => q.id !== questId);
   saveQuestJournal(updated);
   return updated;
+}
+
+/**
+ * 删除自定义任务 (兼容旧引用)
+ */
+export function deleteCustomQuest(questId: string): QuestItem[] {
+  return deleteQuest(questId);
 }
 
 /**

@@ -178,7 +178,7 @@ export const BookVaultApp: React.FC<BookVaultAppProps> = ({ onBack }) => {
         fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif',
       }}
     >
-      {/* 顶部轻拟物导航栏（对标番茄钟） */}
+      {/* 顶部轻拟物导航栏 */}
       <div
         style={{
           padding: '10px 16px 8px',
@@ -418,7 +418,7 @@ export const BookVaultApp: React.FC<BookVaultAppProps> = ({ onBack }) => {
           />
         </div>
 
-        {/* 视角切换主开关（对标番茄钟 Tab 胶囊切换槽） */}
+        {/* 视角切换主开关（Tab 胶囊切换槽） */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           {/* 模式选择底槽 */}
           <div

@@ -1,19 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Palette, CheckCircle2, RotateCw, GitBranch } from 'lucide-react';
+import { ArrowLeft, Plus, Palette, CheckCircle2, RotateCw, GitBranch, FileUp, Dices } from 'lucide-react';
 import { QuestCategory, QuestItem, AwardedStatResult } from '../../../core/quest/questTypes';
 import {
   loadQuestJournal,
   markQuestDone,
   addCustomQuest,
   deleteCustomQuest,
+  updateQuestItem,
+  deleteQuest,
   loadQuestPalette,
   saveQuestPalette,
   triggerEasterEgg,
 } from '../../../core/quest/questStorage';
+import { dropRandomQuest } from '../../../core/quest/randomQuestDropService';
 import { addRPGAttribute } from '../../../core/rpg/rpgStorage';
 import { fetchColormindPalette, rgbToHex } from '../../../core/theme/colormindService';
 import { QuestCard } from './components/QuestCard';
 import { CreateQuestModal } from './components/CreateQuestModal';
+import { ImportQuestTxtModal } from './components/ImportQuestTxtModal';
+import { QuestDetailModal } from './components/QuestDetailModal';
 import { FloatingStatToast } from './components/FloatingStatToast';
 import { FactQuizModal } from './components/FactQuizModal';
 import { MultiverseAgentModal } from './components/MultiverseAgentModal';
@@ -28,6 +33,7 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
   const [quests, setQuests] = useState<QuestItem[]>(loadQuestJournal);
   const [activeTab, setActiveTab] = useState<QuestCategory>('main');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [showFactQuizModal, setShowFactQuizModal] = useState(false);
   const [showMultiverseModal, setShowMultiverseModal] = useState(false);
   const [showDisneyWishModal, setShowDisneyWishModal] = useState(false);
@@ -36,6 +42,8 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
   const [palette, setPalette] = useState<string[]>(loadQuestPalette);
   const [isColoring, setIsColoring] = useState(false);
   const [tapCount, setTapCount] = useState(0);
+  const [isDropping, setIsDropping] = useState(false);
+  const [selectedQuestForDetail, setSelectedQuestForDetail] = useState<QuestItem | null>(null);
 
   // 1. 监听任务更新与彩蛋解锁全局事件
   useEffect(() => {
@@ -131,6 +139,47 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
   const showToast = (text: string) => {
     setToastMsg(text);
     setTimeout(() => setToastMsg(null), 2500);
+  };
+
+  // 🎲 随机派发任务掉落（从 500 条每日任务库中不重复抽取，下发至当前任务栏目）
+  const handleDropRandomQuest = () => {
+    if (isDropping) return;
+    setIsDropping(true);
+    setTimeout(() => setIsDropping(false), 500);
+
+    try {
+      const res = dropRandomQuest(activeTab);
+      const targetName = res.targetCategory === 'main' ? '生活主线' : '冒险支线';
+
+      // 若当前在彩蛋栏目，自动切回主线以便直观查阅掉落的任务
+      if (activeTab === 'easter_egg') {
+        setActiveTab('main');
+      }
+
+      if (res.isPoolReset) {
+        showToast(`✨ 500条任务库已开启新轮回！已掉落至【${targetName}】：${res.quest.title}`);
+      } else {
+        showToast(`🎲 随机任务掉落！已下发至【${targetName}】：${res.quest.title}（${res.quest.tag}）`);
+      }
+    } catch (err) {
+      console.warn('随机掉落任务异常:', err);
+      showToast('⚠️ 任务派发遇到问题，请重试');
+    }
+  };
+
+  // 保存任务配置修改（支持修改名称、六维维度与增益数值、图标、栏目等）
+  const handleUpdateQuest = (updated: QuestItem) => {
+    const list = updateQuestItem(updated);
+    setQuests(list);
+    showToast(`✓ 已成功保存修改：${updated.title}`);
+  };
+
+  // 彻底删掉这个任务
+  const handleDeleteQuest = (questId: string) => {
+    const target = quests.find((q) => q.id === questId);
+    const list = deleteQuest(questId);
+    setQuests(list);
+    showToast(`🗑️ 已删掉任务：${target?.title || '任务已移除'}`);
   };
 
   // 打卡完成（静默联动六维，触发上空飘字，不在面板上显示多余数值）
@@ -258,15 +307,27 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
           flexShrink: 0,
         }}
       >
-        <button
-          type="button"
-          onClick={onBack}
-          className="nm-rebound-btn nm-btn-circle"
-          style={{ width: '38px', height: '38px' }}
-          title="返回主屏"
-        >
-          <ArrowLeft size={18} strokeWidth={2.4} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={onBack}
+            className="nm-rebound-btn nm-btn-circle"
+            style={{ width: '38px', height: '38px' }}
+            title="返回主屏"
+          >
+            <ArrowLeft size={18} strokeWidth={2.4} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowImportModal(true)}
+            className="nm-rebound-btn nm-btn-circle"
+            style={{ width: '38px', height: '38px', color: 'var(--nm-text-main, #334257)' }}
+            title="导入TXT任务"
+          >
+            <FileUp size={17} strokeWidth={2.3} />
+          </button>
+        </div>
 
         <div
           onClick={handleTitleTap}
@@ -284,8 +345,34 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
           </span>
         </div>
 
-        {/* 右侧动作区：收录自定义任务按钮 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        {/* 右侧动作区：随机任务派发按钮 + 收录自定义任务按钮 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button
+            type="button"
+            onClick={handleDropRandomQuest}
+            disabled={isDropping}
+            className="nm-rebound-btn nm-btn-circle"
+            style={{
+              width: '36px',
+              height: '36px',
+              color: 'var(--nm-primary, #5096C6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: isDropping ? 'wait' : 'pointer',
+            }}
+            title={`随机派发一条任务至当前【${activeTab === 'side' ? '冒险支线' : '生活主线'}】(从500条任务库不重复抽取)`}
+          >
+            <Dices
+              size={17}
+              strokeWidth={2.4}
+              style={{
+                transform: isDropping ? 'rotate(180deg) scale(0.88)' : 'rotate(0deg) scale(1)',
+                transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              }}
+            />
+          </button>
+
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
@@ -554,6 +641,7 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
               palette={palette}
               onDone={handleDone}
               onDelete={quest.isCustom ? deleteCustomQuest : undefined}
+              onOpenDetail={(q) => setSelectedQuestForDetail(q)}
             />
           ))
         )}
@@ -595,6 +683,18 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
           onClose={() => setShowCreateModal(false)}
         />
       )}
+
+      {/* 批量TXT导入任务弹窗 */}
+      <ImportQuestTxtModal
+        isOpen={showImportModal}
+        initialCategory={activeTab}
+        onClose={() => setShowImportModal(false)}
+        onImportSuccess={(count, cat) => {
+          setQuests(loadQuestJournal());
+          setActiveTab(cat);
+          showToast(`🎉 成功导入 ${count} 项${cat === 'main' ? '主线' : '支线'}任务！`);
+        }}
+      />
 
       {/* 冷知识“真的假的？”脑洞小测验弹窗 */}
       {showFactQuizModal && (
@@ -640,6 +740,18 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
             const res = markQuestDone('egg_disney_wish');
             setQuests(res.items);
           }}
+        />
+      )}
+
+      {/* 任务详情查看、六维属性配置与删除模态框 */}
+      {selectedQuestForDetail && (
+        <QuestDetailModal
+          quest={selectedQuestForDetail}
+          isOpen={true}
+          onClose={() => setSelectedQuestForDetail(null)}
+          onSave={handleUpdateQuest}
+          onDelete={handleDeleteQuest}
+          onDone={handleDone}
         />
       )}
     </div>

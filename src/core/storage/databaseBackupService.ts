@@ -46,8 +46,6 @@ export const TABLE_FRIENDLY_NAMES: Record<string, string> = {
   messages: '对话聊天记录',
   settings: '系统路由配置',
   memory_books: '过往手账记忆',
-  pomodoro_sessions: '专注番茄时钟',
-  pomodoro_tasks: '番茄修行任务',
   browser_history: '浏览器历史',
   browser_bookmarks: '网络收藏书签',
   browser_shortcuts: '桌面快捷方式',
@@ -89,6 +87,7 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
   const tables: DatabaseTableStat[] = [];
 
   for (const table of db.tables) {
+    if (table.name === 'pomodoro_sessions' || table.name === 'pomodoro_tasks') continue;
     try {
       const count = await table.count();
       totalRecords += count;

@@ -8,14 +8,14 @@ import {
   Trash2,
   Share2,
   Sparkles,
-  Timer,
+  GitBranch,
   Gift,
   FileText,
   Calendar,
 } from 'lucide-react';
 import { VirtualFileRecord } from '../../../../core/files/fileTypes';
 import { updateFile, deleteItem } from '../../../../core/files/fileStorage';
-import { db } from '../../../../core/storage/db';
+import { addCustomQuest } from '../../../../core/quest/questStorage';
 import { addWish } from '../../gachapon/core/gachaStorage';
 
 interface FileViewerModalProps {
@@ -83,23 +83,24 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
     }
   };
 
-  // 跨应用联动 1: 发送到番茄钟待办
-  const handleLinkToPomodoro = async () => {
+  // 跨应用联动 1: 发送到世界线待办
+  const handleLinkToQuest = () => {
     try {
       const taskTitle = name.replace(/\.(md|txt)$/i, '');
-      const now = Date.now();
-      await db.pomodoro_tasks.put({
-        id: `pom_task_${now}_${Math.random().toString(36).substring(2, 6)}`,
+      addCustomQuest({
+        category: 'main',
         title: `[笔记待办] ${taskTitle}`,
-        category: 'study',
-        categoryLabel: '学习',
-        estimatedPoms: 2,
-        completedPoms: 0,
-        isCompleted: false,
-        createdAt: now,
+        desc: `来自文件笔记「${name}」的行动目标`,
+        icon: '📝',
+        tag: '⚡ 精力',
+        statKey: 'SPI',
+        statGain: { fixed: 2 },
+        targetProgress: 1,
+        isDailyRepeatable: false,
       });
+      window.dispatchEvent(new CustomEvent('cloudfly_quests_updated'));
       setShowLinkMenu(false);
-      showToast('已成功添加至「番茄钟修行任务」🎯');
+      showToast('已成功添加至「世界线待办任务」🎯');
     } catch (err) {
       console.error(err);
       showToast('联动失败');
@@ -603,7 +604,7 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
                 }}
               >
                 <button
-                  onClick={handleLinkToPomodoro}
+                  onClick={handleLinkToQuest}
                   style={{
                     padding: '8px 10px',
                     borderRadius: '10px',
@@ -621,8 +622,8 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(80, 150, 198, 0.1)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <Timer size={14} style={{ color: '#FF9F43' }} />
-                  转为番茄钟任务
+                  <GitBranch size={14} style={{ color: '#38BDF8' }} />
+                  转为世界线任务
                 </button>
 
                 <button
