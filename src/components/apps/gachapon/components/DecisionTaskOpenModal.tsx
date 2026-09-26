@@ -257,7 +257,7 @@ export const DecisionTaskOpenModal: React.FC<DecisionTaskOpenModalProps> = ({
                 ) : (
                   <>
                     <ExternalLink size={16} />
-                    <span>📖 前往日记手帐打卡</span>
+                    <span>🌌 前往世界线手账打卡</span>
                   </>
                 )}
               </button>

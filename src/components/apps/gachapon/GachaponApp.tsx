@@ -159,7 +159,7 @@ export const GachaponApp: React.FC<GachaponAppProps> = ({ onBack, onOpenApp }) =
     } else if (activeMode === 'task') {
       // 待办决断池
       if (decisionTasks.length === 0) {
-        showToast('🎯 当前日记与番茄钟无未完成任务');
+        showToast('🎯 当前世界线与番茄钟无未完成任务');
         setShowTaskSyncModal(true);
         return;
       }
@@ -186,7 +186,7 @@ export const GachaponApp: React.FC<GachaponAppProps> = ({ onBack, onOpenApp }) =
             : entertainmentSubFilter === 'movie'
             ? '🍿 放映室中暂无想看/待上映电影'
             : entertainmentSubFilter === 'game'
-            ? '🎮 游戏私藏中暂无在玩或想玩卡带'
+            ? '🕹️ 游戏仓中暂无在玩或想玩卡带'
             : '✨ 暂无在读/待读、想看电影或在玩卡带'
         );
         return;

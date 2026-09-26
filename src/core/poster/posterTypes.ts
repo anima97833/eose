@@ -1,6 +1,6 @@
 export type PosterCategory = 'romance' | 'event' | 'schedule' | 'custom';
 
-export type PosterRepeatMode = 'none' | 'yearly' | 'monthly';
+export type PosterRepeatMode = 'none' | 'weekly' | 'monthly' | 'yearly';
 
 export type PosterStampType = 'achieved' | 'expired' | 'celebrated';
 
@@ -32,7 +32,8 @@ export interface PosterRecord {
   // 日期与周期
   startDate: string;      // 格式：YYYY-MM-DD
   endDate: string;        // 格式：YYYY-MM-DD
-  repeatMode: PosterRepeatMode; // 'none' | 'yearly' | 'monthly'
+  repeatMode: PosterRepeatMode; // 'none' | 'weekly' | 'monthly' | 'yearly'
+  repeatDaysOfWeek?: number[];  // 周循环选中的星期：0=周日, 1=周一, 2=周二, 3=周三, 4=周四, 5=周五, 6=周六
 
   // 背面便签与备忘清单（支持轻拟物 3D 翻转）
   backNote?: string;

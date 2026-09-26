@@ -48,7 +48,7 @@ export async function fetchUncompletedDecisionTasks(): Promise<DecisionTaskItem[
         id: `quest_${q.id}`,
         originalId: q.id,
         source: 'diary',
-        sourceLabel: '📖 日记手帐待办',
+        sourceLabel: '🌌 世界线待办',
         title: q.title,
         desc: q.desc || q.tag,
         icon: q.icon || '📝',

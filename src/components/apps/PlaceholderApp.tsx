@@ -38,14 +38,14 @@ const APP_TITLES: Record<string, { title: string; step: string; desc: string }> 
     desc: '桌面智能体快速问答与灵感卡片正在规划中。',
   },
   diary: {
-    title: '日记',
+    title: '世界线',
     step: '待定',
-    desc: '日记应用通道目前设为待定规划中，敬请期待。',
+    desc: '世界线任务手账应用通道目前设为规划中，敬请期待。',
   },
   camera: {
-    title: '相册胶卷',
+    title: '刻时',
     step: '待建设',
-    desc: '时光拍立得相册、AI 角色合影与生活写真馆正在建设中。',
+    desc: '时光海报展馆、AI 角色合影与生活写真馆正在建设中。',
   },
   clock: {
     title: '时钟闹铃',

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EntertainmentItem, CAPSULE_COLORS, GachaPalette } from '../core/gachaTypes';
 import { gachaAudio } from '../core/gachaAudio';
-import { RotateCcw, Sparkles, BookOpen, Film, Gamepad2, ExternalLink } from 'lucide-react';
+import { RotateCcw, Sparkles, BookOpen, Film, Joystick, ExternalLink } from 'lucide-react';
 
 interface EntertainmentOpenModalProps {
   item: EntertainmentItem;
@@ -312,8 +312,8 @@ export const EntertainmentOpenModal: React.FC<EntertainmentOpenModalProps> = ({
                   </>
                 ) : (
                   <>
-                    <Gamepad2 size={16} strokeWidth={2.5} />
-                    <span>🎮 启动游戏私藏</span>
+                    <Joystick size={16} strokeWidth={2.5} />
+                    <span>🕹️ 启动游戏仓</span>
                   </>
                 )}
               </button>

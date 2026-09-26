@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Palette, CheckCircle2, RotateCw } from 'lucide-react';
+import { ArrowLeft, Plus, Palette, CheckCircle2, RotateCw, GitBranch } from 'lucide-react';
 import { QuestCategory, QuestItem, AwardedStatResult } from '../../../core/quest/questTypes';
 import {
   loadQuestJournal,
@@ -269,14 +269,17 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
 
         <div
           onClick={handleTitleTap}
-          style={{ textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}
+          style={{ textAlign: 'center', cursor: 'pointer', userSelect: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
           title="连续轻触 3 次唤醒暗号彩蛋"
         >
-          <h2 style={{ fontSize: '15px', fontWeight: 900, color: 'var(--nm-text-main, #334257)', margin: 0 }}>
-            日常手账
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <GitBranch size={16} strokeWidth={2.4} style={{ color: 'var(--nm-primary, #5096C6)' }} />
+            <h2 style={{ fontSize: '15px', fontWeight: 900, color: 'var(--nm-text-main, #334257)', margin: 0 }}>
+              世界线
+            </h2>
+          </div>
           <span style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--nm-text-sub, #7D8CA3)' }}>
-            Daily Rituals & Discoveries
+            Worldline & Quests
           </span>
         </div>
 

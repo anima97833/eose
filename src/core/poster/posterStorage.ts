@@ -29,6 +29,70 @@ export function getDaysDiff(targetDateStr: string, fromDateStr: string = formatD
 }
 
 /**
+ * 格式化周循环星期显示文本
+ * e.g. [1, 2, 3, 4, 5] -> "每周一至周五"
+ * e.g. [3, 4, 5] -> "每周三至周五"
+ * e.g. [6, 0] -> "每周末 (六、日)"
+ * e.g. [1, 3, 5] -> "每周一、周三、周五"
+ */
+export function formatWeekdaysText(days: number[]): string {
+  if (!days || days.length === 0) return '未设置';
+  if (days.length === 7) return '每周每天';
+
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const sorted = [...days].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+
+  const dayNames: Record<number, string> = {
+    1: '周一',
+    2: '周二',
+    3: '周三',
+    4: '周四',
+    5: '周五',
+    6: '周六',
+    0: '周日',
+  };
+
+  // 常用区间检测
+  const isWorkdays = sorted.length === 5 && [1, 2, 3, 4, 5].every((d) => sorted.includes(d));
+  if (isWorkdays) return '每周一至周五';
+
+  const isWeekend = sorted.length === 2 && sorted.includes(6) && sorted.includes(0);
+  if (isWeekend) return '每周末 (六、日)';
+
+  // 是否连续 (基于周一到周日顺序)
+  const indices = sorted.map((d) => order.indexOf(d));
+  const isConsecutive = indices.every((idx, i) => i === 0 || idx === indices[i - 1] + 1);
+  if (isConsecutive && sorted.length >= 2) {
+    return `每周${dayNames[sorted[0]]}至${dayNames[sorted[sorted.length - 1]]}`;
+  }
+
+  return '每周' + sorted.map((d) => dayNames[d]).join('、');
+}
+
+/**
+ * 根据起始日期与截止日期计算跨越的星期几列表 (0=周日, 1=周一, ..., 6=周六)
+ */
+export function getDaysOfWeekBetween(startDateStr: string, endDateStr: string): number[] {
+  if (!startDateStr || !endDateStr) return [1, 2, 3, 4, 5];
+  const s = new Date(startDateStr.replace(/-/g, '/'));
+  const e = new Date(endDateStr.replace(/-/g, '/'));
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return [1, 2, 3, 4, 5];
+
+  const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays >= 6) {
+    return [1, 2, 3, 4, 5, 6, 0];
+  }
+
+  const set = new Set<number>();
+  const curr = new Date(s);
+  while (curr <= e) {
+    set.add(curr.getDay());
+    curr.setDate(curr.getDate() + 1);
+  }
+  return Array.from(set);
+}
+
+/**
  * 判断指定海报是否在某天处于“生效展映期”
  */
 export function isPosterActiveOnDate(poster: PosterRecord, dateStr: string = formatDateYMD()): boolean {
@@ -44,6 +108,19 @@ export function isPosterActiveOnDate(poster: PosterRecord, dateStr: string = for
 
   if (poster.repeatMode === 'none') {
     return poster.startDate <= dateStr && dateStr <= poster.endDate;
+  }
+
+  if (poster.repeatMode === 'weekly') {
+    // 若当前日期早于起始日期，则尚未进入生效周期
+    if (poster.startDate && dateStr < poster.startDate) {
+      return false;
+    }
+    const targetDayOfWeek = targetDate.getDay();
+    if (poster.repeatDaysOfWeek && poster.repeatDaysOfWeek.length > 0) {
+      return poster.repeatDaysOfWeek.includes(targetDayOfWeek);
+    }
+    const activeWeekdays = getDaysOfWeekBetween(poster.startDate, poster.endDate);
+    return activeWeekdays.includes(targetDayOfWeek);
   }
 
   if (poster.repeatMode === 'yearly') {

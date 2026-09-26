@@ -28,7 +28,7 @@ export const AVAILABLE_APPS_OPTIONS = [
   { id: 'moments', label: '朋友圈/动态圈 (Moments)' },
   { id: 'checkphone', label: '查手机秘密/日记 (Checkphone)' },
   { id: 'image_gen', label: '场景画图与自拍 (Image Gen)' },
-  { id: 'diary', label: '心事日记本 (Diary)' },
+  { id: 'diary', label: '世界线手账 (Worldline)' },
   { id: 'voice', label: '实时连麦语音 (Voice)' },
 ];
 

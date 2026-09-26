@@ -68,8 +68,8 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
   // === 中央星宿群【生活·羁绊·心愿】 ===
   {
     id: 'diary',
-    name: '任务手账',
-    iconName: 'ScrollText',
+    name: '世界线',
+    iconName: 'GitBranch',
     themeColor: '#34d399',
     glowColor: 'rgba(52, 211, 153, 0.65)',
     x: 50,
@@ -151,8 +151,8 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
   },
   {
     id: 'camera',
-    name: '时光相册',
-    iconName: 'Sparkles',
+    name: '刻时',
+    iconName: 'Aperture',
     themeColor: '#a78bfa',
     glowColor: 'rgba(167, 139, 250, 0.65)',
     x: 76,

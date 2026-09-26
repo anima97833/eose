@@ -66,7 +66,7 @@ export const TaskPoolSyncModal: React.FC<TaskPoolSyncModalProps> = ({
               <span>待办决断扭蛋池</span>
             </div>
             <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2, fontWeight: 600 }}>
-              仅同步日记与番茄钟未打钩的任务 ({tasks.length} 项)
+              仅同步世界线与番茄钟未打钩的任务 ({tasks.length} 项)
             </div>
           </div>
 
@@ -116,7 +116,7 @@ export const TaskPoolSyncModal: React.FC<TaskPoolSyncModalProps> = ({
                 太棒了！所有待办均已打钩完成
               </div>
               <div style={{ fontSize: 12, color: '#9CA3AF', maxWidth: 220, lineHeight: 1.5 }}>
-                当前番茄钟与日记手账中暂无未完成任务。您可在对应应用添加新任务后点击下方刷新。
+                当前番茄钟与世界线手账中暂无未完成任务。您可在对应应用添加新任务后点击下方刷新。
               </div>
             </div>
           ) : (
@@ -166,7 +166,7 @@ export const TaskPoolSyncModal: React.FC<TaskPoolSyncModalProps> = ({
                         color: t.source === 'pomodoro' ? '#B91C1C' : '#0369A1',
                       }}
                     >
-                      {t.source === 'pomodoro' ? '🍅 番茄钟' : '📖 日记'}
+                      {t.source === 'pomodoro' ? '🍅 番茄钟' : '🌌 世界线'}
                     </span>
                     {t.desc && (
                       <span

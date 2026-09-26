@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Plus, Search, Trophy, Clock, Sparkles, Filter, Gamepad2, BarChart3, Star, X } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Trophy, Clock, Sparkles, Filter, Joystick, BarChart3, Star, X } from 'lucide-react';
 import { GameRecord, GameStatus, GamePlatform, GameSearchResult, STATUS_NAMES } from '../../../core/games/gameTypes';
 import { loadAllGames, saveGame, deleteGame, calculateGameStats } from '../../../core/games/gameStorage';
 import { GameCartridgeCard } from './components/GameCartridgeCard';
@@ -149,7 +149,7 @@ export const GameVaultApp: React.FC<GameVaultAppProps> = ({ onBack }) => {
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Gamepad2 size={20} color="#502428" strokeWidth={2.5} />
+          <Joystick size={20} color="#502428" strokeWidth={2.5} />
           <span
             style={{
               fontSize: '18px',
@@ -158,7 +158,7 @@ export const GameVaultApp: React.FC<GameVaultAppProps> = ({ onBack }) => {
               letterSpacing: '0.5px',
             }}
           >
-            游戏私藏
+            游戏仓
           </span>
           <span
             style={{

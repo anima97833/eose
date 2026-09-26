@@ -28,6 +28,9 @@ import {
   Settings,
   Hourglass,
   Disc,
+  GitBranch,
+  Aperture,
+  Joystick,
 } from 'lucide-react';
 import {
   listStoreCatalog,
@@ -50,8 +53,10 @@ export function renderStoreIcon(iconName: string, size = 22) {
     case 'Calculator': return <Calculator size={size} strokeWidth={2.2} />;
     case 'Clock': return <Clock size={size} strokeWidth={2.2} />;
     case 'Camera': return <Camera size={size} strokeWidth={2.2} />;
+    case 'Aperture': return <Aperture size={size} strokeWidth={2.2} />;
     case 'Radio': return <Radio size={size} strokeWidth={2.2} />;
     case 'Gamepad2': return <Gamepad2 size={size} strokeWidth={2.2} />;
+    case 'Joystick': return <Joystick size={size} strokeWidth={2.2} />;
     case 'Folder': return <Folder size={size} strokeWidth={2.2} />;
     case 'Compass': return <Compass size={size} strokeWidth={2.2} />;
     case 'ShieldCheck': return <ShieldCheck size={size} strokeWidth={2.2} />;
@@ -62,6 +67,7 @@ export function renderStoreIcon(iconName: string, size = 22) {
     case 'MessageSquareText': return <MessageSquareText size={size} strokeWidth={2.2} />;
     case 'Sparkles': return <Sparkles size={size} strokeWidth={2.2} />;
     case 'BookOpen': return <BookOpen size={size} strokeWidth={2.2} />;
+    case 'GitBranch': return <GitBranch size={size} strokeWidth={2.2} />;
     case 'UserRound': return <UserRound size={size} strokeWidth={2.2} />;
     case 'Image': return <ImageIcon size={size} strokeWidth={2.2} />;
     case 'Search': return <Search size={size} strokeWidth={2.2} />;

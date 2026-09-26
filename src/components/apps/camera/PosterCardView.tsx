@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { PosterRecord, PosterCategory } from '../../../core/poster/posterTypes';
 import { POSTER_TEMPLATES } from '../../../core/poster/posterTemplates';
-import { getDaysDiff, isPosterActiveOnDate } from '../../../core/poster/posterStorage';
+import { getDaysDiff, isPosterActiveOnDate, formatWeekdaysText, getDaysOfWeekBetween } from '../../../core/poster/posterStorage';
 import './posterAlbum.css';
 
 interface PosterCardViewProps {
@@ -47,12 +47,29 @@ export const PosterCardView: React.FC<PosterCardViewProps> = ({
     statusText = `剩 ${daysToStart} 天`;
     statusClass = 'pa-status-upcoming';
   } else if (isActiveToday) {
-    statusText = daysToEnd === 0 ? '今日截止' : `剩 ${daysToEnd} 天`;
+    statusText = poster.repeatMode === 'weekly' ? '今日展映' : daysToEnd === 0 ? '今日截止' : `剩 ${daysToEnd} 天`;
     statusClass = 'pa-status-active';
+  } else if (poster.repeatMode === 'weekly') {
+    statusText = '周循环';
+    statusClass = 'pa-status-upcoming';
+  } else if (poster.repeatMode === 'monthly') {
+    statusText = '月循环';
+    statusClass = 'pa-status-upcoming';
+  } else if (poster.repeatMode === 'yearly') {
+    statusText = '年循环';
+    statusClass = 'pa-status-upcoming';
   } else if (daysToEnd < 0) {
     statusText = `已逾期`;
     statusClass = 'pa-status-expired';
   }
+
+  const dateSummaryText = poster.repeatMode === 'weekly'
+    ? `${formatWeekdaysText(poster.repeatDaysOfWeek || getDaysOfWeekBetween(poster.startDate, poster.endDate))}`
+    : poster.repeatMode === 'monthly'
+    ? `每月重复 · ${poster.startDate} 至 ${poster.endDate}`
+    : poster.repeatMode === 'yearly'
+    ? `每年重复 · ${poster.startDate} 至 ${poster.endDate}`
+    : `${poster.startDate} 至 ${poster.endDate}`;
 
   // 分类图标
   const renderCategoryIcon = (category: PosterCategory) => {
@@ -162,7 +179,7 @@ export const PosterCardView: React.FC<PosterCardViewProps> = ({
                 }}
               >
                 <Clock size={12} />
-                <span>{poster.startDate} 至 {poster.endDate}</span>
+                <span>{dateSummaryText}</span>
               </div>
             </div>
           )}
@@ -179,7 +196,7 @@ export const PosterCardView: React.FC<PosterCardViewProps> = ({
               </div>
               <div className="pa-front-date-row">
                 <Clock size={11} />
-                <span>{poster.startDate} 至 {poster.endDate}</span>
+                <span>{dateSummaryText}</span>
               </div>
             </div>
           )}

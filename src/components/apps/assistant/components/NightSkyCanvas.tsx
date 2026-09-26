@@ -16,6 +16,7 @@ import {
   Film,
   Gift,
   Compass,
+  Aperture,
 } from 'lucide-react';
 import { ALL_STAR_APPS } from '../../../../core/assistant/appContextAggregator';
 import { StarAppMeta } from '../../../../core/assistant/assistantTypes';
@@ -58,6 +59,7 @@ export const NightSkyCanvas: React.FC<NightSkyCanvasProps> = ({
       case 'GitBranch': return <GitBranch size={size} color={color} />;
       case 'Sparkles': return <Sparkles size={size} color={color} />;
       case 'Camera': return <Camera size={size} color={color} />;
+      case 'Aperture': return <Aperture size={size} color={color} />;
       case 'User': return <User size={size} color={color} />;
       case 'Image': return <ImageIcon size={size} color={color} />;
       case 'Film': return <Film size={size} color={color} />;

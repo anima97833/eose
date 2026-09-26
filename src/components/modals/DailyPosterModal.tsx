@@ -5,7 +5,8 @@ import {
   ChevronRight, 
   Check, 
   Image as ImageIcon,
-  Sunrise
+  Sunrise,
+  Aperture
 } from 'lucide-react';
 import { PosterRecord } from '../../core/poster/posterTypes';
 import { 
@@ -188,8 +189,8 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
             style={{ padding: '8px 0' }}
             onClick={handleGoToAlbum}
           >
-            <ImageIcon size={14} />
-            <span>进入相册</span>
+            <Aperture size={14} />
+            <span>进入刻时</span>
           </button>
 
           <button

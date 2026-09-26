@@ -10,7 +10,8 @@ import {
   X, 
   Check, 
   RotateCcw,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Aperture,
 } from 'lucide-react';
 import { 
   PosterRecord, 
@@ -29,7 +30,9 @@ import {
   formatDateYMD,
   isPosterActiveOnDate,
   getDaysDiff,
-  resetTodayDismissed
+  resetTodayDismissed,
+  formatWeekdaysText,
+  getDaysOfWeekBetween
 } from '../../../core/poster/posterStorage';
 import { POSTER_TEMPLATES } from '../../../core/poster/posterTemplates';
 import { PosterCardView } from './PosterCardView';
@@ -92,8 +95,12 @@ export const PhotoAlbumApp: React.FC<PhotoAlbumAppProps> = ({ onBack }) => {
 
     const isActive = isPosterActiveOnDate(p, todayStr);
     const daysToStart = getDaysDiff(p.startDate, todayStr);
+    const isRecurring = p.repeatMode === 'weekly' || p.repeatMode === 'monthly' || p.repeatMode === 'yearly';
 
     if (activeTab === 'active') {
+      if (isRecurring) {
+        return isActive || (p.startDate <= todayStr);
+      }
       return isActive || getDaysDiff(p.endDate, todayStr) < 0;
     }
 
@@ -105,7 +112,14 @@ export const PhotoAlbumApp: React.FC<PhotoAlbumAppProps> = ({ onBack }) => {
   });
 
   const counts = {
-    active: posters.filter((p) => !p.isArchived && (isPosterActiveOnDate(p, todayStr) || getDaysDiff(p.endDate, todayStr) < 0)).length,
+    active: posters.filter((p) => {
+      if (p.isArchived) return false;
+      const isRecurring = p.repeatMode === 'weekly' || p.repeatMode === 'monthly' || p.repeatMode === 'yearly';
+      if (isRecurring) {
+        return isPosterActiveOnDate(p, todayStr) || p.startDate <= todayStr;
+      }
+      return isPosterActiveOnDate(p, todayStr) || getDaysDiff(p.endDate, todayStr) < 0;
+    }).length,
     upcoming: posters.filter((p) => !p.isArchived && getDaysDiff(p.startDate, todayStr) > 0).length,
     archived: posters.filter((p) => p.isArchived).length,
   };
@@ -179,6 +193,7 @@ export const PhotoAlbumApp: React.FC<PhotoAlbumAppProps> = ({ onBack }) => {
       startDate: todayYMD,
       endDate: endYMD,
       repeatMode: 'none',
+      repeatDaysOfWeek: [],
       backNote: '',
       backItems: [],
       createdAt: Date.now(),
@@ -189,7 +204,10 @@ export const PhotoAlbumApp: React.FC<PhotoAlbumAppProps> = ({ onBack }) => {
 
   // 打开编辑弹窗
   const handleOpenEdit = (poster: PosterRecord) => {
-    setEditingPoster({ ...poster });
+    setEditingPoster({
+      ...poster,
+      repeatDaysOfWeek: poster.repeatDaysOfWeek || [],
+    });
     setIsEditorOpen(true);
     setInspectedPoster(null);
   };
@@ -221,7 +239,8 @@ export const PhotoAlbumApp: React.FC<PhotoAlbumAppProps> = ({ onBack }) => {
             >
               <ArrowLeft size={18} />
             </button>
-            <h2 className="pa-title">相册</h2>
+            <Aperture size={18} strokeWidth={2.4} color="#1a202c" />
+            <h2 className="pa-title">刻时</h2>
             <span className="pa-count-badge">{posters.length}</span>
           </div>
 
@@ -662,6 +681,22 @@ const PosterEditorModal: React.FC<PosterEditorModalProps> = ({
                     <span style={{ fontSize: 11, marginTop: 4 }}>选择本地照片</span>
                   </button>
                 )}
+
+                {/* 提醒小字：海报1:1大小最佳 */}
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: '#64748b',
+                    marginTop: 6,
+                    textAlign: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <span>💡 海报1:1大小最佳</span>
+                </div>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -688,7 +723,15 @@ const PosterEditorModal: React.FC<PosterEditorModalProps> = ({
                 type="date"
                 className="pa-input"
                 value={draft.startDate}
-                onChange={(e) => setDraft({ ...draft, startDate: e.target.value })}
+                onChange={(e) => {
+                  const newStart = e.target.value;
+                  if (draft.repeatMode === 'weekly') {
+                    const autoDays = getDaysOfWeekBetween(newStart, draft.endDate || '');
+                    setDraft({ ...draft, startDate: newStart, repeatDaysOfWeek: autoDays });
+                  } else {
+                    setDraft({ ...draft, startDate: newStart });
+                  }
+                }}
               />
             </div>
             <div className="pa-form-group">
@@ -697,31 +740,135 @@ const PosterEditorModal: React.FC<PosterEditorModalProps> = ({
                 type="date"
                 className="pa-input"
                 value={draft.endDate}
-                onChange={(e) => setDraft({ ...draft, endDate: e.target.value })}
+                onChange={(e) => {
+                  const newEnd = e.target.value;
+                  if (draft.repeatMode === 'weekly') {
+                    const autoDays = getDaysOfWeekBetween(draft.startDate || '', newEnd);
+                    setDraft({ ...draft, endDate: newEnd, repeatDaysOfWeek: autoDays });
+                  } else {
+                    setDraft({ ...draft, endDate: newEnd });
+                  }
+                }}
               />
             </div>
           </div>
 
-          {/* 循环 */}
+          {/* 循环模式 */}
           <div className="pa-form-group">
             <label className="pa-form-label">循环模式</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
               {[
                 { id: 'none', label: '单次' },
-                { id: 'yearly', label: '每年重复' },
+                { id: 'weekly', label: '周循环' },
                 { id: 'monthly', label: '每月重复' },
+                { id: 'yearly', label: '每年重复' },
               ].map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   className={`pa-btn ${draft.repeatMode === item.id ? 'pa-btn-primary' : 'pa-btn-secondary'}`}
                   style={{ padding: '5px 0', fontSize: 11 }}
-                  onClick={() => setDraft({ ...draft, repeatMode: item.id as PosterRepeatMode })}
+                  onClick={() => {
+                    const newMode = item.id as PosterRepeatMode;
+                    if (newMode === 'weekly') {
+                      const autoDays = (draft.repeatDaysOfWeek && draft.repeatDaysOfWeek.length > 0)
+                        ? draft.repeatDaysOfWeek
+                        : getDaysOfWeekBetween(draft.startDate || '', draft.endDate || '');
+                      setDraft({ ...draft, repeatMode: newMode, repeatDaysOfWeek: autoDays });
+                    } else {
+                      setDraft({ ...draft, repeatMode: newMode });
+                    }
+                  }}
                 >
                   {item.label}
                 </button>
               ))}
             </div>
+
+            {/* 若选择周循环，展开星期多选排 */}
+            {draft.repeatMode === 'weekly' && (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: '8px 10px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#475569' }}>
+                    循环星期：
+                    <span style={{ color: '#d97706', fontWeight: 800 }}>
+                      {formatWeekdaysText(draft.repeatDaysOfWeek || [])}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#0284c7',
+                      fontSize: 10,
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                    onClick={() => {
+                      const autoDays = getDaysOfWeekBetween(draft.startDate || '', draft.endDate || '');
+                      setDraft({ ...draft, repeatDaysOfWeek: autoDays });
+                    }}
+                  >
+                    按起止日期同步
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                  {[
+                    { day: 1, label: '一' },
+                    { day: 2, label: '二' },
+                    { day: 3, label: '三' },
+                    { day: 4, label: '四' },
+                    { day: 5, label: '五' },
+                    { day: 6, label: '六' },
+                    { day: 0, label: '日' },
+                  ].map(({ day, label }) => {
+                    const isSelected = (draft.repeatDaysOfWeek || []).includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        className={`pa-btn ${isSelected ? 'pa-btn-primary' : 'pa-btn-secondary'}`}
+                        style={{
+                          padding: '5px 0',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          borderRadius: 8,
+                        }}
+                        onClick={() => {
+                          const currentDays = draft.repeatDaysOfWeek || [];
+                          let nextDays: number[];
+                          if (currentDays.includes(day)) {
+                            if (currentDays.length > 1) {
+                              nextDays = currentDays.filter((d) => d !== day);
+                            } else {
+                              nextDays = currentDays;
+                            }
+                          } else {
+                            nextDays = [...currentDays, day];
+                          }
+                          setDraft({ ...draft, repeatDaysOfWeek: nextDays });
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 背面备忘与待办 */}
