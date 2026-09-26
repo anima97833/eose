@@ -102,8 +102,8 @@ export function calculateDailySettlement(
     }
   }
 
-  // 1. 基础经验 (1:1 转换)
-  const baseExp = totalAttr;
+  // 1. 基础经验 (5:1 转换，六维 5 点转换为 1 点经验，如六维共计 50 分，经验 +10)
+  const baseExp = Math.round(totalAttr / 5);
 
   // 2. 单项突破加成 (High-Water Mark Bonus)
   let breakthroughBonusRate = 0;

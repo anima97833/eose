@@ -793,16 +793,28 @@ export function addRPGAttribute(
 } {
   const profile = loadRPGProfile();
   const maxVal = computeAttributeMax(profile.level || 1);
+  if (!profile.attributes) {
+    profile.attributes = { ...DEFAULT_RPG_PROFILE.attributes };
+  }
+  if (!profile.attributes[key]) {
+    profile.attributes[key] = { ...DEFAULT_RPG_PROFILE.attributes[key], maxValue: maxVal };
+  }
   const currentAttr = profile.attributes[key];
   const oldVal = currentAttr?.value || 0;
   const newVal = Math.min(maxVal, Math.max(0, oldVal + delta));
 
-  if (profile.attributes[key]) {
-    profile.attributes[key].value = newVal;
-    profile.attributes[key].maxValue = maxVal;
+  profile.attributes[key].value = newVal;
+  profile.attributes[key].maxValue = maxVal;
+
+  // 若为精力 (SPI)，同步增加即时精力池
+  if (key === 'SPI' && typeof profile.mp === 'number') {
+    const maxMp = profile.maxMp || 100;
+    profile.mp = Math.min(maxMp, profile.mp + delta);
   }
+
   saveRPGProfile(profile);
   window.dispatchEvent(new CustomEvent('cloudfly_rpg_updated'));
+  window.dispatchEvent(new CustomEvent('cloudfly_profile_updated', { detail: profile }));
   return { oldValue: oldVal, newValue: newVal, maxValue: maxVal };
 }
 

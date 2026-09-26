@@ -259,7 +259,7 @@ export const DailySettlementModal: React.FC<DailySettlementModalProps> = ({
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>基础六维经验转化 (1:1):</span>
+              <span>基础六维经验转化 (5:1):</span>
               <b>+{snapshot.baseExp} EXP</b>
             </div>
 

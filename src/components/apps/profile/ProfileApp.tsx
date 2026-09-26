@@ -532,9 +532,9 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
     });
   }, []);
 
-  // 跨日检测：当用户切回标签页或应用恢复可见时，自动检测北京时间跨日重置
+  // 属性与跨日同步：当外部应用增加六维属性、或切回应用时，自动同步最新的 RPG Profile
   useEffect(() => {
-    const handleCheckDayChange = () => {
+    const handleProfileSync = () => {
       const refreshed = loadRPGProfile();
       setProfile((prev) => ({
         ...refreshed,
@@ -542,11 +542,17 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
         customBgUrl: prev.customBgUrl,
       }));
     };
-    window.addEventListener('focus', handleCheckDayChange);
-    document.addEventListener('visibilitychange', handleCheckDayChange);
+
+    window.addEventListener('cloudfly_rpg_updated', handleProfileSync);
+    window.addEventListener('cloudfly_profile_updated', handleProfileSync);
+    window.addEventListener('focus', handleProfileSync);
+    document.addEventListener('visibilitychange', handleProfileSync);
+
     return () => {
-      window.removeEventListener('focus', handleCheckDayChange);
-      document.removeEventListener('visibilitychange', handleCheckDayChange);
+      window.removeEventListener('cloudfly_rpg_updated', handleProfileSync);
+      window.removeEventListener('cloudfly_profile_updated', handleProfileSync);
+      window.removeEventListener('focus', handleProfileSync);
+      document.removeEventListener('visibilitychange', handleProfileSync);
     };
   }, []);
 
@@ -1519,7 +1525,17 @@ export const ProfileApp: React.FC<ProfileAppProps> = ({ onBack }) => {
         <ClipboardTabButton
           label="六维"
           isActive={activeSheet === 'attributes'}
-          onClick={() => setActiveSheet(activeSheet === 'attributes' ? null : 'attributes')}
+          onClick={() => {
+            if (activeSheet !== 'attributes') {
+              const latest = loadRPGProfile();
+              setProfile((prev) => ({
+                ...latest,
+                customAvatarUrl: prev.customAvatarUrl,
+                customBgUrl: prev.customBgUrl,
+              }));
+            }
+            setActiveSheet(activeSheet === 'attributes' ? null : 'attributes');
+          }}
         />
 
         {/* 2. 状态 */}

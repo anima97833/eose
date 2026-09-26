@@ -10,6 +10,7 @@ import {
   saveQuestPalette,
   triggerEasterEgg,
 } from '../../../core/quest/questStorage';
+import { addRPGAttribute } from '../../../core/rpg/rpgStorage';
 import { fetchColormindPalette, rgbToHex } from '../../../core/theme/colormindService';
 import { QuestCard } from './components/QuestCard';
 import { CreateQuestModal } from './components/CreateQuestModal';
@@ -602,6 +603,8 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
           onAwardStat={(stat) => {
             setFloatingStat(stat);
             setTimeout(() => setFloatingStat(null), 1900);
+            // 真实累加六维属性数值（答对智力 INT +8 / 答错体质 CON +5）
+            addRPGAttribute(stat.key as any, stat.gain);
             // 自动标记彩蛋完成
             const res = markQuestDone('egg_fact_quiz');
             setQuests(res.items);
@@ -617,6 +620,8 @@ export const QuestJournalApp: React.FC<QuestJournalAppProps> = ({ onBack, onOpen
           onAwardStat={(stat) => {
             setFloatingStat(stat);
             setTimeout(() => setFloatingStat(null), 1900);
+            // 真实累加六维属性数值
+            addRPGAttribute(stat.key as any, stat.gain);
             // 自动标记彩蛋完成
             const res = markQuestDone('egg_multiverse_agent');
             setQuests(res.items);
