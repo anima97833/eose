@@ -236,7 +236,7 @@ export const DEFAULT_PRESET_QUESTS: QuestItem[] = [
     icon: '💡',
     tag: '📚 智力',
     statKey: 'INT',
-    statGain: { fixed: 8 },
+    statGain: { fixed: 3 },
     currentProgress: 0,
     targetProgress: 1,
     status: 'in_progress',

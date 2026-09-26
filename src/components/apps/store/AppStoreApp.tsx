@@ -37,6 +37,7 @@ import {
   installAppToDesktop,
   uninstallAppFromDesktop,
   createAndInstallCustomApp,
+  deleteCustomAppPermanently,
   AppStoreItem,
 } from '../../../core/sdk/appStoreCatalog';
 
@@ -118,6 +119,30 @@ export const AppStoreApp: React.FC<AppStoreAppProps> = ({ onBack, onOpenApp }) =
   const showToast = (msg: string) => {
     setToastText(msg);
     setTimeout(() => setToastText(null), 2500);
+  };
+
+  // 彻底删除确认弹窗状态
+  const [confirmDeleteApp, setConfirmDeleteApp] = useState<AppStoreItem | null>(null);
+
+  const isCustomApp = (app: AppStoreItem) => {
+    return app.id.startsWith('custom_') || Boolean(app.htmlContent) || app.categoryLabel === '自定义';
+  };
+
+  const handleDeletePermanently = (app: AppStoreItem) => {
+    setConfirmDeleteApp(app);
+  };
+
+  const executeDeletePermanently = () => {
+    if (!confirmDeleteApp) return;
+    const appName = confirmDeleteApp.name;
+    const success = deleteCustomAppPermanently(confirmDeleteApp.id);
+    setConfirmDeleteApp(null);
+    if (success) {
+      refreshCatalog();
+      showToast(`已从手机彻底删除应用【${appName}】！`);
+    } else {
+      showToast('删除失败：核心系统预设应用不可删除');
+    }
   };
 
   const handleInstall = (appId: string) => {
@@ -316,7 +341,7 @@ export const AppStoreApp: React.FC<AppStoreAppProps> = ({ onBack, onOpenApp }) =
                 </div>
 
                 {/* 操作按键 */}
-                <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {app.isInstalled ? (
                     <button
                       type="button"
@@ -360,6 +385,33 @@ export const AppStoreApp: React.FC<AppStoreAppProps> = ({ onBack, onOpenApp }) =
                     >
                       <Download size={12} />
                       安装
+                    </button>
+                  )}
+
+                  {/* 自定义导入的沙盒微应用：支持随时彻底删除 */}
+                  {isCustomApp(app) && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePermanently(app)}
+                      className="nm-rebound-btn"
+                      style={{
+                        padding: '6px 9px',
+                        borderRadius: '14px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#E11D48',
+                        background: 'linear-gradient(145deg, #FFF1F2 0%, #FFE4E6 100%)',
+                        border: '1px solid rgba(254, 205, 211, 0.9)',
+                        boxShadow: '0 2px 6px rgba(225, 29, 72, 0.12)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                      }}
+                      title="从手机彻底删除此沙盒应用"
+                    >
+                      <Trash2 size={12} />
+                      <span>删除</span>
                     </button>
                   )}
                 </div>
@@ -413,27 +465,56 @@ export const AppStoreApp: React.FC<AppStoreAppProps> = ({ onBack, onOpenApp }) =
                 </div>
 
                 {!app.isSystem && (
-                  <button
-                    type="button"
-                    onClick={() => handleUninstall(app.id)}
-                    className="nm-rebound-btn"
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '14px',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: '#E85A71',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      border: 'none',
-                      cursor: 'pointer',
-                    }}
-                    title="回收到商店"
-                  >
-                    <Trash2 size={12} />
-                    回收卸载
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleUninstall(app.id)}
+                      className="nm-rebound-btn"
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '14px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#475971',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        backgroundColor: 'var(--nm-bg)',
+                        border: '1px solid rgba(166, 180, 200, 0.3)',
+                        cursor: 'pointer',
+                      }}
+                      title="从桌面卸载并回收到商店"
+                    >
+                      <span>回收卸载</span>
+                    </button>
+
+                    {/* 自定义导入沙盒应用：支持随时彻底删除 */}
+                    {isCustomApp(app) && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePermanently(app)}
+                        className="nm-rebound-btn"
+                        style={{
+                          padding: '6px 9px',
+                          borderRadius: '14px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: '#E11D48',
+                          background: 'linear-gradient(145deg, #FFF1F2 0%, #FFE4E6 100%)',
+                          border: '1px solid rgba(254, 205, 211, 0.9)',
+                          boxShadow: '0 2px 6px rgba(225, 29, 72, 0.12)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                        }}
+                        title="从手机彻底删除此应用"
+                      >
+                        <Trash2 size={12} />
+                        <span>彻底删除</span>
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
@@ -567,6 +648,106 @@ export const AppStoreApp: React.FC<AppStoreAppProps> = ({ onBack, onOpenApp }) =
           </form>
         )}
       </div>
+
+      {/* 彻底删除确认模态窗 */}
+      {confirmDeleteApp && (
+        <div
+          onClick={() => setConfirmDeleteApp(null)}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 100,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '300px',
+              backgroundColor: 'var(--nm-bg, #F3F6FA)',
+              borderRadius: '24px',
+              border: '1.5px solid rgba(255, 255, 255, 0.95)',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+              padding: '20px 18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #FFE4E6 0%, #FECDD3 100%)',
+                color: '#E11D48',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto',
+                boxShadow: '0 4px 10px rgba(225, 29, 72, 0.2)',
+              }}
+            >
+              <Trash2 size={22} strokeWidth={2.4} />
+            </div>
+
+            <div>
+              <div style={{ fontSize: '15px', fontWeight: 900, color: 'var(--nm-text-main, #1E293B)' }}>
+                彻底删除沙盒应用？
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--nm-text-sub, #64748B)', marginTop: '6px', lineHeight: 1.5 }}>
+                确定要将【<strong>{confirmDeleteApp.name}</strong>】从手机彻底删除吗？<br />
+                其 HTML 沙盒源码与桌面图标将被完全抹除，无法恢复。
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteApp(null)}
+                style={{
+                  padding: '9px 0',
+                  borderRadius: '14px',
+                  border: '1px solid rgba(166, 180, 200, 0.4)',
+                  backgroundColor: 'var(--nm-bg)',
+                  color: 'var(--nm-text-main)',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                取消
+              </button>
+
+              <button
+                type="button"
+                onClick={executeDeletePermanently}
+                style={{
+                  padding: '9px 0',
+                  borderRadius: '14px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #F43F5E 0%, #E11D48 100%)',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  boxShadow: '0 4px 12px rgba(225, 29, 72, 0.35)',
+                  cursor: 'pointer',
+                }}
+              >
+                彻底删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 浮动 Toast 提示 */}
       {toastText && (

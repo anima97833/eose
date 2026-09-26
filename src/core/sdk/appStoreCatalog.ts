@@ -646,3 +646,73 @@ export function createAndInstallCustomApp(newApp: {
 
   return storeItem;
 }
+
+// 彻底从手机删除自定义导入的应用（从商店目录、桌面、自定义注册表中彻底抹除）
+export function deleteCustomAppPermanently(appId: string): boolean {
+  if (!appId) return false;
+
+  const all = listStoreCatalog();
+  const target = all.find((item) => item.id === appId);
+  if (!target) return false;
+
+  // 保护：仅支持自定义沙盒应用彻底删除，核心系统预设应用不可被彻底删除
+  const isCustomApp =
+    appId.startsWith('custom_') ||
+    Boolean(target.htmlContent) ||
+    target.categoryLabel === '自定义';
+
+  if (!isCustomApp || target.isSystem) {
+    return false;
+  }
+
+  // 1. 从商店目录完全抹除
+  const updatedCatalog = all.filter((item) => item.id !== appId);
+  saveStoreCatalog(updatedCatalog);
+
+  // 2. 从桌面布局（所有分屏与 Dock 栏）彻底移除
+  if (typeof window !== 'undefined') {
+    const LAYOUT_KEY = 'neumorphic_phone_desktop_layout_v2';
+    try {
+      const raw = localStorage.getItem(LAYOUT_KEY);
+      if (raw) {
+        const layout = JSON.parse(raw);
+        if (Array.isArray(layout.pages)) {
+          layout.pages = layout.pages.map((p: string[]) => p.filter((id: string) => id !== appId));
+          while (layout.pages.length > 1 && layout.pages[layout.pages.length - 1].length === 0) {
+            layout.pages.pop();
+          }
+        }
+        layout.page1 = (layout.page1 || []).filter((id: string) => id !== appId);
+        layout.page2 = (layout.page2 || []).filter((id: string) => id !== appId);
+        layout.dock = (layout.dock || []).filter((id: string) => id !== appId);
+        if (Array.isArray(layout.pages)) {
+          layout.page1 = layout.pages[0] || [];
+          layout.page2 = layout.pages[1] || [];
+        }
+        localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
+        window.dispatchEvent(new CustomEvent('aiphone_layout_updated'));
+      }
+    } catch {
+      // ignore
+    }
+
+    // 3. 清理可能存在的沙盒应用隔离数据
+    try {
+      localStorage.removeItem(`custom_app_data_${appId}`);
+      localStorage.removeItem(`custom_app_storage_${appId}`);
+    } catch {
+      // ignore
+    }
+  }
+
+  // 4. 从自定义微应用注册表中彻底移除
+  const customApps = listInstalledCustomApps().filter((c) => c.id !== appId);
+  saveInstalledCustomApps(customApps);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('aiphone_custom_apps_updated'));
+  }
+
+  return true;
+}
+

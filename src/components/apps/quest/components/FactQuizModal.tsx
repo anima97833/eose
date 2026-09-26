@@ -27,20 +27,20 @@ export const FactQuizModal: React.FC<FactQuizModalProps> = ({
 
     const isCorrect = choice === quiz.isTrue;
     if (isCorrect) {
-      // 答对：智力 +8
+      // 答对：智力 +3
       onAwardStat({
         key: 'INT',
         name: '智力',
         icon: '📚',
-        gain: 8,
+        gain: 3,
       });
     } else {
-      // 答错：体质 +5（被冷知识冻伤，锻炼了体魄抗性）
+      // 答错：体质 +1（被冷知识冻伤，锻炼了体魄抗性）
       onAwardStat({
         key: 'CON',
         name: '体质',
         icon: '💪',
-        gain: 5,
+        gain: 1,
       });
     }
   };
@@ -318,7 +318,7 @@ export const FactQuizModal: React.FC<FactQuizModalProps> = ({
                     gap: '2px',
                   }}
                 >
-                  <span>{isCorrect ? '智力 +8' : '体质 +5'}</span>
+                  <span>{isCorrect ? '智力 +3' : '体质 +1'}</span>
                 </div>
               </div>
 
