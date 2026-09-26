@@ -149,15 +149,12 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
     }
   };
 
-  // 确保当 ambientNoise 为 off 或组件卸载时彻底停止白噪音
+  // 仅在整个番茄钟组件卸载时，才需要停止白噪音
   useEffect(() => {
-    if (ambientNoise === 'off') {
-      stopAmbientNoise();
-    }
     return () => {
       stopAmbientNoise();
     };
-  }, [ambientNoise]);
+  }, []);
 
   const [rpgNotice, setRpgNotice] = useState<string | null>(null);
 

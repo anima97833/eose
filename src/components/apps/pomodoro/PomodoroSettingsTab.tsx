@@ -19,12 +19,6 @@ interface PomodoroSettingsTabProps {
   onUpdateSettings: (newSettings: Partial<PomodoroSettings>) => void;
 }
 
-import {
-  CustomDurationSection,
-  FOCUS_PRESETS,
-  SHORT_BREAK_PRESETS,
-  LONG_BREAK_PRESETS,
-} from './CustomDurationSection';
 
 export const PomodoroSettingsTab: React.FC<PomodoroSettingsTabProps> = ({
   settings,
@@ -66,127 +60,7 @@ export const PomodoroSettingsTab: React.FC<PomodoroSettingsTabProps> = ({
         </div>
       </div>
 
-      {/* 模块1：节奏与时长（支持自定义输入与微调） */}
-      <div
-        style={{
-          borderRadius: '16px',
-          backgroundColor: '#EDF5EE',
-          boxShadow: '4px 4px 10px rgba(160, 185, 170, 0.45), -4px -4px 10px rgba(255, 255, 255, 0.95)',
-          border: '1px solid rgba(255, 255, 255, 0.7)',
-          padding: '14px 14px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#2F614C', fontWeight: 700, fontSize: '13px' }}>
-          <Zap size={15} color="#3A8259" />
-          <span>节奏与时长 (支持自定义)</span>
-        </div>
 
-        {/* 专注时长自定义 */}
-        <CustomDurationSection
-          title="专注时长 (分钟)"
-          value={settings.focusDuration}
-          presets={FOCUS_PRESETS}
-          min={1}
-          max={180}
-          stepPresets={[1, 5]}
-          onSelect={(dur) => onUpdateSettings({ focusDuration: dur })}
-        />
-
-        {/* 短休息时长自定义 */}
-        <CustomDurationSection
-          title="短休息时长 (分钟)"
-          value={settings.shortBreakDuration}
-          presets={SHORT_BREAK_PRESETS}
-          min={1}
-          max={30}
-          stepPresets={[1, 5]}
-          onSelect={(dur) => onUpdateSettings({ shortBreakDuration: dur })}
-        />
-
-        {/* 长休息时长自定义 */}
-        <CustomDurationSection
-          title="长休息时长 (分钟)"
-          value={settings.longBreakDuration}
-          presets={LONG_BREAK_PRESETS}
-          min={1}
-          max={60}
-          stepPresets={[1, 5]}
-          onSelect={(dur) => onUpdateSettings({ longBreakDuration: dur })}
-        />
-
-        {/* 长休息触发间隔 */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingTop: '6px',
-            borderTop: '1px solid rgba(195, 218, 205, 0.45)',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '12px', color: '#446652', fontWeight: 600 }}>长休息触发间隔</div>
-            <div style={{ fontSize: '10px', color: '#6A8A73' }}>每完成几个番茄钟后享受长休息</div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={() => {
-                playClickSound();
-                onUpdateSettings({ longBreakInterval: Math.max(2, settings.longBreakInterval - 1) });
-              }}
-              style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: '#EDF5EE',
-                color: '#345E44',
-                fontWeight: 800,
-                cursor: 'pointer',
-                boxShadow: '1px 1px 3px rgba(160, 185, 170, 0.4)',
-              }}
-            >
-              -
-            </button>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#245239',
-                backgroundColor: 'rgba(215, 235, 220, 0.8)',
-                padding: '2px 8px',
-                borderRadius: '8px',
-              }}
-            >
-              每 {settings.longBreakInterval} 个
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                playClickSound();
-                onUpdateSettings({ longBreakInterval: Math.min(8, settings.longBreakInterval + 1) });
-              }}
-              style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: '#EDF5EE',
-                color: '#345E44',
-                fontWeight: 800,
-                cursor: 'pointer',
-                boxShadow: '1px 1px 3px rgba(160, 185, 170, 0.4)',
-              }}
-            >
-              +
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* 模块2：自动流转 */}
       <div

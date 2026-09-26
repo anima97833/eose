@@ -179,8 +179,7 @@ export function startAmbientNoise(type: 'rain' | 'clock' | 'cafe' | 'off'): void
       filter.frequency.setValueAtTime(850, now);
 
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.18, now + 0.3);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
 
       whiteNoise.connect(filter);
       filter.connect(gain);
@@ -195,7 +194,7 @@ export function startAmbientNoise(type: 'rain' | 'clock' | 'cafe' | 'off'): void
       const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
-        output[i] = (Math.random() * 2 - 1) * 0.08;
+        output[i] = (Math.random() * 2 - 1) * 0.1;
       }
 
       const noise = ctx.createBufferSource();
@@ -204,12 +203,11 @@ export function startAmbientNoise(type: 'rain' | 'clock' | 'cafe' | 'off'): void
 
       const filter = ctx.createBiquadFilter();
       filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(450, now);
-      filter.Q.setValueAtTime(1.2, now);
+      filter.frequency.setValueAtTime(450, ctx.currentTime);
+      filter.Q.setValueAtTime(1.2, ctx.currentTime);
 
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.22, now + 0.3);
+      gain.gain.setValueAtTime(0.28, ctx.currentTime);
 
       noise.connect(filter);
       filter.connect(gain);
@@ -231,8 +229,8 @@ export function startAmbientNoise(type: 'rain' | 'clock' | 'cafe' | 'off'): void
           osc.frequency.setValueAtTime(1200, tickNow);
           osc.frequency.exponentialRampToValueAtTime(300, tickNow + 0.015);
 
-          gain.gain.setValueAtTime(0.06, tickNow);
-          gain.gain.exponentialRampToValueAtTime(0.0001, tickNow + 0.02);
+          gain.gain.setValueAtTime(0.12, tickNow);
+          gain.gain.exponentialRampToValueAtTime(0.0001, tickNow + 0.03);
 
           osc.connect(gain);
           gain.connect(ctx.destination);

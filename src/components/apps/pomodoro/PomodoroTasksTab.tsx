@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Check, Trash2, Target, CheckCircle2, Circle, Edit3, X, Zap, Clock, FolderPlus, ArrowRightLeft, Layers } from 'lucide-react';
+import { Plus, Check, Trash2, Target, CheckCircle2, Circle, Edit3, X, Zap, Clock, FolderPlus, ArrowRightLeft, Layers, ChevronDown, ChevronRight } from 'lucide-react';
 import { PomodoroTaskRecord, db } from '../../../core/storage/db';
 import { CustomDurationSection, FOCUS_PRESETS } from './CustomDurationSection';
 import {
@@ -49,12 +49,20 @@ export const PomodoroTasksTab: React.FC<PomodoroTasksTabProps> = ({
   onSelectTask,
   onRefreshTasks,
 }) => {
-  // 大类（任务集）状态
+  // 大类（任务集）状态与展开/收起控制
   const [groups, setGroups] = useState<PomodoroTaskGroup[]>(getPomodoroTaskGroups());
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({});
   const [showAddGroupModal, setShowAddGroupModal] = useState<boolean>(false);
   const [newGroupTitle, setNewGroupTitle] = useState<string>('');
   const [newGroupColor, setNewGroupColor] = useState<string>(GROUP_PALETTE[0]);
   const [movingTask, setMovingTask] = useState<PomodoroTaskRecord | null>(null);
+
+  const toggleGroupExpand = (groupId: string) => {
+    setExpandedGroupIds((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  };
 
   // 新建任务弹窗状态
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
@@ -308,6 +316,7 @@ export const PomodoroTasksTab: React.FC<PomodoroTasksTabProps> = ({
             (t) => (t.groupId || groups[0]?.id) === group.id
           );
           const completedCount = groupTasks.filter((t) => t.isCompleted).length;
+          const isExpanded = !!expandedGroupIds[group.id];
 
           return (
             <div
@@ -318,7 +327,8 @@ export const PomodoroTasksTab: React.FC<PomodoroTasksTabProps> = ({
                 backgroundColor: 'rgba(245, 250, 246, 0.85)',
                 border: '1px solid rgba(220, 235, 225, 0.9)',
                 boxShadow: '0 3px 10px rgba(40, 70, 50, 0.05)',
-                padding: '12px 14px',
+                padding: isExpanded ? '12px 14px' : '10px 14px',
+                transition: 'all 0.2s ease',
               }}
             >
               {/* 大类(任务集) 头部 */}
@@ -327,12 +337,16 @@ export const PomodoroTasksTab: React.FC<PomodoroTasksTabProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  paddingBottom: '8px',
-                  marginBottom: '10px',
-                  borderBottom: '1px solid rgba(160, 185, 170, 0.25)',
+                  paddingBottom: isExpanded ? '8px' : '0px',
+                  marginBottom: isExpanded ? '10px' : '0px',
+                  borderBottom: isExpanded ? '1px solid rgba(160, 185, 170, 0.25)' : 'none',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div
+                  onClick={() => toggleGroupExpand(group.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                  title="点击切换展开/收起"
+                >
                   <div
                     style={{
                       width: '5px',
@@ -358,8 +372,36 @@ export const PomodoroTasksTab: React.FC<PomodoroTasksTabProps> = ({
                   </span>
                 </div>
 
-                {/* 任务集右侧：增加具体任务按钮 & 删除任务集按钮 */}
+                {/* 任务集右侧：三角折叠/展开图标（位于具体任务左边） & 增加具体任务按钮 & 删除任务集按钮 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {/* 需求1：在具体任务左边新增一个三角图标，点击后才可以看到具体任务，不展开只能看到大类名称 */}
+                  <button
+                    type="button"
+                    onClick={() => toggleGroupExpand(group.id)}
+                    style={{
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(160, 185, 170, 0.45)',
+                      backgroundColor: isExpanded ? 'rgba(58, 90, 64, 0.15)' : '#FFFFFF',
+                      color: isExpanded ? '#2F614C' : '#52796F',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      padding: 0,
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                      transition: 'all 0.18s ease',
+                    }}
+                    title={isExpanded ? '收起具体任务' : '展开查看具体任务'}
+                  >
+                    {isExpanded ? (
+                      <ChevronDown size={16} />
+                    ) : (
+                      <ChevronRight size={16} />
+                    )}
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -407,8 +449,9 @@ export const PomodoroTasksTab: React.FC<PomodoroTasksTabProps> = ({
                 </div>
               </div>
 
-              {/* 任务集下的小任务列表 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* 任务集下的小任务列表（仅在展开时显示） */}
+              {isExpanded && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {groupTasks.map((task) => {
                   const isCurrentActive = activeTaskId === task.id;
                   const catMeta = CATEGORIES.find((c) => c.key === task.category) || CATEGORIES[0];
@@ -637,6 +680,7 @@ export const PomodoroTasksTab: React.FC<PomodoroTasksTabProps> = ({
                   </div>
                 )}
               </div>
+              )}
             </div>
           );
         })}
