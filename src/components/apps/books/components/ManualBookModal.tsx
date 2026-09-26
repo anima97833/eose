@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, BookPlus, MapPin, Check, Plus } from 'lucide-react';
 import { PhysicalBookRecord, ReadingStatus } from '../../../../core/books/bookTypes';
 import { getSavedPhysicalLocations, savePhysicalLocation } from '../../../../core/books/bookStorage';
+import { generateFallbackBookCover } from '../../../../core/books/bookApi';
 import { NM } from '../bookNeumorphism';
 
 interface ManualBookModalProps {
@@ -23,7 +24,7 @@ export const ManualBookModal: React.FC<ManualBookModalProps> = ({
   const [price, setPrice] = useState('39.00');
   const [isbn, setIsbn] = useState('');
   const [category, setCategory] = useState('文学');
-  const [pageCount, setPageCount] = useState(280);
+  const [pageCount, setPageCount] = useState<number>(200);
   const [status, setStatus] = useState<ReadingStatus>('unread');
   
   // 书架位置管理
@@ -62,15 +63,20 @@ export const ManualBookModal: React.FC<ManualBookModalProps> = ({
         : `¥${price.trim()}`
       : '¥39.00';
 
+    const safeTitle = title.trim();
+    const safeAuthor = author.trim() || '佚名';
+    const parsedPages = Math.max(1, Number(pageCount) || 240);
+
     const newBook: PhysicalBookRecord = {
       id: `b_manual_${Date.now()}`,
       isbn: cleanIsbn,
-      title: title.trim(),
-      author: author.trim() || '佚名',
+      title: safeTitle,
+      author: safeAuthor,
       publisher: publisher.trim() || '待补充出版社',
       category: category || '藏书',
-      pageCount: Number(pageCount) || 280,
-      currentPage: status === 'read' ? (Number(pageCount) || 280) : 0,
+      coverUrl: generateFallbackBookCover(safeTitle, safeAuthor),
+      pageCount: parsedPages,
+      currentPage: status === 'read' ? parsedPages : 0,
       status,
       physicalLocation: location || '未归位',
       price: cleanPrice,

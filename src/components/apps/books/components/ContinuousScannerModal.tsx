@@ -10,7 +10,7 @@ import {
   decodeBarcodeFromFile,
   normalizeISBN,
 } from '../../../../core/books/scannerEngine';
-import { fetchBookByISBN } from '../../../../core/books/bookApi';
+import { fetchBookByISBN, generateFallbackBookCover } from '../../../../core/books/bookApi';
 import {
   getSavedPhysicalLocations,
   savePhysicalLocation,
@@ -105,17 +105,21 @@ export const ContinuousScannerModal: React.FC<ContinuousScannerModalProps> = ({
 
     try {
       const meta = await fetchBookByISBN(cleanIsbn);
+      const resolvedTitle = meta.title || `图书 ${cleanIsbn}`;
+      const resolvedAuthor = meta.author || '佚名';
+      const resolvedCover = meta.coverUrl || generateFallbackBookCover(resolvedTitle, resolvedAuthor);
+
       const newBook: PhysicalBookRecord = {
         id: `b_${cleanIsbn}_${Date.now()}`,
         isbn: cleanIsbn,
-        title: meta.title || `图书 ${cleanIsbn}`,
+        title: resolvedTitle,
         subtitle: meta.subtitle,
-        author: meta.author || '佚名',
+        author: resolvedAuthor,
         publisher: meta.publisher || '待补充出版社',
         pubDate: meta.pubDate,
         price: meta.price || '¥39.00',
-        coverUrl: meta.coverUrl,
-        pageCount: meta.pageCount || 280,
+        coverUrl: resolvedCover,
+        pageCount: meta.pageCount && meta.pageCount > 0 ? meta.pageCount : 240,
         currentPage: 0,
         status: 'unread',
         physicalLocation: currentLocation,
@@ -800,16 +804,20 @@ export const ContinuousScannerModal: React.FC<ContinuousScannerModalProps> = ({
                     overflow: 'hidden',
                     flexShrink: 0,
                     boxShadow: NM.insetXs,
+                    position: 'relative',
                   }}
                 >
-                  {b.coverUrl && (
-                    <img
-                      src={b.coverUrl}
-                      alt={b.title}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => ((e.currentTarget as HTMLElement).style.display = 'none')}
-                    />
-                  )}
+                  <img
+                    src={b.coverUrl || generateFallbackBookCover(b.title, b.author)}
+                    alt={b.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      const fallback = generateFallbackBookCover(b.title, b.author);
+                      if (e.currentTarget.src !== fallback) {
+                        e.currentTarget.src = fallback;
+                      }
+                    }}
+                  />
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -826,7 +834,7 @@ export const ContinuousScannerModal: React.FC<ContinuousScannerModalProps> = ({
                     {b.title}
                   </div>
                   <div style={{ fontSize: '0.72rem', color: NM.textSub, marginTop: 2 }}>
-                    {b.author} · {b.price} · 放于 <b style={{ color: NM.primaryDark }}>{b.physicalLocation}</b>
+                    {b.author} · {b.pageCount}页 · {b.price} · 放于 <b style={{ color: NM.primaryDark }}>{b.physicalLocation}</b>
                   </div>
                 </div>
 

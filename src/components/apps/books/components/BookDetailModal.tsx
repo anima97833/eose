@@ -8,6 +8,7 @@ import {
   deletePhysicalLocation,
 } from '../../../../core/books/bookStorage';
 import { NM } from '../bookNeumorphism';
+import { generateFallbackBookCover } from '../../../../core/books/bookApi';
 import { LocationManagerModal } from './LocationManagerModal';
 import { Settings } from 'lucide-react';
 
@@ -34,7 +35,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   const [isEditingInfo, setIsEditingInfo] = useState<boolean>(false);
 
   const [currentPage, setCurrentPage] = useState<number>(book.currentPage || 0);
-  const [pageCount, setPageCount] = useState<number>(book.pageCount || 280);
+  const [pageCount, setPageCount] = useState<number>(book.pageCount && book.pageCount > 0 ? book.pageCount : 200);
   const [status, setStatus] = useState<ReadingStatus>(book.status || 'unread');
   const [rating, setRating] = useState<number>(book.rating || 5);
   const [physicalLocation, setPhysicalLocation] = useState<string>(book.physicalLocation || '客厅书柜A1');
@@ -267,14 +268,17 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                   zIndex: 2,
                 }}
               />
-              {book.coverUrl && (
-                <img
-                  src={book.coverUrl}
-                  alt={book.title}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={(e) => ((e.currentTarget as HTMLElement).style.display = 'none')}
-                />
-              )}
+              <img
+                src={book.coverUrl || generateFallbackBookCover(title || book.title, author || book.author)}
+                alt={book.title}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => {
+                  const fallback = generateFallbackBookCover(title || book.title, author || book.author);
+                  if (e.currentTarget.src !== fallback) {
+                    e.currentTarget.src = fallback;
+                  }
+                }}
+              />
             </div>
 
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -332,8 +336,14 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                     {publisher || book.publisher} {book.pubDate ? `· ${book.pubDate}` : ''}
                   </div>
 
-                  <div style={{ fontSize: '0.84rem', color: NM.primaryDark, marginTop: 4, fontWeight: 700 }}>
-                    定价：{price || book.price || '¥39.00'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 5, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.84rem', color: NM.primaryDark, fontWeight: 700 }}>
+                      定价：{price || book.price || '¥39.00'}
+                    </span>
+                    <span style={{ fontSize: '0.74rem', color: NM.textMuted }}>·</span>
+                    <span style={{ fontSize: '0.82rem', color: NM.textSub, fontWeight: 700 }}>
+                      全书共 {pageCount} 页
+                    </span>
                   </div>
                 </>
               ) : (
@@ -412,30 +422,64 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 价格/定价编辑 */}
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: NM.textSub, marginBottom: 2 }}>
-                      定价 / 藏书估值
-                    </label>
-                    <input
-                      type="text"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      placeholder="如 ¥45.00 或 45"
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '5px 8px',
-                        borderRadius: 8,
-                        border: NM.borderSoft,
-                        backgroundColor: NM.bgInset,
-                        boxShadow: NM.insetXs,
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        color: NM.primaryDark,
-                        outline: 'none',
-                      }}
-                    />
+                  {/* 价格与总页数编辑 (支持自定义) */}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: NM.textSub, marginBottom: 2 }}>
+                        定价 / 估值
+                      </label>
+                      <input
+                        type="text"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        placeholder="如 ¥45.00"
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '5px 8px',
+                          borderRadius: 8,
+                          border: NM.borderSoft,
+                          backgroundColor: NM.bgInset,
+                          boxShadow: NM.insetXs,
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          color: NM.primaryDark,
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: NM.textSub, marginBottom: 2 }}>
+                        书籍总页数 (自定义)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={9999}
+                        value={pageCount}
+                        onChange={(e) => {
+                          const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+                          setPageCount(val);
+                          if (currentPage > val) {
+                            setCurrentPage(val);
+                          }
+                        }}
+                        placeholder="如 320"
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '5px 8px',
+                          borderRadius: 8,
+                          border: NM.borderSoft,
+                          backgroundColor: NM.bgInset,
+                          boxShadow: NM.insetXs,
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          color: NM.textMain,
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
@@ -572,97 +616,202 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
             </div>
           </div>
 
-          {/* 2. 阅读进度调节器（内凹槽轻拟物滑尺与步进按键） */}
-          <div
-            style={{
-              backgroundColor: NM.cardBg,
-              boxShadow: NM.convexSm,
-              border: NM.borderLight,
-              borderRadius: 20,
-              padding: '14px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: NM.textMain }}>
-                阅读进度
-              </span>
-              <span style={{ fontSize: '0.86rem', fontWeight: 800, color: NM.primaryDark }}>
-                {currentPage} / {pageCount} 页 ({percent}%)
-              </span>
-            </div>
-
-            {/* 滑动调节尺 */}
-            <input
-              type="range"
-              min={0}
-              max={pageCount}
-              value={currentPage}
-              onChange={(e) => handlePageChange(Number(e.target.value))}
+          {/* 2. 阅读进度调节器（如果书目为“想读”，则不出现阅读进度；如果在读或已读，才出现阅读进度） */}
+          {status === 'unread' ? (
+            <div
               style={{
-                width: '100%',
-                accentColor: NM.primary,
-                cursor: 'pointer',
+                backgroundColor: NM.cardBg,
+                boxShadow: NM.convexSm,
+                border: NM.borderLight,
+                borderRadius: 20,
+                padding: '14px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
               }}
-            />
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 12,
+                    backgroundColor: NM.bgInset,
+                    boxShadow: NM.insetXs,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: NM.primaryDark,
+                    flexShrink: 0,
+                  }}
+                >
+                  <Clock size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 700, color: NM.textMain }}>
+                    当前处于「想读」心愿单
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: NM.textSub, marginTop: 2 }}>
+                    暂无阅读进度 · 切换为在读后将开启页码记录
+                  </div>
+                </div>
+              </div>
 
-            {/* 步进触觉按键 */}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 type="button"
-                onClick={() => handlePageChange(currentPage - 10)}
+                onClick={() => {
+                  setStatus('reading');
+                  if (currentPage === 0) setCurrentPage(1);
+                }}
                 style={{
-                  padding: '5px 12px',
-                  borderRadius: 10,
-                  border: NM.borderLight,
-                  backgroundColor: NM.cardBg,
-                  boxShadow: NM.convexXs,
-                  color: NM.textSub,
-                  fontSize: '0.74rem',
-                  fontWeight: 600,
+                  padding: '7px 14px',
+                  borderRadius: 12,
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                  color: '#FFFFFF',
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  boxShadow: '0 2px 6px rgba(217, 119, 6, 0.3)',
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  flexShrink: 0,
                 }}
               >
-                -10页
-              </button>
-              <button
-                type="button"
-                onClick={() => handlePageChange(currentPage + 10)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: 10,
-                  border: NM.borderLight,
-                  backgroundColor: NM.cardBg,
-                  boxShadow: NM.convexXs,
-                  color: NM.textSub,
-                  fontSize: '0.74rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                +10页
-              </button>
-              <button
-                type="button"
-                onClick={() => handlePageChange(currentPage + 50)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: 10,
-                  border: NM.borderLight,
-                  backgroundColor: NM.cardBg,
-                  boxShadow: NM.convexXs,
-                  color: NM.textSub,
-                  fontSize: '0.74rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                +50页
+                <BookOpen size={13} />
+                <span>开启在读</span>
               </button>
             </div>
-          </div>
+          ) : (
+            <div
+              style={{
+                backgroundColor: NM.cardBg,
+                boxShadow: NM.convexSm,
+                border: NM.borderLight,
+                borderRadius: 20,
+                padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: NM.textMain }}>
+                  阅读进度
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: '0.86rem', fontWeight: 800, color: NM.primaryDark }}>
+                    {currentPage}
+                  </span>
+                  <span style={{ fontSize: '0.82rem', color: NM.textSub, fontWeight: 700 }}>/</span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <input
+                      type="number"
+                      min={1}
+                      max={9999}
+                      value={pageCount}
+                      onChange={(e) => {
+                        const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+                        setPageCount(val);
+                        if (currentPage > val) {
+                          setCurrentPage(val);
+                        }
+                      }}
+                      title="点击直接自定义修改全书总页数"
+                      style={{
+                        width: 52,
+                        padding: '2px 4px',
+                        borderRadius: 6,
+                        border: NM.borderSoft,
+                        backgroundColor: NM.bgInset,
+                        boxShadow: NM.insetXs,
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        color: NM.primaryDark,
+                        textAlign: 'center',
+                        outline: 'none',
+                      }}
+                    />
+                    <span style={{ fontSize: '0.78rem', color: NM.textSub, fontWeight: 600 }}>页</span>
+                  </div>
+                  <span style={{ fontSize: '0.76rem', color: NM.textMuted, fontWeight: 600 }}>
+                    ({percent}%)
+                  </span>
+                </div>
+              </div>
+
+              {/* 滑动调节尺 */}
+              <input
+                type="range"
+                min={0}
+                max={pageCount}
+                value={currentPage}
+                onChange={(e) => handlePageChange(Number(e.target.value))}
+                style={{
+                  width: '100%',
+                  accentColor: NM.primary,
+                  cursor: 'pointer',
+                }}
+              />
+
+              {/* 步进触觉按键 */}
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(currentPage - 10)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 10,
+                    border: NM.borderLight,
+                    backgroundColor: NM.cardBg,
+                    boxShadow: NM.convexXs,
+                    color: NM.textSub,
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  -10页
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(currentPage + 10)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 10,
+                    border: NM.borderLight,
+                    backgroundColor: NM.cardBg,
+                    boxShadow: NM.convexXs,
+                    color: NM.textSub,
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  +10页
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(currentPage + 50)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 10,
+                    border: NM.borderLight,
+                    backgroundColor: NM.cardBg,
+                    boxShadow: NM.convexXs,
+                    color: NM.textSub,
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  +50页
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* 3. 物理存放书架位置标记 */}
           <div

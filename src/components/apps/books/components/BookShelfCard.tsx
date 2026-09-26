@@ -1,6 +1,7 @@
 import React from 'react';
 import { MapPin, BookOpen, CheckCircle2, Clock, Plus, Minus } from 'lucide-react';
 import { PhysicalBookRecord } from '../../../../core/books/bookTypes';
+import { generateFallbackBookCover } from '../../../../core/books/bookApi';
 import { NM } from '../bookNeumorphism';
 
 interface BookShelfCardProps {
@@ -75,33 +76,21 @@ export const BookShelfCard: React.FC<BookShelfCardProps> = ({
           }}
         />
 
-        {book.coverUrl ? (
-          <img
-            src={book.coverUrl}
-            alt={book.title}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
-            onError={(e) => {
-              (e.currentTarget as HTMLElement).style.display = 'none';
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              padding: '8px',
-              textAlign: 'center',
-              fontSize: '0.74rem',
-              fontWeight: 700,
-              color: NM.textSub,
-              lineHeight: 1.3,
-            }}
-          >
-            {book.title}
-          </div>
-        )}
+        <img
+          src={book.coverUrl || generateFallbackBookCover(book.title, book.author)}
+          alt={book.title}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+          onError={(e) => {
+            const fallback = generateFallbackBookCover(book.title, book.author);
+            if (e.currentTarget.src !== fallback) {
+              e.currentTarget.src = fallback;
+            }
+          }}
+        />
       </div>
 
       {/* 右侧书本信息与物理位置 */}
@@ -191,7 +180,7 @@ export const BookShelfCard: React.FC<BookShelfCardProps> = ({
                 }}
               >
                 <Clock size={11} />
-                <span>待读</span>
+                <span>想读</span>
               </span>
             )}
           </div>
@@ -259,107 +248,109 @@ export const BookShelfCard: React.FC<BookShelfCardProps> = ({
           </div>
         </div>
 
-        {/* 底部阅读进度指示条（内凹槽轻拟物） */}
-        <div style={{ marginTop: 8 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '0.7rem',
-              color: NM.textSub,
-              marginBottom: 4,
-            }}
-          >
-            <span>
-              {book.currentPage} / {book.pageCount} 页
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {/* 微调步进按钮 */}
-              <div style={{ display: 'flex', gap: 3 }}>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUpdateProgress(book, -5);
-                  }}
-                  title="退5页"
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: '50%',
-                    border: NM.borderLight,
-                    backgroundColor: NM.cardBg,
-                    boxShadow: NM.convexXs,
-                    color: NM.textSub,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    padding: 0,
-                  }}
-                >
-                  <Minus size={9} />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUpdateProgress(book, 5);
-                  }}
-                  title="进5页"
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: '50%',
-                    border: NM.borderLight,
-                    backgroundColor: NM.cardBg,
-                    boxShadow: NM.convexXs,
-                    color: NM.textSub,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    padding: 0,
-                  }}
-                >
-                  <Plus size={9} />
-                </button>
-              </div>
-
-              <span style={{ fontWeight: 700, color: isCompleted ? NM.emerald : NM.primary }}>
-                {percent}%
-              </span>
-            </div>
-          </div>
-
-          {/* 内凹雕刻进度槽 */}
-          <div
-            style={{
-              width: '100%',
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: NM.bgInset,
-              boxShadow: NM.insetXs,
-              overflow: 'hidden',
-            }}
-          >
+        {/* 底部阅读进度指示条（如果书目为“想读”，则不出现阅读进度；在读或已读才出现） */}
+        {book.status !== 'unread' && (
+          <div style={{ marginTop: 8 }}>
             <div
               style={{
-                height: '100%',
-                width: `${percent}%`,
-                borderRadius: 3,
-                background: isCompleted
-                  ? 'linear-gradient(90deg, #34D399 0%, #10B981 100%)'
-                  : 'linear-gradient(90deg, #FBBF24 0%, #D97706 100%)',
-                boxShadow: isCompleted
-                  ? '0 1px 3px rgba(16, 185, 129, 0.4)'
-                  : '0 1px 3px rgba(217, 119, 6, 0.4)',
-                transition: 'width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.7rem',
+                color: NM.textSub,
+                marginBottom: 4,
               }}
-            />
+            >
+              <span>
+                {book.currentPage} / {book.pageCount} 页
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {/* 微调步进按钮 */}
+                <div style={{ display: 'flex', gap: 3 }}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUpdateProgress(book, -5);
+                    }}
+                    title="退5页"
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: '50%',
+                      border: NM.borderLight,
+                      backgroundColor: NM.cardBg,
+                      boxShadow: NM.convexXs,
+                      color: NM.textSub,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                  >
+                    <Minus size={9} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUpdateProgress(book, 5);
+                    }}
+                    title="进5页"
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: '50%',
+                      border: NM.borderLight,
+                      backgroundColor: NM.cardBg,
+                      boxShadow: NM.convexXs,
+                      color: NM.textSub,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                  >
+                    <Plus size={9} />
+                  </button>
+                </div>
+
+                <span style={{ fontWeight: 700, color: isCompleted ? NM.emerald : NM.primary }}>
+                  {percent}%
+                </span>
+              </div>
+            </div>
+
+            {/* 内凹雕刻进度槽 */}
+            <div
+              style={{
+                width: '100%',
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: NM.bgInset,
+                boxShadow: NM.insetXs,
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  width: `${percent}%`,
+                  borderRadius: 3,
+                  background: isCompleted
+                    ? 'linear-gradient(90deg, #34D399 0%, #10B981 100%)'
+                    : 'linear-gradient(90deg, #FBBF24 0%, #D97706 100%)',
+                  boxShadow: isCompleted
+                    ? '0 1px 3px rgba(16, 185, 129, 0.4)'
+                    : '0 1px 3px rgba(217, 119, 6, 0.4)',
+                  transition: 'width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                }}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
