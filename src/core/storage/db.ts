@@ -66,6 +66,8 @@ export interface PomodoroTaskRecord {
   difficulty?: 'easy' | 'normal' | 'hard' | 'expert';
   focusDurationMinutes?: number; // 任务专属单次专注时长 (分钟)
   timerType?: 'countdown' | 'countup'; // 计时模式：倒计时 或 正向计时
+  groupId?: string; // 任务大类（任务集）ID
+  groupTitle?: string; // 任务大类名称
 }
 
 export interface BrowserHistoryRecord {

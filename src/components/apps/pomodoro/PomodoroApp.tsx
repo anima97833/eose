@@ -149,18 +149,15 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
     }
   };
 
-  // 退出或停止倒计时时处理白噪音
+  // 确保当 ambientNoise 为 off 或组件卸载时彻底停止白噪音
   useEffect(() => {
-    if (!isRunning && ambientNoise !== 'off') {
-      // 专注暂停时保持静音，专注运行时恢复
+    if (ambientNoise === 'off') {
       stopAmbientNoise();
-    } else if (isRunning && ambientNoise !== 'off') {
-      startAmbientNoise(ambientNoise);
     }
     return () => {
       stopAmbientNoise();
     };
-  }, [isRunning, ambientNoise]);
+  }, [ambientNoise]);
 
   const [rpgNotice, setRpgNotice] = useState<string | null>(null);
 
@@ -221,7 +218,9 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
       // 后台 RPG 区间随机结算
       try {
         const settle = settlePomodoroFocus(activeTask?.difficulty, activeTask?.targetAttr);
-        if (settle.leveledUp) {
+        if (activeTask) {
+          showRpgNotice(`🎉 专注达成！任务「${activeTask.title}」已自动勾选`);
+        } else if (settle.leveledUp) {
           showRpgNotice('角色升级');
         } else if (settle.clearedDebuff) {
           showRpgNotice('拖延已破除');
@@ -337,7 +336,9 @@ export const PomodoroApp: React.FC<PomodoroAppProps> = ({ onBack }) => {
     // 后台 RPG 区间奖励结算
     try {
       const settle = settlePomodoroFocus(activeTask?.difficulty, activeTask?.targetAttr);
-      if (settle.leveledUp) {
+      if (activeTask) {
+        showRpgNotice(`🎉 专注达成！任务「${activeTask.title}」已自动勾选`);
+      } else if (settle.leveledUp) {
         showRpgNotice('角色升级');
       } else if (settle.clearedDebuff) {
         showRpgNotice('拖延已破除');

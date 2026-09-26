@@ -85,39 +85,70 @@ export function playClickSound(): void {
   }
 }
 
-// 3. 停止当前白噪音伴奏
+let activeSources: { stop?: () => void; disconnect: () => void }[] = [];
+
+// 3. 彻底立即停止当前白噪音伴奏
 export function stopAmbientNoise(): void {
   if (clockTimerId !== null) {
     window.clearInterval(clockTimerId);
     clockTimerId = null;
   }
 
-  if (currentNoiseGain && audioCtx) {
+  // 1. 立即停止并断开所有已注册的音源节点
+  for (const src of activeSources) {
     try {
-      const now = audioCtx.currentTime;
-      currentNoiseGain.gain.linearRampToValueAtTime(0.001, now + 0.3);
-      setTimeout(() => {
-        if (currentNoiseSource) {
-          (currentNoiseSource as any).stop?.();
-          currentNoiseSource.disconnect();
-          currentNoiseSource = null;
-        }
-        currentNoiseGain = null;
-      }, 350);
+      if (typeof src.stop === 'function') {
+        src.stop();
+      }
     } catch {
-      currentNoiseGain = null;
-      currentNoiseSource = null;
+      // 某些节点可能已结束
     }
+    try {
+      src.disconnect();
+    } catch {
+      // ignore
+    }
+  }
+  activeSources = [];
+
+  // 2. 立即将当前增益设为0并断开
+  if (currentNoiseGain) {
+    try {
+      currentNoiseGain.gain.cancelScheduledValues(0);
+      currentNoiseGain.gain.setValueAtTime(0, 0);
+      currentNoiseGain.disconnect();
+    } catch {
+      // ignore
+    }
+    currentNoiseGain = null;
+  }
+
+  if (currentNoiseSource) {
+    try {
+      (currentNoiseSource as any).stop?.();
+    } catch {
+      // ignore
+    }
+    try {
+      currentNoiseSource.disconnect();
+    } catch {
+      // ignore
+    }
+    currentNoiseSource = null;
   }
 }
 
 // 4. 播放沉浸式白噪音 ('rain' | 'clock' | 'cafe' | 'off')
 export function startAmbientNoise(type: 'rain' | 'clock' | 'cafe' | 'off'): void {
+  // 先无条件彻底停止所有在响的声音
   stopAmbientNoise();
   if (type === 'off') return;
 
   try {
     const ctx = getAudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
     const bufferSize = ctx.sampleRate * 2;
     const now = ctx.currentTime;
 
@@ -149,7 +180,7 @@ export function startAmbientNoise(type: 'rain' | 'clock' | 'cafe' | 'off'): void
 
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.18, now + 1.2);
+      gain.gain.linearRampToValueAtTime(0.18, now + 0.3);
 
       whiteNoise.connect(filter);
       filter.connect(gain);
@@ -158,6 +189,7 @@ export function startAmbientNoise(type: 'rain' | 'clock' | 'cafe' | 'off'): void
       whiteNoise.start();
       currentNoiseSource = whiteNoise;
       currentNoiseGain = gain;
+      activeSources.push(whiteNoise);
     } else if (type === 'cafe') {
       // 咖啡馆低频暖白噪音
       const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -177,7 +209,7 @@ export function startAmbientNoise(type: 'rain' | 'clock' | 'cafe' | 'off'): void
 
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.22, now + 1.2);
+      gain.gain.linearRampToValueAtTime(0.22, now + 0.3);
 
       noise.connect(filter);
       filter.connect(gain);
@@ -186,6 +218,7 @@ export function startAmbientNoise(type: 'rain' | 'clock' | 'cafe' | 'off'): void
       noise.start();
       currentNoiseSource = noise;
       currentNoiseGain = gain;
+      activeSources.push(noise);
     } else if (type === 'clock') {
       // 经典机械钟表滴答声（每秒脉冲）
       const playTick = () => {

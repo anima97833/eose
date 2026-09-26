@@ -1,11 +1,81 @@
 import { db, PomodoroSessionRecord, PomodoroTaskRecord } from '../../../core/storage/db';
 
+export interface PomodoroTaskGroup {
+  id: string;
+  title: string;
+  color: string;
+  createdAt: number;
+}
+
+export const DEFAULT_TASK_GROUPS: PomodoroTaskGroup[] = [
+  { id: 'group_work', title: '日常工作攻坚', color: '#5096C6', createdAt: 1000 },
+  { id: 'group_growth', title: '个人自我提升', color: '#4E937A', createdAt: 2000 },
+];
+
+export function getPomodoroTaskGroups(): PomodoroTaskGroup[] {
+  try {
+    const raw = localStorage.getItem('pomodoro_task_groups');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  localStorage.setItem('pomodoro_task_groups', JSON.stringify(DEFAULT_TASK_GROUPS));
+  return DEFAULT_TASK_GROUPS;
+}
+
+export function savePomodoroTaskGroup(title: string, color?: string): PomodoroTaskGroup {
+  const groups = getPomodoroTaskGroups();
+  const newGroup: PomodoroTaskGroup = {
+    id: `group_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    title: title.trim(),
+    color: color || '#5096C6',
+    createdAt: Date.now(),
+  };
+  const updated = [...groups, newGroup];
+  localStorage.setItem('pomodoro_task_groups', JSON.stringify(updated));
+  return newGroup;
+}
+
+export async function deletePomodoroTaskGroup(groupId: string): Promise<void> {
+  const groups = getPomodoroTaskGroups();
+  const filtered = groups.filter((g) => g.id !== groupId);
+  const fallback = filtered.length > 0 ? filtered : DEFAULT_TASK_GROUPS;
+  localStorage.setItem('pomodoro_task_groups', JSON.stringify(fallback));
+
+  // 将被删除组的任务迁移到 fallback 组
+  const targetGroup = fallback[0];
+  const allTasks = await db.pomodoro_tasks.toArray();
+  for (const t of allTasks) {
+    if (t.groupId === groupId) {
+      t.groupId = targetGroup.id;
+      t.groupTitle = targetGroup.title;
+      await db.pomodoro_tasks.put(t);
+    }
+  }
+}
+
+export async function moveTaskToGroup(taskId: string, targetGroupId: string, targetGroupTitle: string): Promise<void> {
+  const task = await db.pomodoro_tasks.get(taskId);
+  if (task) {
+    task.groupId = targetGroupId;
+    task.groupTitle = targetGroupTitle;
+    await db.pomodoro_tasks.put(task);
+  }
+}
+
 export const DEFAULT_POMODORO_TASKS: PomodoroTaskRecord[] = [
   {
     id: 'task_default_1',
     title: '完成《轻拟物UI设计规范稿》',
     category: 'work',
     categoryLabel: '工作',
+    groupId: 'group_work',
+    groupTitle: '日常工作攻坚',
     estimatedPoms: 4,
     completedPoms: 2,
     isCompleted: false,
@@ -16,6 +86,8 @@ export const DEFAULT_POMODORO_TASKS: PomodoroTaskRecord[] = [
     title: '阅读《思考，快与慢》30分钟',
     category: 'read',
     categoryLabel: '阅读',
+    groupId: 'group_growth',
+    groupTitle: '个人自我提升',
     estimatedPoms: 2,
     completedPoms: 1,
     isCompleted: false,
@@ -26,6 +98,8 @@ export const DEFAULT_POMODORO_TASKS: PomodoroTaskRecord[] = [
     title: 'TypeScript 高阶架构与沙盒学习',
     category: 'study',
     categoryLabel: '学习',
+    groupId: 'group_growth',
+    groupTitle: '个人自我提升',
     estimatedPoms: 3,
     completedPoms: 3,
     isCompleted: true,
@@ -35,14 +109,28 @@ export const DEFAULT_POMODORO_TASKS: PomodoroTaskRecord[] = [
 
 export async function initPomodoroTasksIfEmpty(): Promise<PomodoroTaskRecord[]> {
   try {
+    const groups = getPomodoroTaskGroups();
+    const defaultGroup = groups[0] || DEFAULT_TASK_GROUPS[0];
     const list = await db.pomodoro_tasks.toArray();
+
     if (!list || list.length === 0) {
       for (const t of DEFAULT_POMODORO_TASKS) {
         await db.pomodoro_tasks.put(t);
       }
       return DEFAULT_POMODORO_TASKS;
     }
-    return list;
+
+    // 平滑升级：如果已有任务缺少 groupId，自动赋予默认大类
+    let hasMigration = false;
+    for (const t of list) {
+      if (!t.groupId) {
+        t.groupId = defaultGroup.id;
+        t.groupTitle = defaultGroup.title;
+        await db.pomodoro_tasks.put(t);
+        hasMigration = true;
+      }
+    }
+    return hasMigration ? await db.pomodoro_tasks.toArray() : list;
   } catch (err) {
     console.error('Failed to init tasks:', err);
     return DEFAULT_POMODORO_TASKS;
@@ -57,14 +145,13 @@ export async function recordPomodoroSession(session: Omit<PomodoroSessionRecord,
     };
     await db.pomodoro_sessions.put(record);
 
-    // 如果关联了任务且完成了专注阶段，自动为任务累计番茄数
+    // 如果关联了任务且完成了专注阶段，系统自动为任务累计番茄数并自动完成勾选！
     if (session.taskId && session.isCompleted && session.mode === 'focus') {
       const task = await db.pomodoro_tasks.get(session.taskId);
       if (task) {
         task.completedPoms += 1;
-        if (task.completedPoms >= task.estimatedPoms) {
-          task.isCompleted = true;
-        }
+        // 需求2：任务清单条目左侧的勾选，应该由用户真的完成计时后，系统自动勾选
+        task.isCompleted = true;
         await db.pomodoro_tasks.put(task);
       }
     }
