@@ -162,11 +162,11 @@ export const TaskPoolSyncModal: React.FC<TaskPoolSyncModalProps> = ({
                         fontWeight: 800,
                         padding: '1px 6px',
                         borderRadius: 6,
-                        background: t.source === 'pomodoro' ? '#FEE2E2' : '#E0F2FE',
-                        color: t.source === 'pomodoro' ? '#B91C1C' : '#0369A1',
+                        background: '#E0F2FE',
+                        color: '#0369A1',
                       }}
                     >
-                      {t.source === 'pomodoro' ? '🍅 番茄钟' : '🌌 世界线'}
+                      🌌 世界线
                     </span>
                     {t.desc && (
                       <span

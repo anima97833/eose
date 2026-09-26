@@ -175,23 +175,6 @@ const WORD_PHRASES = [
   (w: string, cnt: number) => `【生词封印】将“${w}”打入熟练掌握区，今晚的生词怪清缴任务就靠你了！`,
 ];
 
-const POMODORO_PHRASES = [
-  '【精力满溢】蓝条已满，开启25分钟专注结界，回蓝冥想刷大招！',
-  '【闭关修炼】开启专注结界！拒绝外界低维信息干扰，心流+999！',
-  '【心流领域展开】今日尚未开启专注法阵，快去注入25分钟神级专注力！',
-  '【回蓝时刻】脑力齿轮已就绪，点燃专注香炉，开启一段无敌心流！',
-  '【结界加护】开启25分钟专注防御罩，屏蔽一切杂音，悟性临时翻倍！',
-  '【修炼洞府】进入番茄钟洞府，打坐25分钟，将浮躁值彻底归零！',
-  '【心流暴击】当世界安静下来，你的产出将产生暴击，速启专注钟！',
-  '【灵气充能】耐力槽正在满格发光，开启专注结界，把杂事一扫而空！',
-  '【沉浸模式】进入深度潜行状态，用25分钟给今日进度条来一次大突进！',
-  '【专注光环】法力池充盈，现在展开专注结界可获得全属性专注加成！',
-  '【极意之境】万籁俱寂，是时候开启心流结界，给今天的难题致命一击！',
-  '【神级专注】专注时钟已上膛，点下开始键，进入属于你的绝对领域！',
-  '【心流护盾】外界杂念正在逼近，快缩进番茄结界里安心产出吧！',
-  '【道心稳固】25分钟弹指一挥间，点亮专注番茄，收获沉甸甸的成就感！',
-];
-
 const MEMO_PHRASES = [
   '【篝火存盘】今日世界线剧情丰富，尚未生成每日存档，速去营地记录！',
   '【服务器维护前】地球Online今日副本行将结算，快去日记本保存剧情进度！',
@@ -464,34 +447,7 @@ export async function detectEarthOnlineNudge(force: boolean = false): Promise<Nu
     console.warn('[NudgeEngine] 检查爽文背词错题失败:', err);
   }
 
-  // 5. 搜集番茄钟专注结界候选
-  try {
-    if (!db.isOpen()) await db.open();
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    const todaySessions = await db.pomodoro_sessions
-      .where('completedAt')
-      .aboveOrEqual(todayStart.getTime())
-      .toArray();
-
-    if (todaySessions.length === 0) {
-      candidatePool.push({
-        id: `nudge_pomodoro_${Date.now()}`,
-        source: 'pomodoro',
-        tag: '地球Online · 心流结界',
-        icon: 'focus',
-        message: pickRandom(POMODORO_PHRASES),
-        targetAppId: 'pomodoro',
-        actionLabel: '去专注',
-        createdAt: Date.now(),
-      });
-    }
-  } catch (err) {
-    console.warn('[NudgeEngine] 检查番茄钟失败:', err);
-  }
-
-  // 6. 搜集手账日记存盘点候选
+  // 5. 搜集手账日记存盘点候选
   try {
     if (!db.isOpen()) await db.open();
     const chapters: MemoChapter[] = await db.memo_chapters.toArray();

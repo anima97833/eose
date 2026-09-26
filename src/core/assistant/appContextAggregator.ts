@@ -132,15 +132,6 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
     y: 20,
   },
   {
-    id: 'pomodoro',
-    name: '心流结界',
-    iconName: 'Clock',
-    themeColor: '#fb923c',
-    glowColor: 'rgba(251, 146, 60, 0.65)',
-    x: 76,
-    y: 36,
-  },
-  {
     id: 'cinema',
     name: '放映室',
     iconName: 'Film',
@@ -250,35 +241,6 @@ export async function aggregateSelectedStarsFacts(selectedStarIds: string[]): Pr
               title: m.word,
               detail: `被绊倒 ${m.wrongCount || 1} 次，等级 ${m.level || '生词'}。上次测试时间：${m.lastTestedAt ? new Date(m.lastTestedAt).toLocaleDateString() : '近期'}`,
               timestamp: m.lastTestedAt,
-            });
-          }
-          break;
-        }
-
-        case 'pomodoro': {
-          if (!db.isOpen()) await db.open();
-          const todayStart = new Date();
-          todayStart.setHours(0, 0, 0, 0);
-          const sessions = await db.pomodoro_sessions.where('completedAt').aboveOrEqual(todayStart.getTime()).toArray();
-          const tasks = await db.pomodoro_tasks.toArray();
-
-          const totalMins = sessions.reduce((acc, s) => acc + (s.durationMinutes || 25), 0);
-          allFacts.push({
-            sourceAppId: 'pomodoro',
-            sourceAppName: '心流番茄钟',
-            category: '今日专注',
-            title: '今日心流累计',
-            detail: `今日已完成 ${sessions.length} 个番茄结界，专注总时长约 ${totalMins} 分钟。`,
-          });
-
-          for (const t of tasks.slice(0, quotaPerApp - 1)) {
-            allFacts.push({
-              sourceAppId: 'pomodoro',
-              sourceAppName: '心流番茄钟',
-              category: '专注任务',
-              title: t.title,
-              detail: `分类：${t.categoryLabel || t.category}，目标 ${t.estimatedPoms} 番茄，已完成 ${t.completedPoms} 番茄 (${t.isCompleted ? '已完成' : '进行中'})`,
-              timestamp: t.createdAt,
             });
           }
           break;

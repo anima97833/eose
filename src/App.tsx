@@ -7,7 +7,6 @@ import { PlaceholderApp } from './components/apps/PlaceholderApp';
 import { CustomAppRunner } from './components/apps/custom/CustomAppRunner';
 import { AppStoreApp } from './components/apps/store/AppStoreApp';
 import { MemoriesApp } from './components/apps/memories/MemoriesApp';
-import { PomodoroApp } from './components/apps/pomodoro/PomodoroApp';
 import { BrowserApp } from './components/apps/browser/BrowserApp';
 import { ProfileApp } from './components/apps/profile/ProfileApp';
 import { MomentsApp } from './components/apps/moments/MomentsApp';
@@ -99,8 +98,6 @@ export const App: React.FC = () => {
             />
           ) : activeApp === 'memories' ? (
             <MemoriesApp onBack={() => setActiveApp(null)} />
-          ) : activeApp === 'pomodoro' ? (
-            <PomodoroApp onBack={() => setActiveApp(null)} />
           ) : activeApp === 'browser' ? (
             <BrowserApp onBack={() => setActiveApp(null)} />
           ) : activeApp === 'profile' ? (

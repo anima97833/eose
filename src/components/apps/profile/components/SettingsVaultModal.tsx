@@ -4,7 +4,7 @@ import {
   addVaultLog,
   calculateFreeDays,
 } from '../../../../core/rpg/vaultStorage';
-import { playClickSound } from '../../pomodoro/soundSynthesizer';
+import { playClickSound } from '../../../../core/audio/soundEffects';
 
 interface SettingsVaultModalProps {
   profile: RPGProfile;

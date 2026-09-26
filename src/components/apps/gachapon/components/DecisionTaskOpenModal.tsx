@@ -48,11 +48,7 @@ export const DecisionTaskOpenModal: React.FC<DecisionTaskOpenModalProps> = ({
   };
 
   const handleLaunchApp = () => {
-    if (task.source === 'pomodoro') {
-      onOpenApp?.('pomodoro');
-    } else {
-      onOpenApp?.('diary');
-    }
+    onOpenApp?.('diary');
   };
 
   return (
@@ -249,17 +245,8 @@ export const DecisionTaskOpenModal: React.FC<DecisionTaskOpenModalProps> = ({
                   boxShadow: `0 3px 0 ${palette.buttonBorder}`,
                 }}
               >
-                {task.source === 'pomodoro' ? (
-                  <>
-                    <Play size={16} fill="#FFFFFF" />
-                    <span>🍅 立即开启番茄专注</span>
-                  </>
-                ) : (
-                  <>
-                    <ExternalLink size={16} />
-                    <span>🌌 前往世界线手账打卡</span>
-                  </>
-                )}
+                <ExternalLink size={16} />
+                <span>🌌 前往世界线手账打卡</span>
               </button>
             )}
 

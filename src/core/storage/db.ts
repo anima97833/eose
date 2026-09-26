@@ -750,3 +750,19 @@ export class NeumorphicPhoneDatabase extends Dexie {
 }
 
 export const db = new NeumorphicPhoneDatabase();
+
+// 自动清理已卸载番茄钟的任务历史与白噪音/分组设置缓存
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.removeItem('cloudfly_pomodoro_settings_v1');
+    localStorage.removeItem('cloudfly_pomodoro_groups_v1');
+    db.open()
+      .then(() => {
+        if (db.pomodoro_sessions) db.pomodoro_sessions.clear().catch(() => {});
+        if (db.pomodoro_tasks) db.pomodoro_tasks.clear().catch(() => {});
+      })
+      .catch(() => {});
+  } catch {
+    // ignore
+  }
+}

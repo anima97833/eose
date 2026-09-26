@@ -1,5 +1,5 @@
 import { MOOD_FORTUNE_APP_HTML } from './presetApps/moodFortuneApp';
-import { CALCULATOR_APP_HTML, POMODORO_APP_HTML } from './presetApps/builtinApps';
+import { CALCULATOR_APP_HTML } from './presetApps/builtinApps';
 import { CustomAppMeta } from './types';
 import { saveInstalledCustomApps, listInstalledCustomApps } from './customAppRegistry';
 
@@ -165,19 +165,6 @@ export const DEFAULT_STORE_CATALOG: AppStoreItem[] = [
     isInstalled: true,
     isSystem: false,
     htmlContent: CALCULATOR_APP_HTML,
-  },
-  {
-    id: 'pomodoro',
-    name: '番茄钟',
-    version: '2.0.0',
-    category: 'life',
-    categoryLabel: '效率',
-    iconName: 'Clock',
-    description: '极简轻拟物专注计时、任务清单、白噪音与IndexedDB历史自动复盘。',
-    features: ['灵活自定义节奏 (50/10)', '任务清单与番茄数预计', 'WebAudio白噪音与风铃音', 'IndexedDB历史自动归档复盘', '底部Tab便捷切换'],
-    isInstalled: true,
-    isSystem: false,
-    htmlContent: POMODORO_APP_HTML,
   },
   {
     id: 'camera',

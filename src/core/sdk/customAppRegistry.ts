@@ -1,7 +1,7 @@
 import { CustomAppMeta } from './types';
 import { MOOD_FORTUNE_APP_HTML } from './presetApps/moodFortuneApp';
 
-import { CALCULATOR_APP_HTML, POMODORO_APP_HTML } from './presetApps/builtinApps';
+import { CALCULATOR_APP_HTML } from './presetApps/builtinApps';
 
 const STORAGE_KEY = 'neumorphic_phone_installed_custom_apps';
 
@@ -48,23 +48,6 @@ export const PRESET_CUSTOM_APPS: CustomAppMeta[] = [
     badgeCount: 0,
     installedAt: 1710000001000,
   },
-  {
-    id: 'pomodoro',
-    name: '番茄钟',
-    version: '2.0.0',
-    description: '极简轻拟物专注计时、任务清单、白噪音与IndexedDB历史自动复盘。',
-    icon: 'Clock',
-    htmlContent: POMODORO_APP_HTML,
-    manifest: {
-      id: 'pomodoro',
-      name: '番茄钟',
-      version: '2.0.0',
-      sdkVersion: '1.0',
-      permissions: ['ui.toast', 'notifications.write'],
-    },
-    badgeCount: 0,
-    installedAt: 1710000002000,
-  },
 ];
 
 export function listInstalledCustomApps(): CustomAppMeta[] {
@@ -74,10 +57,11 @@ export function listInstalledCustomApps(): CustomAppMeta[] {
     if (raw) {
       const parsed: CustomAppMeta[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // 自动同步官方预置微应用最新元数据与 HTML
-        let hasChanges = false;
+        // 自动剔除已下架的 pomodoro
+        const cleanList = parsed.filter(a => a.id !== 'pomodoro');
+        let hasChanges = cleanList.length !== parsed.length;
         for (const preset of PRESET_CUSTOM_APPS) {
-          const item = parsed.find(a => a.id === preset.id);
+          const item = cleanList.find(a => a.id === preset.id);
           if (item) {
             if (item.htmlContent !== preset.htmlContent || item.name !== preset.name || item.icon !== preset.icon) {
               item.htmlContent = preset.htmlContent;
@@ -89,9 +73,9 @@ export function listInstalledCustomApps(): CustomAppMeta[] {
           }
         }
         if (hasChanges) {
-          saveInstalledCustomApps(parsed);
+          saveInstalledCustomApps(cleanList);
         }
-        return parsed;
+        return cleanList;
       }
     }
   } catch {

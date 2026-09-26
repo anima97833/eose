@@ -21,7 +21,7 @@ const ARCADE_INIT_PAGE2_KEY = 'neumorphic_arcade_initial_page2_v1';
 export const DEFAULT_PAGE1_APPS = [
   'phone', 'assistant', 'diary', 'profile',
   'gachapon', 'memories', 'radio', 'storyword',
-  'books', 'poetry', 'calculator', 'pomodoro',
+  'books', 'poetry', 'calculator', 'camera',
   'cinema', 'games', 'memo', 'files'
 ];
 
@@ -100,14 +100,14 @@ export function loadDesktopLayout(): DesktopLayout {
       let rawPages: string[][] = [];
 
       if (Array.isArray(parsed.pages)) {
-        rawPages = parsed.pages.map((p: any) => (Array.isArray(p) ? p.filter(isAppValid) : []));
+        rawPages = parsed.pages.map((p: any) => (Array.isArray(p) ? p.filter((id: string) => isAppValid(id) && id !== 'pomodoro') : []));
       } else if (Array.isArray(parsed.page1) || Array.isArray(parsed.page2)) {
-        const p1 = (parsed.page1 || []).filter(isAppValid);
-        const p2 = (parsed.page2 || []).filter(isAppValid);
+        const p1 = (parsed.page1 || []).filter((id: string) => isAppValid(id) && id !== 'pomodoro');
+        const p2 = (parsed.page2 || []).filter((id: string) => isAppValid(id) && id !== 'pomodoro');
         rawPages = [p1, p2];
       }
 
-      const dock = Array.isArray(parsed.dock) ? parsed.dock.filter(isAppValid) : [...DEFAULT_DOCK_APPS];
+      const dock = Array.isArray(parsed.dock) ? parsed.dock.filter((id: string) => isAppValid(id) && id !== 'pomodoro') : [...DEFAULT_DOCK_APPS];
 
       // 检查是否有新安装但尚未编入桌面的应用
       const allPresent = new Set<string>();

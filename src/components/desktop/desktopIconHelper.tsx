@@ -51,7 +51,6 @@ export function getAppIcon(appId: string, size = 24): React.ReactNode {
     case 'appstore': return <ShoppingBag size={size} strokeWidth={2.2} />;
     case 'mood_fortune': return <BookOpen size={size} strokeWidth={2.2} />;
     case 'calculator': return <Calculator size={size} strokeWidth={2.2} />;
-    case 'pomodoro': return <Clock size={size} strokeWidth={2.2} />;
     case 'camera': return <Aperture size={size} strokeWidth={2.2} />;
     case 'radio': return <Radio size={size} strokeWidth={2.2} />;
     case 'arcade':
@@ -109,7 +108,6 @@ export function getAppTitle(appId: string): string {
     case 'appstore': return '应用商店';
     case 'mood_fortune': return '答案之书';
     case 'calculator': return '计算器';
-    case 'pomodoro': return '番茄钟';
     case 'camera': return '刻时';
     case 'radio': return '电台';
     case 'arcade':

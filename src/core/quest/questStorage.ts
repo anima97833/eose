@@ -98,7 +98,7 @@ export const DEFAULT_PRESET_QUESTS: QuestItem[] = [
     id: 'main_dungeon',
     category: 'main',
     title: '通关日常副本',
-    desc: '在番茄钟专注一个周期或完成一次心智深度聚焦',
+    desc: '静心阅读、放空冥想或沉浸创作片刻，享受无扰心流',
     icon: '⚔️',
     tag: '⚡ 精力',
     statKey: 'SPI',

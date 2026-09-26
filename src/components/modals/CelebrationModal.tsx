@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Sparkles, Award, CheckCircle2, ChevronRight, X } from 'lucide-react';
-import { playCompletionChime, playClickSound } from '../apps/pomodoro/soundSynthesizer';
+import { playCompletionChime, playClickSound } from '../../core/audio/soundEffects';
 
 export interface CelebrationModalProps {
   isOpen: boolean;
