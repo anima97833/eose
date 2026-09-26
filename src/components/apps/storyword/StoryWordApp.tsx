@@ -254,10 +254,10 @@ export const StoryWordApp: React.FC<StoryWordAppProps> = ({ onBack }) => {
           </div>
           <div>
             <div style={{ fontSize: '16px', fontWeight: 800, color: NM.textMain }}>
-              爽文背词
+              间词
             </div>
             <div style={{ fontSize: '11px', color: NM.textMuted }}>
-              网文剧情 · 互动通关 · 打脸背词
+              剧情阅读 · 随文遇词 · 互动记忆
             </div>
           </div>
         </div>

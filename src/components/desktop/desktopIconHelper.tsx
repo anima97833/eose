@@ -126,7 +126,7 @@ export function getAppTitle(appId: string): string {
     case 'poet': return '诗阁';
     case 'books':
     case 'bookvault': return '书藏';
-    case 'storyword': return '爽文背词';
+    case 'storyword': return '间词';
     case 'pocketpad': return 'Pocket Pad';
     case 'gachapon': return '扭蛋';
     case 'gamevault': return '游戏仓';

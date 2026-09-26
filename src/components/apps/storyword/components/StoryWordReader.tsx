@@ -453,7 +453,7 @@ export const StoryWordReader: React.FC<StoryWordReaderProps> = ({
                 }}
               >
                 <Sparkles size={13} />
-                <span>爽文背词 (双语)</span>
+                <span>间词 (双语)</span>
               </button>
 
               <button

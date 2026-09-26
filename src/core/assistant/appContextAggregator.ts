@@ -30,7 +30,7 @@ export const ALL_STAR_APPS: StarAppMeta[] = [
   },
   {
     id: 'storyword',
-    name: '爽文背词',
+    name: '间词',
     iconName: 'Zap',
     themeColor: '#facc15',
     glowColor: 'rgba(250, 204, 21, 0.65)',
@@ -245,7 +245,7 @@ export async function aggregateSelectedStarsFacts(selectedStarIds: string[]): Pr
           for (const m of unmastered.slice(0, quotaPerApp)) {
             allFacts.push({
               sourceAppId: 'storyword',
-              sourceAppName: '爽文背词',
+              sourceAppName: '间词',
               category: '错题高频生词',
               title: m.word,
               detail: `被绊倒 ${m.wrongCount || 1} 次，等级 ${m.level || '生词'}。上次测试时间：${m.lastTestedAt ? new Date(m.lastTestedAt).toLocaleDateString() : '近期'}`,

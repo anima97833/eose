@@ -450,7 +450,7 @@ export async function detectEarthOnlineNudge(force: boolean = false): Promise<Nu
         candidatePool.push({
           id: `nudge_word_${targetWord.id}_${Date.now()}`,
           source: 'word',
-          tag: '地球Online · 爽文背词',
+          tag: '地球Online · 间词',
           icon: 'word',
           message: msg,
           targetAppId: 'storyword',

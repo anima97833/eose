@@ -14,6 +14,7 @@ import {
   FileJson,
   HardDrive,
   ShieldAlert,
+  Zap,
 } from 'lucide-react';
 import {
   getDatabaseStats,
@@ -29,6 +30,7 @@ import {
   requestStoragePersistence,
   StorageAuditResult,
 } from '../../../core/storage/storagePersistence';
+import { runLocalStorageSlimming } from '../../../core/storage/localStorageMigrator';
 
 interface SecurityAppProps {
   onBack: () => void;
@@ -41,6 +43,7 @@ export const SecurityApp: React.FC<SecurityAppProps> = ({ onBack }) => {
   const [exporting, setExporting] = useState<boolean>(false);
   const [importing, setImporting] = useState<boolean>(false);
   const [requestingPersist, setRequestingPersist] = useState<boolean>(false);
+  const [slimming, setSlimming] = useState<boolean>(false);
   const [showTablesDetail, setShowTablesDetail] = useState<boolean>(false);
 
   // 导入确认模态窗状态
@@ -91,6 +94,24 @@ export const SecurityApp: React.FC<SecurityAppProps> = ({ onBack }) => {
       showToast(`申请异常: ${err?.message || err}`);
     } finally {
       setRequestingPersist(false);
+    }
+  };
+
+  const handleSlimStorage = async () => {
+    if (slimming) return;
+    setSlimming(true);
+    try {
+      const res = await runLocalStorageSlimming();
+      await fetchStats();
+      if (res.migratedCount > 0) {
+        showToast(`瘦身成功！已将 ${res.migratedCount} 项臃肿数据迁移至 IndexedDB，释放 ${res.freedFormatted}`);
+      } else {
+        showToast('LocalStorage 当前非常轻盈健康，未发现冗余大体积数据');
+      }
+    } catch (err: any) {
+      showToast(`瘦身失败: ${err?.message || err}`);
+    } finally {
+      setSlimming(false);
     }
   };
 
@@ -568,6 +589,99 @@ export const SecurityApp: React.FC<SecurityAppProps> = ({ onBack }) => {
               <span>当前占用配额比: {storageAudit?.indexedDBPercent || '<0.1'}%</span>
               <span>海量本地离线空间（极充裕）</span>
             </div>
+          </div>
+
+          {/* 一键瘦身到 IndexedDB 操作条 */}
+          <div
+            style={{
+              padding: '12px 14px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, rgba(255, 240, 245, 0.9), rgba(255, 248, 250, 0.95))',
+              border: '1.5px solid rgba(255, 214, 226, 0.8)',
+              boxShadow: '4px 4px 12px rgba(240, 185, 198, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.9)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #FFB4C5 0%, #FA86A0 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#FFF',
+                    boxShadow: '0 4px 8px rgba(250, 134, 160, 0.3)',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Zap size={16} strokeWidth={2.4} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#4A2E35' }}>
+                    一键瘦身至 IndexedDB
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#9E6C78', marginTop: '1px' }}>
+                    无损迁移历史聊天、手账大体积数据，破除 5MB 限制
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSlimStorage}
+                disabled={slimming}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: '12px',
+                  background: slimming
+                    ? '#E0D0D5'
+                    : 'linear-gradient(135deg, #FF94B0 0%, #E85A82 100%)',
+                  border: '1px solid rgba(255, 255, 255, 0.8)',
+                  boxShadow: slimming
+                    ? 'none'
+                    : '3px 3px 8px rgba(232, 90, 130, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.6)',
+                  color: '#FFFFFF',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  cursor: slimming ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  transition: 'all 0.2s ease',
+                }}
+                title="当 LocalStorage 爆满或偏高时，一键将冗余和大体积数据无损搬迁至 IndexedDB"
+              >
+                <Zap size={12} className={slimming ? 'animate-spin' : ''} />
+                <span>{slimming ? '瘦身迁移中...' : '立即一键瘦身'}</span>
+              </button>
+            </div>
+
+            {/* 爆满或偏高警示气泡 (超过 75% 时温馨高亮) */}
+            {(storageAudit?.localStoragePercent || 0) > 75 && (
+              <div
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: '10px',
+                  background: '#FEF2F2',
+                  border: '1px solid #FEE2E2',
+                  fontSize: '10px',
+                  color: '#DC2626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <AlertTriangle size={12} />
+                <span>LocalStorage 占用已超警戒线，建议立即点击一键瘦身！</span>
+              </div>
+            )}
           </div>
 
           {/* 双引擎数据量相对占比对比条 */}
