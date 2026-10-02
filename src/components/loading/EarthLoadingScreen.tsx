@@ -1,13 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  DogCharacter,
-  CatCharacter,
-  StoneCharacter,
-  ButterflyCharacter,
-  WhaleCharacter,
-  HumanCharacter,
-} from './SpeciesSVGs';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import * as THREE from 'three';
+import gsap from 'gsap';
 
 interface EarthLoadingScreenProps {
   onFinished: () => void;
@@ -15,587 +8,714 @@ interface EarthLoadingScreenProps {
   isDemo?: boolean;
 }
 
-interface Particle {
-  id: number;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  color: string;
-  size: number;
-}
-
-interface ClickToast {
-  id: number;
-  x: number;
-  y: number;
-  text: string;
-}
-
-// 6 大物种服配置
-const SPECIES_STAGES = [
-  {
-    id: 'dog',
-    name: '狗狗服',
-    title: '狗狗服加载中...',
-    subText: '忠诚度 100% · 正在快乐巡逻摇尾巴',
-    color: '#F9A436',
-    Component: DogCharacter,
-  },
-  {
-    id: 'cat',
-    name: '猫猫服',
-    title: '猫猫服加载中...',
-    subText: '呼噜声协议就绪 · 垫步踩奶中',
-    color: '#FACC15',
-    Component: CatCharacter,
-  },
-  {
-    id: 'stone',
-    name: '无机物服',
-    title: '无机物服加载中...',
-    subText: '发呆协议已挂载 · 免受一切精神内耗',
-    color: '#A8A29E',
-    Component: StoneCharacter,
-  },
-  {
-    id: 'butterfly',
-    name: '昆虫服',
-    title: '昆虫服加载中...',
-    subText: '扑腾向光频段 · 采蜜微风信标连接中',
-    color: '#34D399',
-    Component: ButterflyCharacter,
-  },
-  {
-    id: 'whale',
-    name: '海洋服',
-    title: '海洋服加载中...',
-    subText: '沉入深蓝静谧 · 52赫兹声波同步完成',
-    color: '#3B82F6',
-    Component: WhaleCharacter,
-  },
-  {
-    id: 'human',
-    name: '人类服',
-    title: '人类服加载完毕！',
-    subText: '连接成功 · 欢迎登入「地球 Online」',
-    color: '#F59E0B',
-    Component: HumanCharacter,
-  },
+// 5 大物种主题配色
+// 5 大地球 Online 物种服务器配置
+const STAGE_THEMES = [
+  { id: 0, name: '狗狗服',   subtitle: '犬科伴侣物种 · 晨光绿野区', sky: 0x90E0EF, ground: 0x7CB518, dirt: 0x5C8001, light: 0xFFF9E6, poof: 0xFFEA00 },
+  { id: 1, name: '猫猫服',   subtitle: '猫科自由物种 · 午夜暗月区', sky: 0x2B2D42, ground: 0x8D99AE, dirt: 0x4A4E69, light: 0xE8EAF6, poof: 0x00F0FF },
+  { id: 2, name: '无机物服', subtitle: '硅基地质原石 · 永恒静止区', sky: 0xFFB703, ground: 0xFB8500, dirt: 0x9C6644, light: 0xFFE8D6, poof: 0xFF5722 },
+  { id: 3, name: '昆虫服',   subtitle: '鳞翅目节肢物种 · 花蜜庭院区', sky: 0xFFC8DD, ground: 0xFFAFCC, dirt: 0xB5838D, light: 0xFFFFFF, poof: 0xFF006E },
+  { id: 4, name: '人类服',   subtitle: '碳基灵长直立人 · 文明探索区', sky: 0x48CAE4, ground: 0xADE8F4, dirt: 0x0077B6, light: 0xCAF0F8, poof: 0xFFFFFF },
 ];
 
-// Web Audio 合成器音效（零体积，不依赖外部 mp3 资源）
-let audioCtx: AudioContext | null = null;
-function getAudioContext(): AudioContext | null {
-  try {
-    const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtor) return null;
-    if (!audioCtx || audioCtx.state === 'suspended') {
-      audioCtx = new AudioCtor();
+const SPLASH_PLAYED_KEY = 'cloudfly_3d_splash_played_v1';
+
+export const EarthLoadingScreen: React.FC<EarthLoadingScreenProps> = ({ onFinished, isDemo }) => {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<{ dispose: () => void } | null>(null);
+
+  const [currentStage, setCurrentStage] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const currentStageRef = useRef(0);
+  const isTransitioningRef = useRef(false);
+
+  const handleEnter = useCallback(() => {
+    if (!isDemo) {
+      try {
+        sessionStorage.setItem(SPLASH_PLAYED_KEY, '1');
+      } catch {}
     }
-    return audioCtx;
-  } catch {
-    return null;
-  }
-}
+    onFinished();
+  }, [isDemo, onFinished]);
 
-// 软木轻敲音效（走路/点击步态反馈）
-function playStepTap(freq = 560): void {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    gain.gain.setValueAtTime(0.04, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.055);
-  } catch {
-    // ignore
-  }
-}
+  // 触发生命流转 / 切换至下一个服务器（人类服之后再点击直接进入桌面）
+  const handleTransform = useCallback(() => {
+    if (isTransitioningRef.current) return;
+    const current = currentStageRef.current;
+    if (current >= STAGE_THEMES.length - 1) {
+      // 已经是人类服，再点击就是进入桌面
+      handleEnter();
+      return;
+    }
+    isTransitioningRef.current = true;
+    setIsTransitioning(true);
+    const next = current + 1;
+    currentStageRef.current = next;
+    setCurrentStage(next);
+    (window as any).__splashTransition?.(current, next);
+  }, [handleEnter]);
 
-// 转生变身清脆和弦音
-function playEvolveChime(stageIdx: number): void {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    const notes = [523.25, 659.25, 783.99, 880.0, 1046.5, 1174.66]; // C5, E5, G5, A5, C6, D6
-    const baseFreq = notes[stageIdx % notes.length] || 659.25;
+  const handleTransformRef = useRef(handleTransform);
+  useEffect(() => {
+    handleTransformRef.current = handleTransform;
+  }, [handleTransform]);
 
-    [baseFreq, baseFreq * 1.25].forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.04);
-      gain.gain.setValueAtTime(0.08, ctx.currentTime + idx * 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.04 + 0.28);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(ctx.currentTime + idx * 0.04);
-      osc.stop(ctx.currentTime + idx * 0.04 + 0.3);
+  // 检查是否在当前会话中已经跳过
+  useEffect(() => {
+    // 清除曾经永久锁死 localStorage 的旧键，释放开屏动画
+    try {
+      localStorage.removeItem(SPLASH_PLAYED_KEY);
+    } catch {}
+
+    if (!isDemo) {
+      const played = sessionStorage.getItem(SPLASH_PLAYED_KEY);
+      if (played === '1') {
+        onFinished();
+        return;
+      }
+    }
+  }, [isDemo, onFinished]);
+
+  useEffect(() => {
+    const container = mountRef.current;
+    if (!container) return;
+
+    // ── 场景 & 相机 ──────────────────────────────────────────────
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(STAGE_THEMES[0].sky);
+    scene.fog = new THREE.FogExp2(STAGE_THEMES[0].sky, 0.02);
+
+    const width = container.clientWidth || 390;
+    const height = container.clientHeight || 700;
+    const aspect = width / height;
+    const viewSize = 7.5;
+    const camera = new THREE.OrthographicCamera(
+      -viewSize * aspect, viewSize * aspect,
+      viewSize, -viewSize, 0.1, 100
+    );
+    camera.position.set(12, 10, 12);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    container.appendChild(renderer.domElement);
+
+    // 内联简易轨道控制器（拖拽旋转 + 滚轮缩放 + 点击屏幕切服）
+    let isDragging = false;
+    let prevMouse = { x: 0, y: 0 };
+    let dragDist = 0;
+    let pointerDownTime = 0;
+    let spherical = { theta: Math.PI / 4, phi: Math.PI / 3.5, radius: Math.sqrt(12 * 12 + 10 * 10 + 12 * 12) };
+    const target = new THREE.Vector3(0, 0, 0);
+    let autoRotate = true;
+
+    function updateCamera() {
+      camera.position.set(
+        target.x + spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta),
+        target.y + spherical.radius * Math.cos(spherical.phi),
+        target.z + spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta)
+      );
+      camera.lookAt(target);
+    }
+    updateCamera();
+
+    const onPointerDown = (e: PointerEvent) => {
+      isDragging = true;
+      autoRotate = false;
+      dragDist = 0;
+      pointerDownTime = Date.now();
+      prevMouse = { x: e.clientX, y: e.clientY };
+      renderer.domElement.setPointerCapture(e.pointerId);
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      if (!isDragging) return;
+      const dx = e.clientX - prevMouse.x;
+      const dy = e.clientY - prevMouse.y;
+      dragDist += Math.abs(dx) + Math.abs(dy);
+      prevMouse = { x: e.clientX, y: e.clientY };
+      spherical.theta -= dx * 0.008;
+      spherical.phi = Math.max(0.15, Math.min(Math.PI / 2.1, spherical.phi + dy * 0.008));
+      updateCamera();
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (!isDragging) return;
+      isDragging = false;
+      try {
+        renderer.domElement.releasePointerCapture(e.pointerId);
+      } catch {}
+
+      // 用户点击屏幕（位移小于 8px 且非长按拖拽），立即切换到下一个服务器！
+      const duration = Date.now() - pointerDownTime;
+      if (dragDist < 8 && duration < 450) {
+        handleTransformRef.current();
+      }
+    };
+    const onWheel = (e: WheelEvent) => {
+      spherical.radius = Math.max(8, Math.min(28, spherical.radius + e.deltaY * 0.02));
+      updateCamera();
+    };
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('pointermove', onPointerMove);
+    renderer.domElement.addEventListener('pointerup', onPointerUp);
+    renderer.domElement.addEventListener('wheel', onWheel, { passive: true });
+
+    const controls = {
+      update: () => {
+        if (autoRotate) {
+          spherical.theta += 0.003;
+          updateCamera();
+        }
+      },
+      dispose: () => {
+        renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+        renderer.domElement.removeEventListener('pointermove', onPointerMove);
+        renderer.domElement.removeEventListener('pointerup', onPointerUp);
+        renderer.domElement.removeEventListener('wheel', onWheel);
+      },
+    };
+
+    // ── 光照 ─────────────────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const dirLight = new THREE.DirectionalLight(STAGE_THEMES[0].light, 0.85);
+    dirLight.position.set(-10, 15, 10);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(1024, 1024);
+    const d = 8;
+    dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d;
+    dirLight.shadow.bias = -0.001;
+    scene.add(dirLight);
+
+    // Toon 渐变纹理
+    const cvs = document.createElement('canvas'); cvs.width = 4; cvs.height = 1;
+    const ctx2d = cvs.getContext('2d')!;
+    ['#444','#888','#ccc','#fff'].forEach((c, i) => { ctx2d.fillStyle = c; ctx2d.fillRect(i, 0, 1, 1); });
+    const toonGradient = new THREE.CanvasTexture(cvs);
+    toonGradient.magFilter = THREE.NearestFilter;
+    toonGradient.minFilter = THREE.NearestFilter;
+
+    const getMat = (hex: number) => new THREE.MeshToonMaterial({ color: hex, gradientMap: toonGradient });
+    const matGround = getMat(STAGE_THEMES[0].ground);
+    const matDirt   = getMat(STAGE_THEMES[0].dirt);
+
+    function createBone(geo: THREE.BufferGeometry, mat: THREE.Material, pivotY: number) {
+      geo.translate(0, pivotY, 0);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    // ── 生物模型 ──────────────────────────────────────────────────
+    const creatures = new THREE.Group(); scene.add(creatures);
+
+    // 【1. 柴犬】
+    const dog = new THREE.Group();
+    const dBodyMat = getMat(0xE07A5F), dBellyMat = getMat(0xF4F1DE), dDarkMat = getMat(0x3D405B), dRedMat = getMat(0xE63946);
+    const dogBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.9, 1.6), dBodyMat);
+    dogBody.position.y = 1.2; dogBody.castShadow = true; dog.add(dogBody);
+    const dogBelly = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.2, 1.4), dBellyMat);
+    dogBelly.position.set(0, -0.36, 0.1); dogBody.add(dogBelly);
+    const dogNeck = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.4, 0.5), dBellyMat);
+    dogNeck.position.set(0, 0.2, 0.8); dogBody.add(dogNeck);
+    const collar = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.15, 0.55), dRedMat);
+    collar.position.set(0, 0.3, 0.78); dogBody.add(collar);
+    const bell = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), getMat(0xF2CC8F));
+    bell.position.set(0, -0.1, 0.3); collar.add(bell);
+    const dogHeadGroup = new THREE.Group(); dogHeadGroup.position.set(0, 0.7, 0.9); dogBody.add(dogHeadGroup);
+    const dogHead = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.0, 1.1), dBodyMat); dogHead.castShadow = true; dogHeadGroup.add(dogHead);
+    const dogSnout = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.5), dBellyMat); dogSnout.position.set(0, -0.2, 0.8); dogHeadGroup.add(dogSnout);
+    const dogNose = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.1), dDarkMat); dogNose.position.set(0, 0.2, 0.25); dogSnout.add(dogNose);
+    for (const i of [-1, 1] as const) {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.2, 0.1), dDarkMat);
+      eye.position.set(i * 0.3, 0.15, 0.56); dogHeadGroup.add(eye);
+      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.1), dBellyMat);
+      brow.position.set(i * 0.3, 0.4, 0.56); dogHeadGroup.add(brow);
+      const earGeo = new THREE.BoxGeometry(0.3, 0.4, 0.2); earGeo.translate(0, 0.2, 0);
+      const ear = new THREE.Mesh(earGeo, dBodyMat);
+      const earInner = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.25, 0.1), getMat(0xF4A261));
+      earInner.position.set(0, 0.2, 0.06); ear.add(earInner);
+      ear.position.set(i * 0.4, 0.5, -0.2); ear.rotation.z = i * -0.2; ear.rotation.x = 0.1;
+      dogHeadGroup.add(ear);
+    }
+    const dogLegs: THREE.Object3D[] = [];
+    for (let i = 0; i < 4; i++) {
+      const leg = createBone(new THREE.BoxGeometry(0.3, 0.8, 0.3), dBodyMat, -0.4);
+      leg.position.set(i % 2 === 0 ? 0.45 : -0.45, 0.8, i < 2 ? 0.5 : -0.5);
+      const paw = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.2, 0.35), dBellyMat);
+      paw.position.set(0, -0.7, 0.05); leg.add(paw);
+      dog.add(leg); dogLegs.push(leg);
+    }
+    const dogTail = createBone(new THREE.BoxGeometry(0.3, 0.6, 0.3), dBodyMat, 0.3);
+    dogTail.position.set(0, 1.5, -0.7); dogTail.rotation.x = 0.5;
+    const tailTip = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.2, 0.32), dBellyMat);
+    tailTip.position.set(0, 0.6, 0); dogTail.add(tailTip);
+    dogBody.add(dogTail);
+    creatures.add(dog);
+
+    // 【2. 燕尾服猫】
+    const cat = new THREE.Group();
+    const cBlack = getMat(0x1D1E20), cWhite = getMat(0xFFFFFF), cEye = getMat(0xE9C46A);
+    const catBody = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 1.8), cBlack);
+    catBody.position.y = 1.1; catBody.castShadow = true; cat.add(catBody);
+    const catChest = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.6, 0.6), cWhite);
+    catChest.position.set(0, -0.05, 0.65); catBody.add(catChest);
+    const catHeadGroup = new THREE.Group(); catHeadGroup.position.set(0, 0.5, 1.0); catBody.add(catHeadGroup);
+    const catHead = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.8, 0.9), cBlack); catHead.castShadow = true; catHeadGroup.add(catHead);
+    const catSnout = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.3), cWhite); catSnout.position.set(0, -0.2, 0.46); catHeadGroup.add(catSnout);
+    const catNose = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.1), getMat(0xFFB4A2)); catNose.position.set(0, 0.15, 0.15); catSnout.add(catNose);
+    for (const i of [-1, 1] as const) {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.1), cEye);
+      eye.position.set(i * 0.25, 0.1, 0.46);
+      const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.15, 0.11), cBlack); eye.add(pupil); catHeadGroup.add(eye);
+      const ear = createBone(new THREE.ConeGeometry(0.2, 0.4, 4), cBlack, 0.2);
+      ear.position.set(i * 0.35, 0.4, -0.1); ear.rotation.y = Math.PI / 4; catHeadGroup.add(ear);
+      for (let j = 0; j < 2; j++) {
+        const whisker = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.02, 0.02), cWhite);
+        whisker.position.set(i * 0.4, -0.2 + j * 0.1, 0.5); whisker.rotation.z = i * (0.1 - j * 0.2); catHeadGroup.add(whisker);
+      }
+    }
+    const catLegs: THREE.Object3D[] = [];
+    for (let i = 0; i < 4; i++) {
+      const leg = createBone(new THREE.BoxGeometry(0.2, 0.8, 0.2), cBlack, -0.4);
+      leg.position.set(i % 2 === 0 ? 0.35 : -0.35, 0.8, i < 2 ? 0.6 : -0.6);
+      const paw = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.15, 0.25), cWhite); paw.position.set(0, -0.75, 0.05); leg.add(paw);
+      cat.add(leg); catLegs.push(leg);
+    }
+    const catTailGroup = new THREE.Group(); catTailGroup.position.set(0, 0.3, -0.9); catBody.add(catTailGroup);
+    const t1 = createBone(new THREE.BoxGeometry(0.15, 0.5, 0.15), cBlack, 0.25); t1.rotation.x = 1.0; catTailGroup.add(t1);
+    const t2 = createBone(new THREE.BoxGeometry(0.15, 0.5, 0.15), cBlack, 0.25); t2.position.set(0, 0.5, 0); t1.add(t2);
+    const t3 = createBone(new THREE.BoxGeometry(0.15, 0.5, 0.15), cWhite, 0.25); t3.position.set(0, 0.5, 0); t2.add(t3);
+    creatures.add(cat); cat.scale.setScalar(0); cat.visible = false;
+
+    // 【3. 原石】
+    const rock = new THREE.Group();
+    const rMat = getMat(0x6C7A89), rMossMat = getMat(0x7CB342), rCrystalMat = getMat(0x4DD0E1);
+    const mainRock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2, 1), rMat);
+    mainRock.position.y = 1.0; mainRock.castShadow = true; rock.add(mainRock);
+    const moss1 = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.4, 0.8), rMossMat); moss1.position.set(0.5, 0.8, 0); moss1.rotation.z = -0.4; mainRock.add(moss1);
+    const moss2 = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 1.0), rMossMat); moss2.position.set(-0.6, 0.2, 0.6); moss2.rotation.x = 0.5; mainRock.add(moss2);
+    for (let i = 0; i < 3; i++) {
+      const crystal = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.8, 6), rCrystalMat);
+      crystal.position.set(Math.random() - 0.5, Math.random() + 0.5, Math.random() - 0.5);
+      crystal.lookAt(0, 0, 0); crystal.rotateX(Math.PI / 2); mainRock.add(crystal);
+    }
+    creatures.add(rock); rock.scale.setScalar(0); rock.visible = false;
+
+    // 【4. 彩蝶】
+    const butterfly = new THREE.Group();
+    const bBodyMat = getMat(0x2B2D42), bWingTopMat = getMat(0xFF006E), bWingBotMat = getMat(0xFFBE0B);
+    const thorax = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.5, 4, 8), bBodyMat);
+    thorax.position.y = 2.5; thorax.rotation.x = Math.PI / 2; thorax.castShadow = true; butterfly.add(thorax);
+    const bHead = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), bBodyMat); bHead.position.set(0, 0, 0.4); thorax.add(bHead);
+    for (const i of [-1, 1] as const) {
+      const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.4), bBodyMat);
+      ant.position.set(i * 0.1, 0.2, 0.1); ant.rotation.z = i * -0.3; ant.rotation.x = 0.5; bHead.add(ant);
+    }
+    const wingGroupL = new THREE.Group(); wingGroupL.position.set(0.1, 0.1, 0); thorax.add(wingGroupL);
+    const wingGroupR = new THREE.Group(); wingGroupR.position.set(-0.1, 0.1, 0); thorax.add(wingGroupR);
+    function makeWing(w: number, h: number, mat: THREE.Material, px: number, pz: number, ry: number) {
+      const geo = new THREE.BoxGeometry(w, 0.02, h); geo.translate(px, 0, pz);
+      const mesh = new THREE.Mesh(geo, mat); mesh.rotation.y = ry; mesh.castShadow = true; return mesh;
+    }
+    wingGroupL.add(makeWing(1.2, 0.8, bWingTopMat, 0.6, 0.2, 0.2));
+    wingGroupL.add(makeWing(0.8, 1.0, bWingBotMat, 0.4, -0.4, -0.2));
+    wingGroupR.add(makeWing(1.2, 0.8, bWingTopMat, -0.6, 0.2, -0.2));
+    wingGroupR.add(makeWing(0.8, 1.0, bWingBotMat, -0.4, -0.4, 0.2));
+    creatures.add(butterfly); butterfly.scale.setScalar(0); butterfly.visible = false;
+
+    // 【5. 旅人】
+    const human = new THREE.Group();
+    const hSkin = getMat(0xFFC8A2), hHair = getMat(0x3E2723), hJacket = getMat(0x2A9D8F), hPants = getMat(0x264653), hShoe = getMat(0xE76F51);
+    const hTorso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.5), hJacket);
+    hTorso.position.y = 1.6; hTorso.castShadow = true; human.add(hTorso);
+    const backpack = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.8, 0.4), getMat(0xE9C46A));
+    backpack.position.set(0, 0, -0.45); hTorso.add(backpack);
+    const hHeadGroup = new THREE.Group(); hHeadGroup.position.set(0, 0.7, 0); hTorso.add(hHeadGroup);
+    const hHead = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), hSkin); hHead.castShadow = true; hHeadGroup.add(hHead);
+    const hair = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.2, 0.7), hHair); hair.position.set(0, 0.35, -0.05); hHeadGroup.add(hair);
+    const hairBang = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.2, 0.2), hHair); hairBang.position.set(0, 0.2, 0.3); hHeadGroup.add(hairBang);
+    const hArms: THREE.Object3D[] = [], hLegs: THREE.Object3D[] = [];
+    for (const i of [-1, 1] as const) {
+      const arm = createBone(new THREE.BoxGeometry(0.25, 0.5, 0.25), hJacket, -0.25);
+      arm.position.set(i * 0.55, 0.4, 0); hTorso.add(arm); hArms.push(arm);
+      const lowerArm = createBone(new THREE.BoxGeometry(0.22, 0.4, 0.22), hSkin, -0.2);
+      lowerArm.position.set(0, -0.5, 0); arm.add(lowerArm);
+      const leg = createBone(new THREE.BoxGeometry(0.35, 0.6, 0.35), hPants, -0.3);
+      leg.position.set(i * 0.22, -0.5, 0); hTorso.add(leg); hLegs.push(leg);
+      const lowerLeg = createBone(new THREE.BoxGeometry(0.32, 0.5, 0.32), hSkin, -0.25);
+      lowerLeg.position.set(0, -0.6, 0); leg.add(lowerLeg);
+      const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.2, 0.45), hShoe);
+      shoe.position.set(0, -0.6, 0.05); lowerLeg.add(shoe);
+    }
+    creatures.add(human); human.scale.setScalar(0); human.visible = false;
+
+    const forms = [dog, cat, rock, butterfly, human];
+
+    // ── 环境底座 ──────────────────────────────────────────────────
+    const environment = new THREE.Group(); scene.add(environment);
+    const ground = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 1, 48), matGround);
+    ground.position.y = -0.5; ground.receiveShadow = true; environment.add(ground);
+    const dirtRing = new THREE.Mesh(new THREE.CylinderGeometry(7.8, 7.5, 1.5, 48), matDirt);
+    dirtRing.position.y = -1.5; environment.add(dirtRing);
+
+    const propsContainer = new THREE.Group(); environment.add(propsContainer);
+    const propsGroups: THREE.Group[] = Array.from({ length: 5 }, () => {
+      const g = new THREE.Group(); propsContainer.add(g); return g;
     });
-  } catch {
-    // ignore
-  }
-}
+    propsGroups.forEach((g, i) => { if (i !== 0) g.scale.setScalar(0); });
 
-export const EarthLoadingScreen: React.FC<EarthLoadingScreenProps> = ({ onFinished }) => {
-  const [progress, setProgress] = useState<number>(0);
-  const [currentStageIdx, setCurrentStageIdx] = useState<number>(0);
-  const [isMorphing, setIsMorphing] = useState<boolean>(false);
-  const [isAccelerating, setIsAccelerating] = useState<boolean>(false);
-  const [isExiting, setIsExiting] = useState<boolean>(false);
+    for (let i = 0; i < 16; i++) {
+      const angle = (i / 16) * Math.PI * 2;
+      const r = 4.5 + Math.random() * 2.5;
+      const x = r * Math.cos(angle), z = r * Math.sin(angle);
 
-  // 粒子与点击浮动提示
-  const [particles, setParticles] = useState<Particle[]>([]);
-  const [clickToasts, setClickToasts] = useState<ClickToast[]>([]);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const accelerateTimeoutRef = useRef<number | null>(null);
+      if (i % 2 === 0) {
+        const tree = new THREE.Group();
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 1.5), getMat(0x795548)); trunk.position.y = 0.75; tree.add(trunk);
+        const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2), getMat(0x43A047)); leaves.position.y = 1.8; tree.add(leaves);
+        tree.position.set(x, 0, z); propsGroups[0].add(tree);
+      } else {
+        const bush = new THREE.Mesh(new THREE.SphereGeometry(0.6, 6, 6), getMat(0x81C784));
+        bush.position.set(x, 0.2, z); propsGroups[0].add(bush);
+      }
+      if (i % 3 === 0) {
+        const yarn = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12), getMat(0xFF5252));
+        yarn.position.set(x, 0.4, z); propsGroups[1].add(yarn);
+      } else {
+        const box = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 1.2), getMat(0xD7CCC8));
+        box.position.set(x, 0.4, z); box.rotation.y = Math.random(); propsGroups[1].add(box);
+      }
+      if (i % 2 === 0) {
+        const bamboo = new THREE.Group();
+        for (let j = 0; j < 4; j++) {
+          const sec = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.6), getMat(0x8BC34A));
+          sec.position.y = j * 0.62 + 0.3; bamboo.add(sec);
+        }
+        bamboo.position.set(x, 0, z); propsGroups[2].add(bamboo);
+      } else {
+        const fr = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.2, 6), getMat(0x546E7A));
+        fr.position.set(x, 0.1, z); propsGroups[2].add(fr);
+      }
+      const flower = new THREE.Group();
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.0), getMat(0x4CAF50)); stem.position.y = 1.0; flower.add(stem);
+      const petals = new THREE.Mesh(new THREE.TorusKnotGeometry(0.4, 0.15, 64, 8), getMat(0xFF9800)); petals.position.y = 2.0; petals.rotation.x = 0.5; flower.add(petals);
+      flower.position.set(x, 0, z); propsGroups[3].add(flower);
+      if (i === 0 || i === 8) {
+        const sign = new THREE.Group();
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2), getMat(0x555555)); post.position.y = 1; sign.add(post);
+        const board = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 0.1), getMat(0xFFCC00)); board.position.set(0.2, 1.6, 0); sign.add(board);
+        sign.position.set(x, 0, z); propsGroups[4].add(sign);
+      } else {
+        const ro = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4), getMat(0x90A4AE));
+        ro.position.set(x, 0.2, z); propsGroups[4].add(ro);
+      }
+    }
 
-  // 根据进度动态计算当前所处阶段 (0 ~ 5)
-  // 狗: 0~17%, 猫: 18~34%, 石头: 35~51%, 蝴蝶: 52~68%, 鲸鱼: 69~85%, 人类: 86~100%
-  const calculateStageIndex = (prog: number) => {
-    if (prog < 18) return 0;
-    if (prog < 36) return 1;
-    if (prog < 54) return 2;
-    if (prog < 72) return 3;
-    if (prog < 88) return 4;
-    return 5;
-  };
+    // ── 粒子特效 ──────────────────────────────────────────────────
+    const pGeo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
+    const particles: { mesh: THREE.Mesh; vel: THREE.Vector3 }[] = [];
+    const particleGroup = new THREE.Group(); scene.add(particleGroup);
+    for (let i = 0; i < 40; i++) {
+      const mesh = new THREE.Mesh(pGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      mesh.visible = false; particleGroup.add(mesh); particles.push({ mesh, vel: new THREE.Vector3() });
+    }
+    function triggerBurst(hexColor: number) {
+      particles.forEach(p => {
+        p.mesh.visible = true;
+        (p.mesh.material as THREE.MeshBasicMaterial).color.setHex(hexColor);
+        p.mesh.position.set((Math.random() - 0.5) * 2, 1.5 + (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2);
+        p.mesh.scale.setScalar(Math.random() * 1.5 + 0.5);
+        p.vel.set((Math.random() - 0.5) * 6, Math.random() * 5, (Math.random() - 0.5) * 6);
+      });
+    }
 
-  // 触发转生变身粒子爆散
-  const triggerMorphExplosion = useCallback((color: string) => {
-    setIsMorphing(true);
-    const newParticles: Particle[] = Array.from({ length: 14 }).map((_, i) => {
-      const angle = (Math.PI * 2 * i) / 14 + (Math.random() - 0.5) * 0.4;
-      const speed = 3.5 + Math.random() * 4.5;
-      return {
-        id: Date.now() + i,
-        x: 0,
-        y: 0,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        color: i % 2 === 0 ? color : '#FCD34D',
-        size: 5 + Math.random() * 5,
-      };
-    });
-    setParticles(newParticles);
+    // ── 形变切换（暴露给 React UI 层） ───────────────────────────
+    const triggerTransition = (prevIdx: number, nextIdx: number) => {
+      const prevModel = forms[prevIdx];
+      const nextModel = forms[nextIdx];
+      const nextTheme = STAGE_THEMES[nextIdx];
 
-    // 变身结束后恢复角色正常形态
-    window.setTimeout(() => {
-      setIsMorphing(false);
-      setParticles([]);
-    }, 450);
+      gsap.to(prevModel.scale, {
+        x: 0.001, y: 0.001, z: 0.001, duration: 0.3, ease: 'back.in(1.5)',
+        onComplete: () => {
+          prevModel.visible = false;
+          triggerBurst(nextTheme.poof);
+          nextModel.visible = true;
+          gsap.to(nextModel.scale, {
+            x: 1, y: 1, z: 1, duration: 0.4, ease: 'back.out(1.5)',
+            onComplete: () => { isTransitioningRef.current = false; setIsTransitioning(false); },
+          });
+        },
+      });
+      gsap.to(propsGroups[prevIdx].scale, { x: 0.001, y: 0.001, z: 0.001, duration: 0.4, ease: 'power2.in' });
+      gsap.to(propsGroups[nextIdx].scale, { x: 1, y: 1, z: 1, duration: 0.6, ease: 'elastic.out(1,0.7)', delay: 0.2 });
+
+      const tl = gsap.timeline();
+      const skyC = new THREE.Color(nextTheme.sky);
+      const gndC = new THREE.Color(nextTheme.ground);
+      const drtC = new THREE.Color(nextTheme.dirt);
+      const lgtC = new THREE.Color(nextTheme.light);
+      tl.to(scene.background as THREE.Color, { r: skyC.r, g: skyC.g, b: skyC.b, duration: 1.0 }, 0);
+      tl.to((scene.fog as THREE.FogExp2).color,   { r: skyC.r, g: skyC.g, b: skyC.b, duration: 1.0 }, 0);
+      tl.to(matGround.color, { r: gndC.r, g: gndC.g, b: gndC.b, duration: 1.0 }, 0);
+      tl.to(matDirt.color,   { r: drtC.r, g: drtC.g, b: drtC.b, duration: 1.0 }, 0);
+      tl.to(dirLight.color,  { r: lgtC.r, g: lgtC.g, b: lgtC.b, duration: 1.0 }, 0);
+    };
+    (window as any).__splashTransition = triggerTransition;
+
+    // ── 动画主循环 ────────────────────────────────────────────────
+    const clock = new THREE.Clock();
+    let rafId = 0;
+
+    function animate() {
+      rafId = requestAnimationFrame(animate);
+      const dt = clock.getDelta();
+      const t  = clock.getElapsedTime();
+      controls.update();
+      environment.rotation.y -= 0.012;
+
+      particles.forEach(p => {
+        if (p.mesh.visible) {
+          p.mesh.position.addScaledVector(p.vel, dt);
+          p.mesh.rotation.x += 0.2; p.mesh.rotation.y += 0.2;
+          p.mesh.scale.multiplyScalar(0.9);
+          if (p.mesh.scale.x < 0.05) p.mesh.visible = false;
+        }
+      });
+
+      if (dog.visible) {
+        const w = t * 10;
+        dogBody.position.y = 1.2 + Math.abs(Math.sin(w)) * 0.1;
+        dogHeadGroup.rotation.x = Math.sin(w) * 0.05;
+        dogHeadGroup.rotation.y = Math.sin(w * 0.5) * 0.05;
+        dogTail.rotation.z = Math.sin(t * 15) * 0.4;
+        dogLegs[0].rotation.x =  Math.sin(w) * 0.5;
+        dogLegs[3].rotation.x =  Math.sin(w) * 0.5;
+        dogLegs[1].rotation.x =  Math.sin(w + Math.PI) * 0.5;
+        dogLegs[2].rotation.x =  Math.sin(w + Math.PI) * 0.5;
+      }
+      if (cat.visible) {
+        const w = t * 8;
+        catBody.position.y = 1.1 + Math.abs(Math.sin(w)) * 0.04;
+        catBody.rotation.z = Math.sin(w * 0.5) * 0.03;
+        catHeadGroup.rotation.z = Math.sin(w * 0.5) * 0.05;
+        t1.rotation.z = Math.sin(t * 3) * 0.3;
+        t2.rotation.z = Math.sin(t * 3 - 0.5) * 0.4;
+        t3.rotation.z = Math.sin(t * 3 - 1.0) * 0.5;
+        catLegs[0].rotation.x =  Math.sin(w) * 0.6;
+        catLegs[3].rotation.x =  Math.sin(w) * 0.6;
+        catLegs[1].rotation.x =  Math.sin(w + Math.PI) * 0.6;
+        catLegs[2].rotation.x =  Math.sin(w + Math.PI) * 0.6;
+      }
+      if (rock.visible) {
+        mainRock.rotation.x -= dt * 2.5;
+        mainRock.position.y = 1.0 + Math.abs(Math.sin(mainRock.rotation.x * 2.5)) * 0.15;
+      }
+      if (butterfly.visible) {
+        thorax.position.y = 2.5 + Math.sin(t * 3) * 0.4;
+        thorax.rotation.z = Math.sin(t * 2) * 0.1;
+        const flap = Math.sin(t * 30) * 0.8 + 0.2;
+        wingGroupL.rotation.z =  flap;
+        wingGroupR.rotation.z = -flap;
+      }
+      if (human.visible) {
+        const w = t * 7;
+        hTorso.position.y = 1.6 + Math.abs(Math.sin(w)) * 0.06;
+        hTorso.rotation.y = Math.sin(w) * 0.1;
+        hHeadGroup.rotation.y = -Math.sin(w) * 0.1;
+        hArms[0].rotation.x = Math.sin(w) * 0.5;
+        hArms[0].children[0].rotation.x = -0.2 + Math.sin(w) * 0.2;
+        hArms[1].rotation.x = Math.sin(w + Math.PI) * 0.5;
+        hArms[1].children[0].rotation.x = -0.2 - Math.sin(w) * 0.2;
+        hLegs[0].rotation.x = Math.sin(w + Math.PI) * 0.6;
+        hLegs[0].children[0].rotation.x = Math.max(0, Math.sin(w + Math.PI - 1.5)) * 0.5;
+        hLegs[1].rotation.x = Math.sin(w) * 0.6;
+        hLegs[1].children[0].rotation.x = Math.max(0, Math.sin(w - 1.5)) * 0.5;
+      }
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    const onResize = () => {
+      if (!container) return;
+      const w = container.clientWidth || 390;
+      const h = container.clientHeight || 700;
+      const asp = w / h;
+      camera.left = -viewSize * asp; camera.right = viewSize * asp;
+      camera.top = viewSize; camera.bottom = -viewSize;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    };
+    window.addEventListener('resize', onResize);
+    const ro = new ResizeObserver(() => onResize());
+    ro.observe(container);
+
+    sceneRef.current = {
+      dispose: () => {
+        cancelAnimationFrame(rafId);
+        controls.dispose();
+        renderer.dispose();
+        window.removeEventListener('resize', onResize);
+        ro.disconnect();
+        if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
+        delete (window as any).__splashTransition;
+      },
+    };
+
+    return () => sceneRef.current?.dispose();
   }, []);
 
-  // 正常自增时钟：约 4.2 秒自动走完
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          window.clearInterval(interval);
-          return 100;
-        }
-        // 基础自增步长：人类阶段放慢一点点方便欣赏
-        const increment = prev > 86 ? 0.9 : 1.25;
-        const next = Math.min(100, prev + increment);
-
-        // 检测是否跨过了形态分界线
-        const prevStage = calculateStageIndex(prev);
-        const nextStage = calculateStageIndex(next);
-        if (nextStage !== prevStage) {
-          setCurrentStageIdx(nextStage);
-          triggerMorphExplosion(SPECIES_STAGES[nextStage].color);
-          playEvolveChime(nextStage);
-        }
-
-        return next;
-      });
-    }, 50);
-
-    return () => window.clearInterval(interval);
-  }, [triggerMorphExplosion]);
-
-  // 当进度达到 100% 时的优雅退出处理
-  useEffect(() => {
-    if (progress >= 100 && !isExiting) {
-      const timer = window.setTimeout(() => {
-        setIsExiting(true);
-        window.setTimeout(() => {
-          onFinished();
-        }, 550);
-      }, 700);
-      return () => window.clearTimeout(timer);
-    }
-  }, [progress, isExiting, onFinished]);
-
-  // 点击屏幕“狂点加速转生”交互
-  const handleScreenClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isExiting) return;
-
-    // 播放小木块踩踏脚步音
-    playStepTap(currentStageIdx * 40 + 520);
-
-    // 加速角色 walk-cycle 动作 400ms
-    setIsAccelerating(true);
-    if (accelerateTimeoutRef.current) clearTimeout(accelerateTimeoutRef.current);
-    accelerateTimeoutRef.current = window.setTimeout(() => {
-      setIsAccelerating(false);
-    }, 400);
-
-    // 增加 12% 进度
-    setProgress((prev) => {
-      const next = Math.min(100, prev + 12);
-      const prevStage = calculateStageIndex(prev);
-      const nextStage = calculateStageIndex(next);
-      if (nextStage !== prevStage) {
-        setCurrentStageIdx(nextStage);
-        triggerMorphExplosion(SPECIES_STAGES[nextStage].color);
-        playEvolveChime(nextStage);
-      }
-      return next;
-    });
-
-    // 产生触点位置的卡通气泡扬尘
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (rect) {
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-      const newToast: ClickToast = {
-        id: Date.now() + Math.random(),
-        x: clickX,
-        y: clickY,
-        text: '💨 转生加速 +12%',
-      };
-      setClickToasts((prev) => [...prev.slice(-3), newToast]);
-
-      window.setTimeout(() => {
-        setClickToasts((prev) => prev.filter((item) => item.id !== newToast.id));
-      }, 600);
-    }
-  };
-
-  // 点击右上角“跳过”直接进系统
-  const handleSkip = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsExiting(true);
-    playEvolveChime(5);
-    window.setTimeout(() => {
-      onFinished();
-    }, 350);
-  };
-
-  const currentStage = SPECIES_STAGES[currentStageIdx];
-  const CurrentCharacter = currentStage.Component;
+  const theme = STAGE_THEMES[currentStage];
 
   return (
     <div
-      ref={containerRef}
-      onClick={handleScreenClick}
+      onClick={(e) => {
+        // 点击屏幕任意非按钮区域即可切换服务器
+        const target = e.target as HTMLElement;
+        if (target && target.closest('button')) return;
+        handleTransform();
+      }}
       style={{
         position: 'absolute',
         inset: 0,
-        backgroundColor: '#F5ECE1', // 与参考图完全一致的温暖奶油米色
+        width: '100%',
+        height: '100%',
         zIndex: 9999,
+        overflow: 'hidden',
+        background: '#000',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '24px 20px 32px',
-        userSelect: 'none',
         cursor: 'pointer',
-        overflow: 'hidden',
-        transition: 'opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
-        opacity: isExiting ? 0 : 1,
-        transform: isExiting ? 'scale(1.04)' : 'scale(1)',
+        userSelect: 'none',
       }}
     >
-      {/* 动画关键帧 */}
-      <style>{`
-        @keyframes morphSquash {
-          0% { transform: scale(1, 1); }
-          30% { transform: scale(1.3, 0.65); }
-          60% { transform: scale(0.85, 1.25); }
-          85% { transform: scale(1.08, 0.95); }
-          100% { transform: scale(1, 1); }
-        }
-        @keyframes toastFloat {
-          0% { opacity: 0; transform: translateY(0) scale(0.8); }
-          30% { opacity: 1; transform: translateY(-16px) scale(1); }
-          100% { opacity: 0; transform: translateY(-40px) scale(0.9); }
-        }
-        @keyframes pulseGlow {
-          0%, 100% { opacity: 0.6; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.15); }
-        }
-      `}</style>
+      {/* Three.js 挂载点 */}
+      <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* 顶部仅保留纯文字“跳过”，移除左侧胶囊按钮 */}
-      <div
-        style={{
-          width: '100%',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          marginTop: 6,
-          paddingRight: 6,
+      {/* 右上角进入桌面快捷按钮 */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleEnter();
         }}
+        style={{
+          position: 'absolute',
+          top: 14,
+          right: 14,
+          zIndex: 30,
+          padding: '6px 14px',
+          borderRadius: '20px',
+          backgroundColor: 'rgba(0, 0, 0, 0.35)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255, 255, 255, 0.25)',
+          color: '#fff',
+          fontSize: '12px',
+          fontWeight: 700,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+          transition: 'all 0.2s ease',
+          pointerEvents: 'auto',
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.55)';
+          e.currentTarget.style.transform = 'scale(1.04)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.35)';
+          e.currentTarget.style.transform = 'scale(1)';
+        }}
+        title="直接进入系统桌面"
       >
-        <button
-          type="button"
-          onClick={handleSkip}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: '4px 6px',
-            color: '#A8A29E',
-            fontSize: '0.82rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            letterSpacing: '1px',
-            outline: 'none',
-            transition: 'color 0.15s ease',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#78350F')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = '#A8A29E')}
-        >
-          跳过
-        </button>
+        <span>进入桌面</span>
+        <span style={{ fontSize: '10px' }}>➔</span>
+      </button>
+
+      {/* 顶部选服与交互提示 */}
+      <div style={{
+        position: 'absolute', top: 16, left: 0, right: 0,
+        textAlign: 'center', pointerEvents: 'none', zIndex: 10,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+      }}>
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '3px 12px',
+          borderRadius: '12px',
+          backgroundColor: 'rgba(0,0,0,0.25)',
+          backdropFilter: 'blur(6px)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          fontSize: 10,
+          fontWeight: 700,
+          color: 'rgba(255,255,255,0.9)',
+          letterSpacing: '0.1em',
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+          <span>地球 ONLINE · 物种服务器</span>
+        </div>
+        <span style={{
+          fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.6)',
+          letterSpacing: '0.08em', textShadow: '0 1px 4px rgba(0,0,0,0.4)',
+        }}>
+          拖拽旋转视角 · 滚轮缩放细节
+        </span>
       </div>
 
-      {/* 屏幕中央角色展示与变身区域 */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative',
-          width: '100%',
-        }}
-      >
-        {/* 上方可爱文案与配色标注 */}
-        <div
-          style={{
-            textAlign: 'center',
-            marginBottom: 24,
-            transition: 'all 0.3s ease',
-          }}
-        >
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '4px 14px',
-              borderRadius: 16,
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              boxShadow: '0 3px 12px rgba(180, 155, 130, 0.18)',
-              marginBottom: 8,
-              border: `1.5px solid ${currentStage.color}`,
-              transition: 'border-color 0.3s ease',
-            }}
-          >
-            <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: '50%',
-                backgroundColor: currentStage.color,
-                animation: 'pulseGlow 1.2s infinite ease-in-out',
-              }}
-            />
-            <span
-              style={{
-                fontSize: '0.86rem',
-                fontWeight: 800,
-                color: '#292524',
-                letterSpacing: '0.5px',
-              }}
-            >
-              {currentStage.title}
-            </span>
-          </div>
-
-          <p
-            style={{
-              margin: 0,
-              fontSize: '0.75rem',
-              color: '#78716C',
-              fontWeight: 500,
-              letterSpacing: '0.2px',
-            }}
-          >
-            {currentStage.subText}
-          </p>
+      {/* 底部 UI：服务器信息与点击切服提示（触发生命与进入桌面按钮已彻底移除） */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        paddingBottom: 36, gap: 10, zIndex: 10, pointerEvents: 'none',
+      }}>
+        {/* 服务器大名称 */}
+        <div style={{
+          fontSize: 30, fontWeight: 900, color: '#fff',
+          textShadow: '0 2px 14px rgba(0,0,0,0.45)',
+          letterSpacing: '0.12em',
+          fontFamily: "'PingFang SC', 'Noto Sans SC', system-ui, sans-serif",
+        }}>
+          {theme.name}
         </div>
 
-        {/* 核心 SVG 角色容器（支持变身 Q 弹果冻与粒子爆散） */}
-        <div
-          style={{
-            position: 'relative',
-            width: 220,
-            height: 180,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            animation: isMorphing ? 'morphSquash 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
-          }}
-        >
-          <CurrentCharacter isAccelerating={isAccelerating} />
+        {/* 副标题 */}
+        <div style={{
+          fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)',
+          textShadow: '0 1px 6px rgba(0,0,0,0.6)',
+          backgroundColor: 'rgba(0,0,0,0.2)',
+          padding: '2px 10px',
+          borderRadius: '10px',
+          backdropFilter: 'blur(4px)',
+        }}>
+          {theme.subtitle}
+        </div>
 
-          {/* 转生变身星光微粒 */}
-          {particles.map((p) => (
+        {/* 5 个服务器进度指示器 */}
+        <div style={{ display: 'flex', gap: 7, marginTop: 4 }}>
+          {STAGE_THEMES.map((item, i) => (
             <div
-              key={p.id}
+              key={i}
+              title={item.name}
               style={{
-                position: 'absolute',
-                left: '50%',
-                top: '50%',
-                width: p.size,
-                height: p.size,
-                borderRadius: '50%',
-                backgroundColor: p.color,
-                boxShadow: `0 0 8px ${p.color}`,
-                transform: `translate(${p.vx * 12}px, ${p.vy * 12}px)`,
-                opacity: 0,
-                transition: 'all 0.45s cubic-bezier(0.16, 1, 0.3, 1)',
-                pointerEvents: 'none',
+                width: i === currentStage ? 24 : 8,
+                height: 8,
+                borderRadius: 4,
+                background: i === currentStage ? '#fff' : 'rgba(255,255,255,0.35)',
+                boxShadow: i === currentStage ? '0 0 10px #fff' : 'none',
+                transition: 'all 0.3s ease',
               }}
             />
           ))}
         </div>
-
-        {/* 6 大阶段指示微圆点 */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 8,
-            marginTop: 20,
-          }}
-        >
-          {SPECIES_STAGES.map((s, idx) => {
-            const isActive = idx === currentStageIdx;
-            const isPassed = idx < currentStageIdx;
-            return (
-              <div
-                key={s.id}
-                style={{
-                  width: isActive ? 22 : 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: isActive ? s.color : isPassed ? '#A8A29E' : '#E7E5E4',
-                  boxShadow: isActive ? `0 0 8px ${s.color}` : 'none',
-                  transition: 'all 0.3s ease',
-                }}
-              />
-            );
-          })}
-        </div>
       </div>
-
-      {/* 底部进度条与狂点交互引导 */}
-      <div
-        style={{
-          width: '100%',
-          maxWidth: 320,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 10,
-        }}
-      >
-        {/* 轻拟物进度条凹槽 */}
-        <div
-          style={{
-            width: '100%',
-            height: 10,
-            backgroundColor: 'rgba(215, 200, 185, 0.45)',
-            borderRadius: 8,
-            padding: 2,
-            boxShadow: 'inset 1px 1px 3px rgba(120, 100, 80, 0.25)',
-          }}
-        >
-          <div
-            style={{
-              width: `${progress}%`,
-              height: '100%',
-              borderRadius: 6,
-              background: `linear-gradient(90deg, #F9A436 0%, ${currentStage.color} 100%)`,
-              boxShadow: `0 0 10px ${currentStage.color}88`,
-              transition: 'width 0.15s ease-out, background 0.3s ease',
-            }}
-          />
-        </div>
-
-        {/* 提示文案与百分比 */}
-        <div
-          style={{
-            width: '100%',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <span
-            style={{
-              fontSize: '0.72rem',
-              color: '#A8A29E',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
-          >
-            <span>👆 点击屏幕加速演化</span>
-            {isAccelerating && (
-              <span style={{ color: '#D97706', fontWeight: 800 }}>⚡ 冲刺中!</span>
-            )}
-          </span>
-
-          <span
-            style={{
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              color: '#78350F',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {Math.round(progress)}%
-          </span>
-        </div>
-      </div>
-
-      {/* 屏幕狂点产生的浮动加速气泡 */}
-      {clickToasts.map((toast) => (
-        <div
-          key={toast.id}
-          style={{
-            position: 'absolute',
-            left: toast.x,
-            top: toast.y,
-            transform: 'translate(-50%, -50%)',
-            pointerEvents: 'none',
-            fontSize: '0.76rem',
-            fontWeight: 800,
-            color: '#B45309',
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            padding: '3px 10px',
-            borderRadius: 12,
-            boxShadow: '0 4px 12px rgba(180, 120, 50, 0.25)',
-            whiteSpace: 'nowrap',
-            animation: 'toastFloat 0.6s ease-out forwards',
-          }}
-        >
-          {toast.text}
-        </div>
-      ))}
     </div>
   );
 };

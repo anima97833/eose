@@ -38,6 +38,10 @@ tsconfig.tsbuildinfo
 *.mhtml
 *.db
 *.zip
+*.epub
+term_bank_*.json
+开屏-*.html
+碎片星球*.html
 pure_writer_export*
 scratch_*
 scratch/

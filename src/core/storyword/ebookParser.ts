@@ -13,9 +13,12 @@ export interface ParsedEbook {
 export function splitTextIntoChapters(fullText: string, defaultTitle: string): StoryChapter[] {
   const cleanText = fullText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  // 匹配常见中文小说与英文章节名：第x章/回/节/卷、Chapter x
+  // 匹配常见中、英、韩网文与小说章节名：
+  // 中文：第x章/回/节/卷
+  // 英文：Chapter x
+  // 韩文：제x장 / 제x화 / x화 / 프롤로그 (序章) / 에필로그 (后记)
   const chapterRegex =
-    /(?:^|\n)\s*(第[0-9一二三四五六七八九十百千万零两]+[章回节卷集部篇][^\n]{0,35}|Chapter\s+[0-9]+[^\n]{0,35})/gi;
+    /(?:^|\n)\s*(第[0-9一二三四五六七八九十百千万零两]+[章回节卷集部篇][^\n]{0,35}|Chapter\s+[0-9]+[^\n]{0,35}|제\s*[0-9]+\s*[장화회][^\n]{0,35}|[0-9]+\s*[화장회]\.?[^\n]{0,35}|프롤로그[^\n]{0,35}|에필로그[^\n]{0,35})/gi;
 
   const matches: Array<{ index: number; title: string }> = [];
   let match: RegExpExecArray | null;
@@ -223,19 +226,31 @@ export async function parseEpubFile(file: File): Promise<ParsedEbook> {
     const headingEl = doc.querySelector('h1, h2, h3, title, .chapter-title, .title');
     let chapterTitle = headingEl?.textContent?.trim();
 
-    // 提取正文文本，保留换行段落
+    // 提取正文文本，保留换行段落（优先提取 p 标签，避免 div 与 p 双重递归重复提取）
     const paragraphs: string[] = [];
-    const pEls = doc.querySelectorAll('p, div, blockquote');
-    if (pEls.length > 0) {
-      pEls.forEach((p) => {
-        const text = p.textContent?.trim();
-        if (text && text.length > 0) {
-          paragraphs.push(text);
-        }
-      });
-    } else {
-      const bodyText = doc.body?.innerText || doc.body?.textContent || '';
-      paragraphs.push(bodyText.trim());
+    const pNodes = doc.querySelectorAll('p');
+    const nodes = pNodes.length > 0
+      ? Array.from(pNodes)
+      : Array.from(doc.querySelectorAll('div, blockquote'));
+
+    nodes.forEach((el) => {
+      // 深度清洗不可见空白字符如 \u00A0 (&nbsp; / &#160;) 与零宽字符
+      const text = (el.textContent || '')
+        .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
+        .replace(/\u200B|\uFEFF/g, '')
+        .trim();
+      if (text.length > 0) {
+        paragraphs.push(text);
+      }
+    });
+
+    if (paragraphs.length === 0) {
+      const bodyText = (doc.body?.innerText || doc.body?.textContent || '')
+        .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
+        .trim();
+      if (bodyText) {
+        paragraphs.push(bodyText);
+      }
     }
 
     const chapterText = paragraphs.join('\n\n');

@@ -17,6 +17,10 @@ import {
 import { StoryClozeCard } from './StoryClozeCard';
 import { SelectionTranslateModal } from './SelectionTranslateModal';
 import { CustomLexiconModal } from './CustomLexiconModal';
+import { KoreanDictModal } from './KoreanDictModal';
+import { KoreanLookupResult, KoreanDictMeta } from '../../../../core/storyword/koreanTermTypes';
+import { lookupKoreanTerm, getKoreanDictMeta } from '../../../../core/storyword/yomitanParser';
+import { cleanKoreanWord, hasHangul } from '../../../../core/storyword/koreanDeinflector';
 import { NM } from '../storyWordNeumorphism';
 import {
   ArrowLeft,
@@ -54,6 +58,14 @@ export const StoryWordReader: React.FC<StoryWordReaderProps> = ({
   const [activeLexiconId, setActiveLexiconId] = useState<string | null>(novel.activeLexiconId || null);
   const [activeLexicon, setActiveLexicon] = useState<CustomLexicon | null>(null);
   const [isCustomLexiconModalOpen, setIsCustomLexiconModalOpen] = useState(false);
+  const [lexiconModalInitialTab, setLexiconModalInitialTab] = useState<'list' | 'import' | 'korean'>('list');
+
+  // 韩语原著查词状态
+  const [koreanDictMeta, setKoreanDictMeta] = useState<KoreanDictMeta | null>(null);
+  const [isKoreanModalOpen, setIsKoreanModalOpen] = useState(false);
+  const [koreanLookupResult, setKoreanLookupResult] = useState<KoreanLookupResult | null>(null);
+  const [koreanModalWord, setKoreanModalWord] = useState('');
+  const [isKoreanLoading, setIsKoreanLoading] = useState(false);
 
   // 纯中文原著模式 vs 爽文双语背词模式
   const [isOriginalMode, setIsOriginalMode] = useState<boolean>(false);
@@ -67,6 +79,48 @@ export const StoryWordReader: React.FC<StoryWordReaderProps> = ({
   const [isTranslateModalOpen, setIsTranslateModalOpen] = useState(false);
 
   const currentChapter = novel.chapters[currentIdx] || novel.chapters[0];
+
+  // 探测当前章节是否为韩语原著
+  const isKoreanNovel = useMemo(() => {
+    if (!currentChapter) return false;
+    return hasHangul(currentChapter.originalText.slice(0, 600));
+  }, [currentChapter]);
+
+  useEffect(() => {
+    getKoreanDictMeta().then(meta => {
+      setKoreanDictMeta(meta);
+    });
+  }, [isCustomLexiconModalOpen]);
+
+  const handleKoreanWordClick = async (word: string) => {
+    const cleaned = cleanKoreanWord(word);
+    if (!cleaned) return;
+    setKoreanModalWord(cleaned);
+    setKoreanLookupResult(null);
+    setIsKoreanLoading(true);
+    setIsKoreanModalOpen(true);
+    try {
+      const res = await lookupKoreanTerm(cleaned);
+      setKoreanLookupResult(res);
+    } catch (err) {
+      console.error('Korean lookup error', err);
+    } finally {
+      setIsKoreanLoading(false);
+    }
+  };
+
+  const handleAddKoreanMistake = async (res: KoreanLookupResult) => {
+    const fakeWord: EnglishWord = {
+      word: res.matchedTerm.term,
+      phonetic: res.matchedTerm.reading || (res.matchedTerm.hanja ? `〔${res.matchedTerm.hanja}〕` : ''),
+      translation: res.matchedTerm.summary.slice(0, 120),
+      partOfSpeech: res.matchedTerm.pos || '韩语',
+      level: 'cet4',
+      triggers: [res.matchedTerm.term],
+    };
+    await addMistakeWord(fakeWord, res.searchedText);
+    showToast(`已收藏至错词本: ${res.matchedTerm.term}`);
+  };
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -86,6 +140,16 @@ export const StoryWordReader: React.FC<StoryWordReaderProps> = ({
   // 编译中英文混合段落 (融合官方考纲/私人词库 + 用户自定义在线抠入生词)
   const compiledParagraphs: CompiledParagraph[] = useMemo(() => {
     if (!currentChapter) return [];
+    if (isKoreanNovel) {
+      // 韩文原著：保持韩语自然段落排版，并赋予全本点词即查能力
+      const paras = currentChapter.originalText
+        .split(/\r?\n/)
+        .map(p => p.trim())
+        .filter(p => p.length > 0);
+      return paras.map(p => ({
+        tokens: [{ type: 'korean' as any, content: p }],
+      }));
+    }
     if (isOriginalMode) {
       // 纯原文模式：直接分割为普通段落文本，不执行任何词汇替换
       const paras = currentChapter.originalText
@@ -104,7 +168,7 @@ export const StoryWordReader: React.FC<StoryWordReaderProps> = ({
       strictOnly,
       activeLexicon ? activeLexicon.words : undefined
     );
-  }, [currentChapter, targetLevel, density, customWords, strictOnly, activeLexicon, isOriginalMode]);
+  }, [currentChapter, targetLevel, density, customWords, strictOnly, activeLexicon, isOriginalMode, isKoreanNovel]);
 
   // 生成 Direction B 剧情打脸填空关卡 (每个章节 2~3 关)
   const [clozeChallenges, setClozeChallenges] = useState(() => {
@@ -349,6 +413,34 @@ export const StoryWordReader: React.FC<StoryWordReaderProps> = ({
             {isOriginalMode ? <BookOpen size={14} color={NM.amber} /> : <Sparkles size={14} color={NM.amber} />}
             <span>{isOriginalMode ? '切回背词' : '切回原文'}</span>
           </button>
+
+          {isKoreanNovel && (
+            <button
+              onClick={() => {
+                setLexiconModalInitialTab('korean');
+                setIsCustomLexiconModalOpen(true);
+              }}
+              title={koreanDictMeta ? `已导入韩语词库: ${koreanDictMeta.name} (${koreanDictMeta.termCount.toLocaleString()} 词)` : '导入韩语 Yomitan 词库'}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '0 8px',
+                height: '32px',
+                borderRadius: '10px',
+                backgroundColor: NM.cardBg,
+                boxShadow: NM.convexXs,
+                border: NM.borderLight,
+                cursor: 'pointer',
+                color: NM.amber,
+                fontSize: '11px',
+                fontWeight: 700,
+              }}
+            >
+              <Languages size={14} />
+              <span>{koreanDictMeta ? `${koreanDictMeta.termCount.toLocaleString()} 词` : '韩语词库'}</span>
+            </button>
+          )}
 
           <button
             onClick={() => {
@@ -746,19 +838,33 @@ export const StoryWordReader: React.FC<StoryWordReaderProps> = ({
               backgroundColor: NM.bgInset,
               boxShadow: NM.insetXs,
               fontSize: '11px',
-              color: isOriginalMode ? NM.gold : NM.amber,
+              color: isKoreanNovel ? NM.amber : isOriginalMode ? NM.gold : NM.amber,
               fontWeight: 600,
             }}
           >
-            {isOriginalMode ? <BookOpen size={11} /> : <Sparkles size={11} />}
-            <span>{isOriginalMode ? '纯享原著阅读模式 (点击顶部或设置可切回背词)' : '网文双语混编 · 爽点通关模式'}</span>
+            {isKoreanNovel ? (
+              <>
+                <Languages size={11} />
+                <span>🇰🇷 韩文原著伴读模式 (点击任意韩文词汇即刻查词与发音)</span>
+              </>
+            ) : isOriginalMode ? (
+              <>
+                <BookOpen size={11} />
+                <span>纯享原著阅读模式 (点击顶部或设置可切回背词)</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={11} />
+                <span>网文双语混编 · 爽点通关模式</span>
+              </>
+            )}
           </div>
         </div>
 
         {/* 正文渲染 */}
         {compiledParagraphs.map((para, pIdx) => {
           // 仅在爽词模式下嵌入 Direction B 互动通关关卡（纯原文模式保持沉浸连贯）
-          const insertClozeIdx = !isOriginalMode && (pIdx === 2 ? 0 : pIdx === 5 ? 1 : -1);
+          const insertClozeIdx = !isOriginalMode && !isKoreanNovel && (pIdx === 2 ? 0 : pIdx === 5 ? 1 : -1);
           const cloze = typeof insertClozeIdx === 'number' && insertClozeIdx !== -1 ? clozeChallenges[insertClozeIdx] : null;
 
           return (
@@ -767,15 +873,78 @@ export const StoryWordReader: React.FC<StoryWordReaderProps> = ({
                 className="allow-text-selection"
                 style={{
                   fontSize: `${fontSize}px`,
-                  lineHeight: '1.9',
-                  margin: '0 0 10px 0',
-                  textIndent: '2em',
+                  lineHeight: isKoreanNovel ? '2.1' : '1.9',
+                  margin: isKoreanNovel ? '0 0 14px 0' : '0 0 10px 0',
+                  textIndent: isKoreanNovel ? 0 : '2em',
+                  wordBreak: isKoreanNovel ? 'keep-all' : 'break-word',
+                  fontFamily: isKoreanNovel
+                    ? '"Pretendard", -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif'
+                    : undefined,
                   color: NM.textMain,
                   userSelect: 'text',
                   WebkitUserSelect: 'text',
                 }}
               >
                 {para.tokens.map((token: StoryToken, tIdx: number) => {
+                  if ((token as any).type === 'korean' || isKoreanNovel) {
+                    const content = (token as any).content || (token as any).type === 'text' ? (token as any).content : '';
+                    if (!content) return null;
+                    const parts = content.split(/(\s+)/);
+                    return (
+                      <React.Fragment key={tIdx}>
+                        {parts.map((part: string, wIdx: number) => {
+                          if (/^\s+$/.test(part)) {
+                            return (
+                              <span key={wIdx} style={{ textIndent: 0, whiteSpace: 'pre-wrap' }}>
+                                {part}
+                              </span>
+                            );
+                          }
+                          const cleaned = cleanKoreanWord(part);
+                          if (!cleaned || !hasHangul(cleaned)) {
+                            return (
+                              <span key={wIdx} style={{ textIndent: 0 }}>
+                                {part}
+                              </span>
+                            );
+                          }
+                          return (
+                            <span
+                              key={wIdx}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleKoreanWordClick(part);
+                              }}
+                              className="korean-word-token allow-text-selection"
+                              style={{
+                                display: 'inline',
+                                textIndent: 0,
+                                cursor: 'pointer',
+                                borderRadius: '4px',
+                                padding: '1px 2px',
+                                margin: 0,
+                                boxDecorationBreak: 'clone',
+                                WebkitBoxDecorationBreak: 'clone' as any,
+                                transition: 'all 0.12s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(217, 119, 6, 0.18)';
+                                e.currentTarget.style.color = NM.amber;
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                                e.currentTarget.style.color = 'inherit';
+                              }}
+                              title="点击查看韩语释义"
+                            >
+                              {part}
+                            </span>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  }
+
                   if (token.type === 'text') {
                     return (
                       <span
@@ -1100,6 +1269,7 @@ export const StoryWordReader: React.FC<StoryWordReaderProps> = ({
         isOpen={isCustomLexiconModalOpen}
         onClose={() => setIsCustomLexiconModalOpen(false)}
         activeLexiconId={activeLexiconId}
+        initialTab={lexiconModalInitialTab}
         onSelectLexicon={lex => {
           const lexId = lex ? lex.id : null;
           setActiveLexiconId(lexId);
@@ -1108,6 +1278,21 @@ export const StoryWordReader: React.FC<StoryWordReaderProps> = ({
           saveStoryNovel(updated);
           showToast(lex ? `已启用私人词库《${lex.name}》` : '已切回官方考纲词库');
         }}
+      />
+
+      {/* 韩语原著点词即查词典弹窗 */}
+      <KoreanDictModal
+        isOpen={isKoreanModalOpen}
+        onClose={() => setIsKoreanModalOpen(false)}
+        result={koreanLookupResult}
+        rawWord={koreanModalWord}
+        hasDictionaryInstalled={!!koreanDictMeta && koreanDictMeta.termCount > 0}
+        isLoading={isKoreanLoading}
+        onOpenLexiconModal={() => {
+          setLexiconModalInitialTab('korean');
+          setIsCustomLexiconModalOpen(true);
+        }}
+        onAddToMistakes={handleAddKoreanMistake}
       />
     </div>
   );

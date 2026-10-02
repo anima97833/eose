@@ -34,7 +34,7 @@ export interface WishItem {
 export interface DecisionTaskItem {
   id: string;
   originalId: string;
-  source: 'diary';
+  source: 'diary' | 'kanban';
   sourceLabel: string;
   title: string;
   desc?: string;

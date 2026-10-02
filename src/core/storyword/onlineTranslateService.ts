@@ -40,8 +40,9 @@ export async function onlineTranslate(
 
   // 1. 自动判断源语言与目标语言
   const hasChinese = /[\u4e00-\u9fa5]/.test(trimmed);
-  const sourceLang = hasChinese ? 'zh-CN' : 'en';
-  const targetLang = targetLanguage || (hasChinese ? 'en' : 'zh-CN');
+  const hasHangulText = /[\uAC00-\uD7A3]/.test(trimmed);
+  const sourceLang = hasHangulText ? 'ko' : hasChinese ? 'zh-CN' : 'en';
+  const targetLang = targetLanguage || (hasHangulText || !hasChinese ? 'zh-CN' : 'en');
 
   const cacheKey = `${sourceLang}->${targetLang}:${trimmed}`;
   if (translationCache.has(cacheKey)) {

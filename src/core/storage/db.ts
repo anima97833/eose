@@ -8,6 +8,7 @@ import { MovieRecord } from '../cinema/cinemaTypes';
 import { SavedPoemRecord } from '../poetry/poetryTypes';
 import { PhysicalBookRecord } from '../books/bookTypes';
 import { StoryNovel, StoryWordMistake, BookSourceRule, CustomLexicon } from '../storyword/storyWordTypes';
+import { KoreanTermRecord } from '../storyword/koreanTermTypes';
 
 import { VirtualFileRecord } from '../files/fileTypes';
 import { PosterRecord } from '../poster/posterTypes';
@@ -182,6 +183,7 @@ export class NeumorphicPhoneDatabase extends Dexie {
   storyword_mistakes!: Table<StoryWordMistake, string>;
   storyword_sources!: Table<BookSourceRule, string>;
   storyword_custom_lexicons!: Table<CustomLexicon, string>;
+  storyword_korean_terms!: Table<KoreanTermRecord, string>;
   rpg_life_stories!: Table<RPGLifeStoryRecord, string>;
   rpg_background_images!: Table<RPGBackgroundImageRecord, string>;
   rpg_activity_banners!: Table<RPGActivityBannerRecord, string>;
@@ -722,6 +724,11 @@ export class NeumorphicPhoneDatabase extends Dexie {
     this.version(26).stores({
       pomodoro_sessions: null,
       pomodoro_tasks: null,
+    });
+
+    // 版本 27: 用户自主导入的韩语 Yomitan/TermBank 词库表
+    this.version(27).stores({
+      storyword_korean_terms: 'id, term, score, *hanja',
     });
   }
 }

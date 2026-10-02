@@ -38,11 +38,15 @@ export const App: React.FC = () => {
   const [activeApp, setActiveApp] = useState<string | null>(null);
   const [isOpeningApp, setIsOpeningApp] = useState<boolean>(false);
   const [isBooting, setIsBooting] = useState<boolean>(true);
+  const [isForceReplay, setIsForceReplay] = useState<boolean>(false);
 
   // 初始化桌面 15 秒静止白日梦沉思侦听 & 重温开屏动画事件侦听
   useEffect(() => {
     const cleanup = initIdleMasterDetector();
-    const handleReplay = () => setIsBooting(true);
+    const handleReplay = () => {
+      setIsForceReplay(true);
+      setIsBooting(true);
+    };
     window.addEventListener('replay-earth-splash', handleReplay);
 
     return () => {
@@ -161,7 +165,13 @@ export const App: React.FC = () => {
 
       {/* 地球 Online 物种服加载开屏动画 */}
       {isBooting && (
-        <EarthLoadingScreen onFinished={() => setIsBooting(false)} />
+        <EarthLoadingScreen
+          isDemo={isForceReplay}
+          onFinished={() => {
+            setIsBooting(false);
+            setIsForceReplay(false);
+          }}
+        />
       )}
 
       {/* 每日晨间今日海报开屏展映 (每天自动唤醒一次，支持翻转看备忘打勾) */}

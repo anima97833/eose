@@ -23,13 +23,23 @@ import {
   X,
   BookOpen,
   Info,
+  Languages,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
+import {
+  getKoreanDictMeta,
+  importYomitanJsonFiles,
+  clearKoreanDictionary,
+} from '../../../../core/storyword/yomitanParser';
+import { KoreanDictMeta } from '../../../../core/storyword/koreanTermTypes';
 
 interface CustomLexiconModalProps {
   isOpen: boolean;
   onClose: () => void;
   activeLexiconId?: string | null;
   onSelectLexicon: (lexicon: CustomLexicon | null) => void;
+  initialTab?: 'list' | 'import' | 'korean';
 }
 
 export const CustomLexiconModal: React.FC<CustomLexiconModalProps> = ({
@@ -37,10 +47,20 @@ export const CustomLexiconModal: React.FC<CustomLexiconModalProps> = ({
   onClose,
   activeLexiconId,
   onSelectLexicon,
+  initialTab = 'list',
 }) => {
-  const [activeTab, setActiveTab] = useState<'list' | 'import'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'import' | 'korean'>(initialTab);
   const [lexicons, setLexicons] = useState<CustomLexicon[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // 韩语 Yomitan 词库状态
+  const [koreanMeta, setKoreanMeta] = useState<KoreanDictMeta | null>(null);
+  const [isImportingKorean, setIsImportingKorean] = useState(false);
+  const [koreanProgress, setKoreanProgress] = useState(0);
+  const [koreanCurrent, setKoreanCurrent] = useState(0);
+  const [koreanTotal, setKoreanTotal] = useState(0);
+  const [koreanAppendMode, setKoreanAppendMode] = useState(false);
+  const koreanFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // 导入状态
   const [lexiconName, setLexiconName] = useState('');
@@ -65,11 +85,60 @@ export const CustomLexiconModal: React.FC<CustomLexiconModalProps> = ({
     }
   };
 
+  const loadKoreanMeta = async () => {
+    const meta = await getKoreanDictMeta();
+    setKoreanMeta(meta);
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadLexicons();
+      loadKoreanMeta();
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialTab]);
+
+  // 处理韩语 Yomitan JSON 导入
+  const handleKoreanFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList);
+
+    setIsImportingKorean(true);
+    setKoreanProgress(0);
+    setKoreanCurrent(0);
+    setKoreanTotal(0);
+
+    try {
+      showToast(files.length === 1 ? `开始解析韩语词典：${files[0].name}` : `开始批量解析 ${files.length} 个韩语词库分卷...`);
+      const meta = await importYomitanJsonFiles(
+        files,
+        (percent, cur, tot) => {
+          setKoreanProgress(percent);
+          setKoreanCurrent(cur);
+          setKoreanTotal(tot);
+        },
+        { append: koreanAppendMode }
+      );
+      setKoreanMeta(meta);
+      showToast(`🎉 成功入库！本地共收录 ${meta.termCount.toLocaleString()} 词`);
+    } catch (err: any) {
+      showToast(`导入失败: ${err.message || '格式错误'}`);
+    } finally {
+      setIsImportingKorean(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleClearKoreanDict = async () => {
+    if (window.confirm('确定要清空本地 IndexedDB 中的韩语词库吗？清空后点词查词将需要重新导入。')) {
+      await clearKoreanDictionary();
+      setKoreanMeta(null);
+      showToast('已清空本地韩语词库');
+    }
+  };
 
   // 实时嗅探解析输入文本
   useEffect(() => {
@@ -244,7 +313,7 @@ export const CustomLexiconModal: React.FC<CustomLexiconModalProps> = ({
           style={{
             display: 'flex',
             padding: '8px 16px',
-            gap: '8px',
+            gap: '6px',
             backgroundColor: NM.bgInset,
           }}
         >
@@ -252,10 +321,10 @@ export const CustomLexiconModal: React.FC<CustomLexiconModalProps> = ({
             onClick={() => setActiveTab('list')}
             style={{
               flex: 1,
-              padding: '7px 0',
+              padding: '7px 4px',
               borderRadius: '10px',
               border: 'none',
-              fontSize: '12px',
+              fontSize: '11px',
               fontWeight: 700,
               cursor: 'pointer',
               backgroundColor: activeTab === 'list' ? NM.cardBg : 'transparent',
@@ -263,17 +332,17 @@ export const CustomLexiconModal: React.FC<CustomLexiconModalProps> = ({
               boxShadow: activeTab === 'list' ? NM.convexXs : 'none',
             }}
           >
-            我的词库 ({lexicons.length})
+            英语词库 ({lexicons.length})
           </button>
 
           <button
             onClick={() => setActiveTab('import')}
             style={{
               flex: 1,
-              padding: '7px 0',
+              padding: '7px 4px',
               borderRadius: '10px',
               border: 'none',
-              fontSize: '12px',
+              fontSize: '11px',
               fontWeight: 700,
               cursor: 'pointer',
               backgroundColor: activeTab === 'import' ? NM.cardBg : 'transparent',
@@ -281,7 +350,43 @@ export const CustomLexiconModal: React.FC<CustomLexiconModalProps> = ({
               boxShadow: activeTab === 'import' ? NM.convexXs : 'none',
             }}
           >
-            ➕ 导入 / 粘贴新词库
+            ➕ 导入英语
+          </button>
+
+          <button
+            onClick={() => setActiveTab('korean')}
+            style={{
+              flex: 1.2,
+              padding: '7px 4px',
+              borderRadius: '10px',
+              border: 'none',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              backgroundColor: activeTab === 'korean' ? NM.cardBg : 'transparent',
+              color: activeTab === 'korean' ? NM.gold : NM.textSub,
+              boxShadow: activeTab === 'korean' ? NM.convexXs : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+            }}
+          >
+            <Languages size={12} />
+            <span>韩语 Yomitan</span>
+            {koreanMeta && (
+              <span
+                style={{
+                  fontSize: '9px',
+                  backgroundColor: '#10b981',
+                  color: '#fff',
+                  borderRadius: '10px',
+                  padding: '1px 4px',
+                }}
+              >
+                已装
+              </span>
+            )}
           </button>
         </div>
 
@@ -685,6 +790,228 @@ export const CustomLexiconModal: React.FC<CustomLexiconModalProps> = ({
                   </>
                 )}
               </button>
+            </div>
+          )}
+
+          {activeTab === 'korean' && (
+            /* =================== TAB 3: 韩语 Yomitan 词库 =================== */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* 隐藏的文件上传 input (支持多选) */}
+              <input
+                ref={koreanFileInputRef}
+                type="file"
+                multiple
+                accept=".json"
+                style={{ display: 'none' }}
+                onChange={handleKoreanFileUpload}
+              />
+
+              {/* 当前词库状态卡片 */}
+              <div
+                style={{
+                  padding: '14px',
+                  borderRadius: '14px',
+                  backgroundColor: NM.cardBg,
+                  boxShadow: NM.convexSm,
+                  border: NM.borderLight,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Languages size={18} color={NM.amber} />
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: NM.textMain }}>
+                      本地韩中词典库
+                    </span>
+                  </div>
+
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '8px',
+                      backgroundColor: koreanMeta ? 'rgba(16, 185, 129, 0.12)' : 'rgba(156, 163, 175, 0.15)',
+                      color: koreanMeta ? '#10b981' : NM.textSub,
+                    }}
+                  >
+                    {koreanMeta ? '✓ 已就绪' : '未导入'}
+                  </span>
+                </div>
+
+                {koreanMeta ? (
+                  <div
+                    style={{
+                      padding: '12px',
+                      borderRadius: '10px',
+                      backgroundColor: NM.bgInset,
+                      boxShadow: NM.insetXs,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: NM.textSub }}>词库名称:</span>
+                      <strong style={{ color: NM.textMain }}>{koreanMeta.name}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: NM.textSub }}>总词条量:</span>
+                      <strong style={{ color: NM.amber }}>{koreanMeta.termCount.toLocaleString()} 词</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: NM.textSub }}>更新时间:</span>
+                      <span style={{ color: NM.textSub }}>{new Date(koreanMeta.updatedAt).toLocaleDateString()}</span>
+                    </div>
+
+                    <div style={{ borderTop: NM.borderSoft, paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={handleClearKoreanDict}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#ef4444',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                        }}
+                      >
+                        <Trash2 size={12} />
+                        <span>清空词库</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      padding: '12px',
+                      borderRadius: '10px',
+                      backgroundColor: NM.bgInset,
+                      boxShadow: NM.insetXs,
+                      fontSize: '12px',
+                      lineHeight: '1.6',
+                      color: NM.textSub,
+                    }}
+                  >
+                    暂无本地韩语词库。导入后支持韩文原著小说<strong>全本点词即查、词干形态素还原、汉字词互查及真人韩语发音</strong>。
+                  </div>
+                )}
+              </div>
+
+              {/* 上传导入区域 */}
+              <div
+                style={{
+                  padding: '16px',
+                  borderRadius: '14px',
+                  backgroundColor: NM.cardBg,
+                  boxShadow: NM.convexSm,
+                  border: NM.borderLight,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: NM.textMain }}>
+                    {koreanMeta ? '导入更多分卷 / 覆盖词典文件' : '导入 Yomitan JSON 词典'}
+                  </span>
+
+                  {/* 追加模式开关 */}
+                  {koreanMeta && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', cursor: 'pointer', color: NM.amber, fontWeight: 700 }}>
+                      <input
+                        type="checkbox"
+                        checked={koreanAppendMode}
+                        onChange={e => setKoreanAppendMode(e.target.checked)}
+                        style={{ accentColor: NM.amber }}
+                      />
+                      <span>分卷追加模式（不清除现有分卷）</span>
+                    </label>
+                  )}
+                </div>
+
+                <div
+                  onClick={() => !isImportingKorean && koreanFileInputRef.current?.click()}
+                  style={{
+                    padding: '20px 14px',
+                    borderRadius: '12px',
+                    backgroundColor: NM.bgInset,
+                    boxShadow: NM.insetSm,
+                    border: '1.5px dashed rgba(217, 119, 6, 0.4)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    cursor: isImportingKorean ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <Upload size={24} color={NM.amber} />
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: NM.textMain }}>
+                    {isImportingKorean ? '正在流式分批写入 IndexedDB...' : '点击选择 term_bank_*.json 文件（支持按住 Ctrl 多选）'}
+                  </span>
+                  <span style={{ fontSize: '11px', color: NM.textSub }}>
+                    支持标准 Yomitan / TermBank 格式 JSON，可单次同时选取全部词库分卷
+                  </span>
+                </div>
+
+                {/* 导入进度条 */}
+                {isImportingKorean && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: NM.amber, fontWeight: 700 }}>
+                      <span>解析入库进度</span>
+                      <span>{koreanProgress}% ({koreanCurrent.toLocaleString()} / {koreanTotal.toLocaleString()} 词)</span>
+                    </div>
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '7px',
+                        borderRadius: '4px',
+                        backgroundColor: NM.bgInset,
+                        boxShadow: NM.insetXs,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${koreanProgress}%`,
+                          height: '100%',
+                          backgroundColor: NM.amber,
+                          borderRadius: '4px',
+                          transition: 'width 0.15s ease',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 核心原则轻拟物说明卡 */}
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  backgroundColor: 'rgba(217, 119, 6, 0.06)',
+                  border: '1px solid rgba(217, 119, 6, 0.15)',
+                  fontSize: '11px',
+                  color: NM.textSub,
+                  lineHeight: '1.6',
+                  display: 'flex',
+                  gap: '8px',
+                }}
+              >
+                <Info size={15} color={NM.amber} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span>
+                  <strong>零打包承诺</strong>：间词框架绝不预置或打包任何实体词库，词典完全由您自主导入并保存在您手机/电脑的本地 IndexedDB 中，秒级加载、断网可用。
+                </span>
+              </div>
             </div>
           )}
         </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { DecisionTaskItem, GachaPalette } from '../core/gachaTypes';
-import { X, RefreshCw, CheckCircle, Clock, BookOpen, Sparkles } from 'lucide-react';
+import { X, RefreshCw, CheckCircle } from 'lucide-react';
 
 interface TaskPoolSyncModalProps {
   tasks: DecisionTaskItem[];
@@ -10,6 +10,19 @@ interface TaskPoolSyncModalProps {
   onOpenApp?: (appId: string) => void;
 }
 
+// 来源标签样式配置
+const SOURCE_BADGE_STYLES: Record<string, { bg: string; color: string }> = {
+  diary:              { bg: '#E0F2FE', color: '#0369A1' },
+  kanban_in_progress: { bg: '#ECFDF5', color: '#065F46' },
+  kanban_backlog:     { bg: '#FEF3C7', color: '#92400E' },
+};
+
+function getSourceBadgeStyle(task: DecisionTaskItem) {
+  if (task.source === 'diary') return SOURCE_BADGE_STYLES.diary;
+  if (task.sourceLabel.includes('正在学')) return SOURCE_BADGE_STYLES.kanban_in_progress;
+  return SOURCE_BADGE_STYLES.kanban_backlog;
+}
+
 export const TaskPoolSyncModal: React.FC<TaskPoolSyncModalProps> = ({
   tasks,
   palette,
@@ -17,6 +30,10 @@ export const TaskPoolSyncModal: React.FC<TaskPoolSyncModalProps> = ({
   onRefresh,
   onOpenApp,
 }) => {
+  const diaryCount   = tasks.filter((t) => t.source === 'diary').length;
+  const inProgCount  = tasks.filter((t) => t.source === 'kanban' && t.sourceLabel.includes('正在学')).length;
+  const backlogCount = tasks.filter((t) => t.source === 'kanban' && t.sourceLabel.includes('还没学')).length;
+
   return (
     <div
       style={{
@@ -65,8 +82,11 @@ export const TaskPoolSyncModal: React.FC<TaskPoolSyncModalProps> = ({
               <span>🎯</span>
               <span>待办决断扭蛋池</span>
             </div>
-            <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2, fontWeight: 600 }}>
-              仅同步世界线未打钩的任务 ({tasks.length} 项)
+            <div style={{ fontSize: 11, color: '#6B7280', marginTop: 4, fontWeight: 600, display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
+              <span>共 {tasks.length} 项</span>
+              {diaryCount > 0   && <span style={{ color: '#0369A1' }}>🌌 待办 {diaryCount}</span>}
+              {inProgCount > 0  && <span style={{ color: '#065F46' }}>📖 在学 {inProgCount}</span>}
+              {backlogCount > 0 && <span style={{ color: '#92400E' }}>⏳ 待学 {backlogCount}</span>}
             </div>
           </div>
 
@@ -83,6 +103,7 @@ export const TaskPoolSyncModal: React.FC<TaskPoolSyncModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
+              flexShrink: 0,
             }}
           >
             <X size={16} />
@@ -113,78 +134,85 @@ export const TaskPoolSyncModal: React.FC<TaskPoolSyncModalProps> = ({
             >
               <div style={{ fontSize: 36 }}>🎉</div>
               <div style={{ fontSize: 15, fontWeight: 800, color: '#374151' }}>
-                太棒了！所有待办均已打钩完成
+                太棒了！当前没有待决断事项
               </div>
               <div style={{ fontSize: 12, color: '#9CA3AF', maxWidth: 220, lineHeight: 1.5 }}>
-                当前世界线手账中暂无未完成任务。您可在世界线添加新任务后点击下方刷新。
+                世界线待办已全部完成，学习看板中也暂无进行中或待开始的课程。
               </div>
             </div>
           ) : (
-            tasks.map((t) => (
-              <div
-                key={t.id}
-                style={{
-                  padding: '12px 14px',
-                  borderRadius: 14,
-                  background: '#FFFFFF',
-                  border: '1.5px solid rgba(0,0,0,0.08)',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                }}
-              >
-                <div style={{ fontSize: 24 }}>{t.icon}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 800,
-                      color: '#1F2937',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {t.title}
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      marginTop: 4,
-                    }}
-                  >
-                    <span
+            tasks.map((t) => {
+              const badgeStyle = getSourceBadgeStyle(t);
+              return (
+                <div
+                  key={t.id}
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: 14,
+                    background: '#FFFFFF',
+                    border: '1.5px solid rgba(0,0,0,0.08)',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ fontSize: 24, flexShrink: 0 }}>{t.icon}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
                       style={{
-                        fontSize: 10,
+                        fontSize: 13,
                         fontWeight: 800,
-                        padding: '1px 6px',
-                        borderRadius: 6,
-                        background: '#E0F2FE',
-                        color: '#0369A1',
+                        color: '#1F2937',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                     >
-                      🌌 世界线
-                    </span>
-                    {t.desc && (
+                      {t.title}
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        marginTop: 4,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      {/* 来源标签 */}
                       <span
                         style={{
-                          fontSize: 11,
-                          color: '#6B7280',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
+                          fontSize: 10,
+                          fontWeight: 800,
+                          padding: '1px 6px',
+                          borderRadius: 6,
+                          background: badgeStyle.bg,
+                          color: badgeStyle.color,
+                          flexShrink: 0,
                         }}
                       >
-                        {t.desc}
+                        {t.sourceLabel}
                       </span>
-                    )}
+                      {/* 描述信息 */}
+                      {t.desc && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: '#6B7280',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {t.desc}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -217,7 +245,7 @@ export const TaskPoolSyncModal: React.FC<TaskPoolSyncModalProps> = ({
             }}
           >
             <RefreshCw size={14} />
-            <span>刷新待办</span>
+            <span>刷新</span>
           </button>
 
           <button

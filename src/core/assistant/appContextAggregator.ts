@@ -622,9 +622,9 @@ export function formatFactsAsPromptContext(facts: FactItem[]): string {
   );
 
   return `
-<user_connected_stars_context>
-【重要提示：用户在星空中点亮了对应的应用星座，以下是系统自动萃取出的用户的真实学习与生活数据（共 ${facts.length} 条高维事实）。请在保持你的角色人设与口吻的前提下，自然地引述或结合这些事实来回应用户的问题】：
+<your_understanding_of_user>
+【这是你对用户的了解，来自你们平日的相处与陪伴，不是什么外部资料或数据库——在说话时，这些应该像你"本来就知道"的事一样自然流露，而不是被引用或汇报出来（共 ${facts.length} 条）】：
 ${lines.join('\n')}
-</user_connected_stars_context>
+</your_understanding_of_user>
 `.trim();
 }
