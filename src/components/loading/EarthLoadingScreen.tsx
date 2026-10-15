@@ -9,12 +9,13 @@ interface EarthLoadingScreenProps {
 }
 
 // 5 大物种主题配色
+// 5 大地球 Online 物种服务器配置
 const STAGE_THEMES = [
-  { id: 0, name: '狗狗的林间晨跑',  sky: 0x90E0EF, ground: 0x7CB518, dirt: 0x5C8001, light: 0xFFF9E6, poof: 0xFFEA00 },
-  { id: 1, name: '猫咪的午夜探险',  sky: 0x2B2D42, ground: 0x8D99AE, dirt: 0x4A4E69, light: 0xE8EAF6, poof: 0x00F0FF },
-  { id: 2, name: '原石的日落翻滚',  sky: 0xFFB703, ground: 0xFB8500, dirt: 0x9C6644, light: 0xFFE8D6, poof: 0xFF5722 },
-  { id: 3, name: '彩蝶的春日庭院',  sky: 0xFFC8DD, ground: 0xFFAFCC, dirt: 0xB5838D, light: 0xFFFFFF, poof: 0xFF006E },
-  { id: 4, name: '旅人的无尽漫步',  sky: 0x48CAE4, ground: 0xADE8F4, dirt: 0x0077B6, light: 0xCAF0F8, poof: 0xFFFFFF },
+  { id: 0, name: '狗狗服',   subtitle: '犬科伴侣物种 · 晨光绿野区', sky: 0x90E0EF, ground: 0x7CB518, dirt: 0x5C8001, light: 0xFFF9E6, poof: 0xFFEA00 },
+  { id: 1, name: '猫猫服',   subtitle: '猫科自由物种 · 午夜暗月区', sky: 0x2B2D42, ground: 0x8D99AE, dirt: 0x4A4E69, light: 0xE8EAF6, poof: 0x00F0FF },
+  { id: 2, name: '无机物服', subtitle: '硅基地质原石 · 永恒静止区', sky: 0xFFB703, ground: 0xFB8500, dirt: 0x9C6644, light: 0xFFE8D6, poof: 0xFF5722 },
+  { id: 3, name: '昆虫服',   subtitle: '鳞翅目节肢物种 · 花蜜庭院区', sky: 0xFFC8DD, ground: 0xFFAFCC, dirt: 0xB5838D, light: 0xFFFFFF, poof: 0xFF006E },
+  { id: 4, name: '人类服',   subtitle: '碳基灵长直立人 · 文明探索区', sky: 0x48CAE4, ground: 0xADE8F4, dirt: 0x0077B6, light: 0xCAF0F8, poof: 0xFFFFFF },
 ];
 
 const SPLASH_PLAYED_KEY = 'cloudfly_3d_splash_played_v1';
@@ -28,22 +29,51 @@ export const EarthLoadingScreen: React.FC<EarthLoadingScreenProps> = ({ onFinish
   const currentStageRef = useRef(0);
   const isTransitioningRef = useRef(false);
 
-  // 检查是否已经播放过（非 demo 模式下跳过）
-  useEffect(() => {
+  const handleEnter = useCallback(() => {
     if (!isDemo) {
-      const played = localStorage.getItem(SPLASH_PLAYED_KEY);
+      try {
+        sessionStorage.setItem(SPLASH_PLAYED_KEY, '1');
+      } catch {}
+    }
+    onFinished();
+  }, [isDemo, onFinished]);
+
+  // 触发生命流转 / 切换至下一个服务器（人类服之后再点击直接进入桌面）
+  const handleTransform = useCallback(() => {
+    if (isTransitioningRef.current) return;
+    const current = currentStageRef.current;
+    if (current >= STAGE_THEMES.length - 1) {
+      // 已经是人类服，再点击就是进入桌面
+      handleEnter();
+      return;
+    }
+    isTransitioningRef.current = true;
+    setIsTransitioning(true);
+    const next = current + 1;
+    currentStageRef.current = next;
+    setCurrentStage(next);
+    (window as any).__splashTransition?.(current, next);
+  }, [handleEnter]);
+
+  const handleTransformRef = useRef(handleTransform);
+  useEffect(() => {
+    handleTransformRef.current = handleTransform;
+  }, [handleTransform]);
+
+  // 检查是否在当前会话中已经跳过
+  useEffect(() => {
+    // 清除曾经永久锁死 localStorage 的旧键，释放开屏动画
+    try {
+      localStorage.removeItem(SPLASH_PLAYED_KEY);
+    } catch {}
+
+    if (!isDemo) {
+      const played = sessionStorage.getItem(SPLASH_PLAYED_KEY);
       if (played === '1') {
         onFinished();
         return;
       }
     }
-  }, [isDemo, onFinished]);
-
-  const handleEnter = useCallback(() => {
-    if (!isDemo) {
-      localStorage.setItem(SPLASH_PLAYED_KEY, '1');
-    }
-    onFinished();
   }, [isDemo, onFinished]);
 
   useEffect(() => {
@@ -55,7 +85,9 @@ export const EarthLoadingScreen: React.FC<EarthLoadingScreenProps> = ({ onFinish
     scene.background = new THREE.Color(STAGE_THEMES[0].sky);
     scene.fog = new THREE.FogExp2(STAGE_THEMES[0].sky, 0.02);
 
-    const aspect = container.clientWidth / container.clientHeight;
+    const width = container.clientWidth || 390;
+    const height = container.clientHeight || 700;
+    const aspect = width / height;
     const viewSize = 7.5;
     const camera = new THREE.OrthographicCamera(
       -viewSize * aspect, viewSize * aspect,
@@ -65,16 +97,18 @@ export const EarthLoadingScreen: React.FC<EarthLoadingScreenProps> = ({ onFinish
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
 
-    // 内联简易轨道控制器（拖拽旋转 + 滚轮缩放）
+    // 内联简易轨道控制器（拖拽旋转 + 滚轮缩放 + 点击屏幕切服）
     let isDragging = false;
     let prevMouse = { x: 0, y: 0 };
+    let dragDist = 0;
+    let pointerDownTime = 0;
     let spherical = { theta: Math.PI / 4, phi: Math.PI / 3.5, radius: Math.sqrt(12 * 12 + 10 * 10 + 12 * 12) };
     const target = new THREE.Vector3(0, 0, 0);
     let autoRotate = true;
@@ -90,7 +124,10 @@ export const EarthLoadingScreen: React.FC<EarthLoadingScreenProps> = ({ onFinish
     updateCamera();
 
     const onPointerDown = (e: PointerEvent) => {
-      isDragging = true; autoRotate = false;
+      isDragging = true;
+      autoRotate = false;
+      dragDist = 0;
+      pointerDownTime = Date.now();
       prevMouse = { x: e.clientX, y: e.clientY };
       renderer.domElement.setPointerCapture(e.pointerId);
     };
@@ -98,12 +135,25 @@ export const EarthLoadingScreen: React.FC<EarthLoadingScreenProps> = ({ onFinish
       if (!isDragging) return;
       const dx = e.clientX - prevMouse.x;
       const dy = e.clientY - prevMouse.y;
+      dragDist += Math.abs(dx) + Math.abs(dy);
       prevMouse = { x: e.clientX, y: e.clientY };
       spherical.theta -= dx * 0.008;
       spherical.phi = Math.max(0.15, Math.min(Math.PI / 2.1, spherical.phi + dy * 0.008));
       updateCamera();
     };
-    const onPointerUp = () => { isDragging = false; };
+    const onPointerUp = (e: PointerEvent) => {
+      if (!isDragging) return;
+      isDragging = false;
+      try {
+        renderer.domElement.releasePointerCapture(e.pointerId);
+      } catch {}
+
+      // 用户点击屏幕（位移小于 8px 且非长按拖拽），立即切换到下一个服务器！
+      const duration = Date.now() - pointerDownTime;
+      if (dragDist < 8 && duration < 450) {
+        handleTransformRef.current();
+      }
+    };
     const onWheel = (e: WheelEvent) => {
       spherical.radius = Math.max(8, Math.min(28, spherical.radius + e.deltaY * 0.02));
       updateCamera();
@@ -493,7 +543,8 @@ export const EarthLoadingScreen: React.FC<EarthLoadingScreenProps> = ({ onFinish
 
     const onResize = () => {
       if (!container) return;
-      const w = container.clientWidth, h = container.clientHeight;
+      const w = container.clientWidth || 390;
+      const h = container.clientHeight || 700;
       const asp = w / h;
       camera.left = -viewSize * asp; camera.right = viewSize * asp;
       camera.top = viewSize; camera.bottom = -viewSize;
@@ -501,6 +552,8 @@ export const EarthLoadingScreen: React.FC<EarthLoadingScreenProps> = ({ onFinish
       renderer.setSize(w, h);
     };
     window.addEventListener('resize', onResize);
+    const ro = new ResizeObserver(() => onResize());
+    ro.observe(container);
 
     sceneRef.current = {
       dispose: () => {
@@ -508,6 +561,7 @@ export const EarthLoadingScreen: React.FC<EarthLoadingScreenProps> = ({ onFinish
         controls.dispose();
         renderer.dispose();
         window.removeEventListener('resize', onResize);
+        ro.disconnect();
         if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
         delete (window as any).__splashTransition;
       },
@@ -516,102 +570,150 @@ export const EarthLoadingScreen: React.FC<EarthLoadingScreenProps> = ({ onFinish
     return () => sceneRef.current?.dispose();
   }, []);
 
-  const handleTransform = useCallback(() => {
-    if (isTransitioningRef.current) return;
-    isTransitioningRef.current = true;
-    setIsTransitioning(true);
-    const prev = currentStageRef.current;
-    const next = (prev + 1) % STAGE_THEMES.length;
-    currentStageRef.current = next;
-    setCurrentStage(next);
-    (window as any).__splashTransition?.(prev, next);
-  }, []);
-
   const theme = STAGE_THEMES[currentStage];
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', background: '#000' }}>
+    <div
+      onClick={(e) => {
+        // 点击屏幕任意非按钮区域即可切换服务器
+        const target = e.target as HTMLElement;
+        if (target && target.closest('button')) return;
+        handleTransform();
+      }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        zIndex: 9999,
+        overflow: 'hidden',
+        background: '#000',
+        display: 'flex',
+        flexDirection: 'column',
+        cursor: 'pointer',
+        userSelect: 'none',
+      }}
+    >
       {/* Three.js 挂载点 */}
       <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* 拖拽提示 */}
+      {/* 右上角进入桌面快捷按钮 */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleEnter();
+        }}
+        style={{
+          position: 'absolute',
+          top: 14,
+          right: 14,
+          zIndex: 30,
+          padding: '6px 14px',
+          borderRadius: '20px',
+          backgroundColor: 'rgba(0, 0, 0, 0.35)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255, 255, 255, 0.25)',
+          color: '#fff',
+          fontSize: '12px',
+          fontWeight: 700,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+          transition: 'all 0.2s ease',
+          pointerEvents: 'auto',
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.55)';
+          e.currentTarget.style.transform = 'scale(1.04)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.35)';
+          e.currentTarget.style.transform = 'scale(1)';
+        }}
+        title="直接进入系统桌面"
+      >
+        <span>进入桌面</span>
+        <span style={{ fontSize: '10px' }}>➔</span>
+      </button>
+
+      {/* 顶部选服与交互提示 */}
       <div style={{
         position: 'absolute', top: 16, left: 0, right: 0,
         textAlign: 'center', pointerEvents: 'none', zIndex: 10,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
       }}>
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '3px 12px',
+          borderRadius: '12px',
+          backgroundColor: 'rgba(0,0,0,0.25)',
+          backdropFilter: 'blur(6px)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          fontSize: 10,
+          fontWeight: 700,
+          color: 'rgba(255,255,255,0.9)',
+          letterSpacing: '0.1em',
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+          <span>地球 ONLINE · 物种服务器</span>
+        </div>
         <span style={{
-          fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)',
-          letterSpacing: '0.12em', textShadow: '0 1px 6px rgba(0,0,0,0.4)',
+          fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.6)',
+          letterSpacing: '0.08em', textShadow: '0 1px 4px rgba(0,0,0,0.4)',
         }}>
           拖拽旋转视角 · 滚轮缩放细节
         </span>
       </div>
 
-      {/* 底部 UI */}
+      {/* 底部 UI：服务器信息与点击切服提示（触发生命与进入桌面按钮已彻底移除） */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        paddingBottom: 40, gap: 14, zIndex: 10, pointerEvents: 'none',
+        paddingBottom: 36, gap: 10, zIndex: 10, pointerEvents: 'none',
       }}>
+        {/* 服务器大名称 */}
         <div style={{
-          fontSize: 22, fontWeight: 900, color: '#fff',
-          textShadow: '0 2px 12px rgba(0,0,0,0.3)',
+          fontSize: 30, fontWeight: 900, color: '#fff',
+          textShadow: '0 2px 14px rgba(0,0,0,0.45)',
           letterSpacing: '0.12em',
           fontFamily: "'PingFang SC', 'Noto Sans SC', system-ui, sans-serif",
         }}>
           {theme.name}
         </div>
 
-        {/* 进度小点 */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          {STAGE_THEMES.map((_, i) => (
-            <div key={i} style={{
-              width: 10, height: 10, borderRadius: '50%',
-              background: i === currentStage ? '#fff' : 'rgba(255,255,255,0.35)',
-              transform: i === currentStage ? 'scale(1.3)' : 'scale(1)',
-              boxShadow: i === currentStage ? '0 0 10px #fff' : 'none',
-              transition: 'all 0.3s',
-            }} />
-          ))}
+        {/* 副标题 */}
+        <div style={{
+          fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)',
+          textShadow: '0 1px 6px rgba(0,0,0,0.6)',
+          backgroundColor: 'rgba(0,0,0,0.2)',
+          padding: '2px 10px',
+          borderRadius: '10px',
+          backdropFilter: 'blur(4px)',
+        }}>
+          {theme.subtitle}
         </div>
 
-        {/* 按钮行 */}
-        <div style={{ display: 'flex', gap: 12, pointerEvents: 'auto' }}>
-          <button
-            onClick={handleTransform}
-            disabled={isTransitioning}
-            style={{
-              background: 'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)',
-              color: '#5C4033', fontWeight: 900,
-              padding: '14px 36px', borderRadius: 40,
-              border: '4px solid white',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.18)',
-              cursor: isTransitioning ? 'not-allowed' : 'pointer',
-              fontSize: 16, opacity: isTransitioning ? 0.7 : 1,
-              transition: 'all 0.3s',
-              fontFamily: "'PingFang SC', 'Noto Sans SC', system-ui, sans-serif",
-            }}
-          >
-            ✨ 触发生命流转（形变）
-          </button>
-
-          {currentStage === STAGE_THEMES.length - 1 && (
-            <button
-              onClick={handleEnter}
+        {/* 5 个服务器进度指示器 */}
+        <div style={{ display: 'flex', gap: 7, marginTop: 4 }}>
+          {STAGE_THEMES.map((item, i) => (
+            <div
+              key={i}
+              title={item.name}
               style={{
-                background: 'linear-gradient(135deg, #2A9D8F 0%, #48CAE4 100%)',
-                color: '#fff', fontWeight: 900,
-                padding: '14px 32px', borderRadius: 40,
-                border: '4px solid rgba(255,255,255,0.8)',
-                boxShadow: '0 10px 25px rgba(72,202,228,0.4)',
-                cursor: 'pointer', fontSize: 16,
-                transition: 'all 0.3s',
-                fontFamily: "'PingFang SC', 'Noto Sans SC', system-ui, sans-serif",
+                width: i === currentStage ? 24 : 8,
+                height: 8,
+                borderRadius: 4,
+                background: i === currentStage ? '#fff' : 'rgba(255,255,255,0.35)',
+                boxShadow: i === currentStage ? '0 0 10px #fff' : 'none',
+                transition: 'all 0.3s ease',
               }}
-            >
-              🌿 进入世界
-            </button>
-          )}
+            />
+          ))}
         </div>
       </div>
     </div>

@@ -40,6 +40,9 @@ export interface MemoryBookRecord {
   messageCount: number;
   totalWords: number;
   messages: MemoryBookMessage[];
+  bgUrl?: string;
+  characterSpriteUrl?: string;
+  protagonistAvatarUrl?: string;
 }
 
 

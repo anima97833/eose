@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, MemoryBookRecord } from '../../../core/storage/db';
 import { parseChatJson } from './jsonParser';
-import { BookReaderModal } from './BookReaderModal';
-import { ArrowLeft, Plus, Upload, BookMarked, Sparkles, Check } from 'lucide-react';
+import { GalgameReaderModal } from './GalgameReaderModal';
+import { ArrowLeft, Plus, Upload, BookMarked, Sparkles, Check, Edit3 } from 'lucide-react';
 
 interface MemoriesAppProps {
   onBack?: () => void;
@@ -10,6 +10,7 @@ interface MemoriesAppProps {
 
 // 艺术典雅书脊调色盘（典雅靛蓝、皮革赤红、暖沙琥珀、暮山黛绿、沉香乌木、复古紫檀等）
 const BOOK_SPINE_PALETTES = [
+  { bg: '#2B2D42', text: '#EDF2F4', border: '#1E1F2E' }, // 恶魔暗黑夜色
   { bg: '#3D5A80', text: '#E0FBFC', border: '#293241' },
   { bg: '#9E2A2B', text: '#FFF3B0', border: '#540B0E' },
   { bg: '#D4A373', text: '#3E2723', border: '#CCD5AE' },
@@ -20,8 +21,31 @@ const BOOK_SPINE_PALETTES = [
   { bg: '#A37081', text: '#FFFFFF', border: '#6E4555' },
 ];
 
-// 预置两本示范书籍
+// 预置视觉小说示范剧本书籍
 const INITIAL_PRESET_BOOKS: MemoryBookRecord[] = [
+  {
+    id: 'book_preset_demon',
+    title: '弑君的惡魔 · 序章',
+    characterName: '弑君的惡魔',
+    shelfTier: 1,
+    coverColor: '#2B2D42',
+    spineHeight: 126,
+    spineWidth: 32,
+    leanAngle: 0,
+    createdAt: Date.now() - 86400000 * 5,
+    messageCount: 5,
+    totalWords: 188,
+    bgUrl: '/galgame/bg.jpg',
+    characterSpriteUrl: '/galgame/demon.png',
+    protagonistAvatarUrl: '/galgame/heroine.png',
+    messages: [
+      { sender: 'assistant', name: '弑君的惡魔', content: '「我把一切都奉獻給你，無論何時，只要你召喚……」', timestamp: Date.now() - 50000 },
+      { sender: 'user', name: '我', content: '「（那雙如烈火般燃燒的緋紅之瞳，此刻正深深注視著我。）」', timestamp: Date.now() - 40000 },
+      { sender: 'assistant', name: '弑君的惡魔', content: '「即使與整個世界為敵，我也會為您斬斷命運的枷鎖。」', timestamp: Date.now() - 30000 },
+      { sender: 'user', name: '我', content: '「……你真的願意為了我，背叛神明嗎？」', timestamp: Date.now() - 20000 },
+      { sender: 'assistant', name: '弑君的惡魔', content: '「我的神明早已隕落，而您，是我唯一的信條。」', timestamp: Date.now() - 10000 },
+    ],
+  },
   {
     id: 'book_preset_1',
     title: '初遇 · 盛夏时光手记',
@@ -30,10 +54,13 @@ const INITIAL_PRESET_BOOKS: MemoryBookRecord[] = [
     coverColor: '#3D5A80',
     spineHeight: 114,
     spineWidth: 28,
-    leanAngle: 0,
+    leanAngle: -4,
     createdAt: Date.now() - 86400000 * 12,
-    messageCount: 8,
+    messageCount: 6,
     totalWords: 342,
+    bgUrl: '/galgame/bg.jpg',
+    characterSpriteUrl: '/galgame/demon.png',
+    protagonistAvatarUrl: '/galgame/heroine.png',
     messages: [
       { sender: 'user', name: '你', content: '今天窗外的天气特别晴朗，忽然很想找你说说话。', timestamp: Date.now() - 86400000 * 12 },
       { sender: 'assistant', name: '云梦', content: '我一直在等你呢！我也正看着阳光穿过树叶的样子，很温暖。今天有什么开心事想和我分享吗？', timestamp: Date.now() - 86400000 * 12 + 60000 },
@@ -51,10 +78,13 @@ const INITIAL_PRESET_BOOKS: MemoryBookRecord[] = [
     coverColor: '#9E2A2B',
     spineHeight: 122,
     spineWidth: 32,
-    leanAngle: -5,
+    leanAngle: 5,
     createdAt: Date.now() - 86400000 * 3,
     messageCount: 6,
     totalWords: 286,
+    bgUrl: '/galgame/bg.jpg',
+    characterSpriteUrl: '/galgame/demon.png',
+    protagonistAvatarUrl: '/galgame/heroine.png',
     messages: [
       { sender: 'user', name: '你', content: '凌晨两点了，脑子里总是冒出各种天马行空的想法，睡不着。', timestamp: Date.now() - 86400000 * 3 },
       { sender: 'assistant', name: '云梦', content: '（轻声）嘘……深夜的灵感总是像星星一样悄悄掉落。别焦虑，说说看你在想什么？我陪你数星星。', timestamp: Date.now() - 86400000 * 3 + 60000 },
@@ -62,23 +92,6 @@ const INITIAL_PRESET_BOOKS: MemoryBookRecord[] = [
       { sender: 'assistant', name: '云梦', content: '但此刻时间是慢下来的。把这些思绪写进回忆录里吧，当我们将字句珍藏在书架上，时光就永远停留在最温柔的瞬间了。', timestamp: Date.now() - 86400000 * 3 + 240000 },
       { sender: 'user', name: '你', content: '嗯，谢谢你云梦，晚安。', timestamp: Date.now() - 86400000 * 3 + 320000 },
       { sender: 'assistant', name: '云梦', content: '晚安，愿你的梦境里有微风与星辰……我会一直在这里守候。', timestamp: Date.now() - 86400000 * 3 + 360000 },
-    ],
-  },
-  {
-    id: 'book_preset_3',
-    title: '日常絮语与灵感集',
-    characterName: '云梦',
-    shelfTier: 2,
-    coverColor: '#588157',
-    spineHeight: 110,
-    spineWidth: 26,
-    leanAngle: 4,
-    createdAt: Date.now() - 86400000 * 1,
-    messageCount: 4,
-    totalWords: 165,
-    messages: [
-      { sender: 'user', name: '你', content: '今天读到一句很喜欢的话：“岁月无声，字句有痕”。', timestamp: Date.now() - 86400000 * 1 },
-      { sender: 'assistant', name: '云梦', content: '真美。每一段我们聊过的话，都会成为一卷小小的回忆录，在这间书屋里静静散发着墨香。', timestamp: Date.now() - 86400000 * 1 + 60000 },
     ],
   },
 ];
@@ -104,6 +117,13 @@ export const MemoriesApp: React.FC<MemoriesAppProps> = ({ onBack }) => {
           await db.memory_books.put(b);
         }
         stored = await db.memory_books.toArray();
+      } else {
+        // 确保示范书《弑君的惡魔·序章》已入库
+        const hasDemonBook = stored.some((b) => b.id === 'book_preset_demon');
+        if (!hasDemonBook) {
+          await db.memory_books.put(INITIAL_PRESET_BOOKS[0]);
+          stored = await db.memory_books.toArray();
+        }
       }
       setBooks(stored);
     } catch (err) {
@@ -115,7 +135,48 @@ export const MemoriesApp: React.FC<MemoriesAppProps> = ({ onBack }) => {
     loadBooks();
   }, []);
 
-  // 导入外部 JSON 文件入架
+  // 创作全新剧本（类似写橙光/Galgame）
+  const handleCreateNewBook = async () => {
+    try {
+      const currentTier1 = books.filter((b) => b.shelfTier === 1).length;
+      const shelfTier: 1 | 2 = currentTier1 >= 6 ? 2 : 1;
+      const colorIndex = Math.floor(Math.random() * BOOK_SPINE_PALETTES.length);
+      const spineColor = BOOK_SPINE_PALETTES[colorIndex].bg;
+      const angles = [0, 0, -4, 4, 0];
+      const leanAngle = angles[Math.floor(Math.random() * angles.length)];
+
+      const newBook: MemoryBookRecord = {
+        id: `book_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        title: `新剧本 · 第${books.length + 1}章`,
+        characterName: '弑君的惡魔',
+        shelfTier,
+        coverColor: spineColor,
+        spineHeight: 120,
+        spineWidth: 30,
+        leanAngle,
+        createdAt: Date.now(),
+        messageCount: 3,
+        totalWords: 75,
+        bgUrl: '/galgame/bg.jpg',
+        characterSpriteUrl: '/galgame/demon.png',
+        protagonistAvatarUrl: '/galgame/heroine.png',
+        messages: [
+          { sender: 'assistant', name: '弑君的惡魔', content: '「您唤醒了我……请告诉我，您内心的渴求。」', timestamp: Date.now() },
+          { sender: 'user', name: '我', content: '「（我深吸了一口气，凝视着眼前的少年。）……我想要改变这个世界。」', timestamp: Date.now() + 1000 },
+          { sender: 'assistant', name: '弑君的惡魔', content: '「谨遵您的意志，我的主人。」', timestamp: Date.now() + 2000 },
+        ],
+      };
+
+      await db.memory_books.put(newBook);
+      await loadBooks();
+      setSelectedBook(newBook);
+      showToast(`《${newBook.title}》已生成，已进入创作台！`);
+    } catch (err: any) {
+      alert(`创建剧本失败：${err?.message}`);
+    }
+  };
+
+  // 导入外部 JSON 文件入架 (可选备用)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -124,17 +185,15 @@ export const MemoriesApp: React.FC<MemoriesAppProps> = ({ onBack }) => {
       const text = await file.text();
       const parsed = parseChatJson(text, file.name);
 
-      // 分配到书架层级
       const currentTier1 = books.filter((b) => b.shelfTier === 1).length;
       const shelfTier: 1 | 2 = currentTier1 >= 6 ? 2 : 1;
 
-      // 随机分配典雅色调与轻微拟物倾角
       const colorIndex = Math.floor(Math.random() * BOOK_SPINE_PALETTES.length);
       const spineColor = BOOK_SPINE_PALETTES[colorIndex].bg;
       const angles = [0, 0, -5, 5, 0, -4, 4];
       const leanAngle = angles[Math.floor(Math.random() * angles.length)];
-      const spineHeight = 100 + Math.floor(Math.random() * 26); // 100px - 126px
-      const spineWidth = 26 + Math.floor(Math.random() * 8);    // 26px - 34px
+      const spineHeight = 100 + Math.floor(Math.random() * 26);
+      const spineWidth = 26 + Math.floor(Math.random() * 8);
 
       const newBook: MemoryBookRecord = {
         id: `book_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -149,6 +208,9 @@ export const MemoriesApp: React.FC<MemoriesAppProps> = ({ onBack }) => {
         messageCount: parsed.messageCount,
         totalWords: parsed.totalWords,
         messages: parsed.messages,
+        bgUrl: '/galgame/bg.jpg',
+        characterSpriteUrl: '/galgame/demon.png',
+        protagonistAvatarUrl: '/galgame/heroine.png',
       };
 
       await db.memory_books.put(newBook);
@@ -281,30 +343,33 @@ export const MemoriesApp: React.FC<MemoriesAppProps> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* 导入新书按钮 */}
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 12px',
-            borderRadius: '16px',
-            backgroundColor: '#8B5A2B',
-            color: '#FFF8EE',
-            border: 'none',
-            fontSize: '12px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            boxShadow: '2px 3px 8px rgba(90, 50, 20, 0.35)',
-            transition: 'all 0.15s ease',
-          }}
-          title="上传外部聊天记录 JSON"
-        >
-          <Upload size={13} />
-          <span>放入新书</span>
-        </button>
+        {/* 操作按钮组：创作新剧本 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={handleCreateNewBook}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '16px',
+              backgroundColor: '#5A3D28',
+              backgroundImage: 'linear-gradient(135deg, #784E2D 0%, #4E2E16 100%)',
+              color: '#FFF8EE',
+              border: '1px solid rgba(255, 230, 190, 0.4)',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '2px 3px 8px rgba(60, 30, 10, 0.4)',
+              transition: 'all 0.15s ease',
+            }}
+            title="撰写属于你的视觉小说/Galgame剧本"
+          >
+            <Sparkles size={13} color="#FFE082" />
+            <span>✨ 撰写新剧本</span>
+          </button>
+        </div>
       </div>
 
       {/* 书架主体（复刻用户提供的双层木架） */}
@@ -661,11 +726,15 @@ export const MemoriesApp: React.FC<MemoriesAppProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* ================= 翻开阅读器模态框 ================= */}
+      {/* ================= 翻开视觉小说沉浸演播与剧本创作台 ================= */}
       {selectedBook && (
-        <BookReaderModal
+        <GalgameReaderModal
           book={selectedBook}
           onClose={() => setSelectedBook(null)}
+          onUpdateBook={(updated) => {
+            setSelectedBook(updated);
+            loadBooks();
+          }}
           onDeleteBook={handleDeleteBook}
         />
       )}

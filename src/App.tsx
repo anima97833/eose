@@ -58,6 +58,8 @@ export const App: React.FC = () => {
   const handleOpenApp = (appId: string) => {
     setIsOpeningApp(true);
     setActiveApp(appId);
+    // 防御性保护：打开任意应用时，确保开屏动画彻底卸载，绝不残留在文档流中
+    setIsBooting(false);
 
     // 深夜 23:00 之后打开微聊触发夜雨寄语彩蛋
     if (appId === 'chat') {
