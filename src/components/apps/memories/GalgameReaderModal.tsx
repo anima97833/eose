@@ -1852,54 +1852,55 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                         )}
                       </div>
 
-                      {/* 渲染所有已绑定的角色小选择块 */}
-                      {characterAssets.map((char) => {
-                        const isMatch = currentName === char.name;
-                        return (
-                          <button
-                            key={char.id}
-                            type="button"
-                            onClick={() => handleAssignSpeaker(idx, char.name)}
-                            style={{
-                              background: isMatch ? '#4F46E5' : 'rgba(255, 255, 255, 0.06)',
-                              color: isMatch ? '#FFFFFF' : '#CBD5E1',
-                              border: isMatch ? '1px solid #818CF8' : '1px solid rgba(255, 255, 255, 0.1)',
-                              padding: '2px 7px',
-                              borderRadius: '4px',
-                              fontSize: '10px',
-                              fontWeight: isMatch ? 600 : 400,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '3px',
-                            }}
-                          >
-                            <span>{char.name}</span>
-                          </button>
-                        );
-                      })}
-
-                      {/* + 角色 快速新增按钮 */}
-                      <button
-                        type="button"
-                        onClick={() => spriteUploadRef.current?.click()}
+                      {/* 极简水平一体化角色胶囊条 */}
+                      <div
                         style={{
-                          background: 'rgba(255, 255, 255, 0.04)',
-                          color: '#94A3B8',
-                          border: '1px dashed rgba(255, 255, 255, 0.2)',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          fontSize: '10px',
-                          cursor: 'pointer',
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
+                          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                          padding: '2px',
+                          borderRadius: '9999px',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
                           gap: '2px',
+                          maxWidth: '100%',
+                          overflowX: 'auto',
                         }}
-                        title="上传图片绑定新角色"
                       >
-                        <Plus size={10} />
-                        <span>新角色</span>
-                      </button>
+                        {characterAssets.map((char) => {
+                          const isMatch = currentName === char.name;
+                          const isNarrator = char.name === '旁白';
+                          return (
+                            <button
+                              key={char.id}
+                              type="button"
+                              onClick={() => handleAssignSpeaker(idx, char.name)}
+                              style={{
+                                background: isMatch
+                                  ? isNarrator
+                                    ? 'linear-gradient(135deg, #475569 0%, #334155 100%)'
+                                    : 'linear-gradient(135deg, #4F46E5 0%, #6366F1 100%)'
+                                  : 'transparent',
+                                color: isMatch ? '#FFFFFF' : '#94A3B8',
+                                border: 'none',
+                                padding: '2px 8px',
+                                borderRadius: '9999px',
+                                fontSize: '10px',
+                                fontWeight: isMatch ? 600 : 400,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                boxShadow: isMatch ? '0 1px 4px rgba(0, 0, 0, 0.35)' : 'none',
+                                whiteSpace: 'nowrap',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                              }}
+                            >
+                              {isNarrator && <span style={{ opacity: 0.7, fontSize: '9px' }}>📜</span>}
+                              <span>{char.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* 条目操作按钮 (纯图标干练) */}
