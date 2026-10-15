@@ -25,6 +25,7 @@ export interface MemoryBookMessage {
   name?: string;
   content: string;
   timestamp?: number;
+  voiceUrl?: string;
 }
 
 export interface MemoryBookRecord {

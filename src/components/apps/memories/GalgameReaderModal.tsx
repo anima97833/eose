@@ -21,7 +21,10 @@ import {
   User,
   Smile,
   BookOpen,
-  Tag
+  Tag,
+  Mic,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 
 interface GalgameReaderModalProps {
@@ -84,11 +87,16 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
   const [displayedText, setDisplayedText] = useState<string>('');
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [showLogModal, setShowLogModal] = useState<boolean>(false);
-  const [showAssetModal, setShowAssetModal] = useState<boolean>(false); // 快速换装换景面板
-  const [showSystemMenu, setShowSystemMenu] = useState<boolean>(false); // 点击 Menu 弹出的系统菜单
+  const [showAssetModal, setShowAssetModal] = useState<boolean>(false);
+  const [showSystemMenu, setShowSystemMenu] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // 素材命名确认弹窗状态（用户上传素材后绑定角色名）
+  // 语音播放相关状态与引用
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlayingVoice, setIsPlayingVoice] = useState<boolean>(false);
+  const [voiceTargetIdx, setVoiceTargetIdx] = useState<number | null>(null);
+
+  // 素材命名确认弹窗状态
   const [namingModal, setNamingModal] = useState<{
     isOpen: boolean;
     pendingDataUrl: string;
@@ -104,6 +112,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
   const bgUploadRef = useRef<HTMLInputElement>(null);
   const spriteUploadRef = useRef<HTMLInputElement>(null);
   const heroineUploadRef = useRef<HTMLInputElement>(null);
+  const voiceUploadRef = useRef<HTMLInputElement>(null);
 
   // 打字机计时器
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -146,7 +155,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
   const activeAvatarUrl = matchedChar?.avatarUrl || matchedChar?.spriteUrl || currentBook.protagonistAvatarUrl || '/galgame/heroine.png';
   const bgImage = currentBook.bgUrl || '/galgame/bg.jpg';
 
-  // 格式化文本输出：对话自动加「」，旁白不加引号保持纯粹描写
+  // 格式化文本输出
   const formatDialogueText = (raw: string, isNar: boolean) => {
     const trimmed = (raw || '').trim();
     if (!trimmed) return '……';
@@ -192,6 +201,49 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     };
   }, [currentIndex, mode, currentBook]);
 
+  // 演播模式：当进入新台词时，若有绑定的语音音频，自动播放该句语音
+  useEffect(() => {
+    if (mode !== 'play') {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+        setIsPlayingVoice(false);
+      }
+      return;
+    }
+
+    // 暂停上一句语音
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+      setIsPlayingVoice(false);
+    }
+
+    // 自动播放本句语音
+    if (currentMsg?.voiceUrl) {
+      try {
+        const audio = new Audio(currentMsg.voiceUrl);
+        currentAudioRef.current = audio;
+        setIsPlayingVoice(true);
+        audio.play().catch((err) => {
+          console.warn('Audio auto-play blocked or failed:', err);
+          setIsPlayingVoice(false);
+        });
+        audio.onended = () => setIsPlayingVoice(false);
+        audio.onerror = () => setIsPlayingVoice(false);
+      } catch (err) {
+        console.error('Audio init error', err);
+        setIsPlayingVoice(false);
+      }
+    }
+
+    return () => {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+      }
+    };
+  }, [currentIndex, mode, currentBook]);
+
   // 点击推进台词
   const handleStageClick = (e: React.MouseEvent) => {
     if (
@@ -199,7 +251,8 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
       (e.target as HTMLElement).closest('.log-modal') ||
       (e.target as HTMLElement).closest('.asset-modal') ||
       (e.target as HTMLElement).closest('.naming-modal') ||
-      (e.target as HTMLElement).closest('.system-menu-pop')
+      (e.target as HTMLElement).closest('.system-menu-pop') ||
+      (e.target as HTMLElement).closest('.voice-player-btn')
     ) {
       return;
     }
@@ -228,6 +281,20 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     } else {
       showToast('本章演播完毕');
     }
+  };
+
+  // 手动重播或试听某条音频
+  const playVoiceAudio = (audioUrl: string) => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+    const audio = new Audio(audioUrl);
+    currentAudioRef.current = audio;
+    setIsPlayingVoice(true);
+    audio.play().catch((e) => console.warn(e));
+    audio.onended = () => setIsPlayingVoice(false);
+    audio.onerror = () => setIsPlayingVoice(false);
   };
 
   // 保存剧本到 IndexedDB
@@ -272,7 +339,6 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     try {
       const dataUrl = await fileToDataUrl(file);
       const cleanUrl = await removeWhiteBackground(dataUrl);
-      // 调出命名绑定确认框，默认推荐文件名作为参考
       const defaultName = file.name.replace(/\.[^/.]+$/, '').slice(0, 10);
       setInputCharName(defaultName);
       setNamingModal({
@@ -287,7 +353,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     }
   };
 
-  // 女主头像上传：去白底后调出命名绑定弹窗
+  // 女主头像上传
   const handleHeroineFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -305,6 +371,42 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     } finally {
       if (e.target) e.target.value = '';
     }
+  };
+
+  // 语音音频文件上传：转为 Base64 绑定入 IndexedDB
+  const handleVoiceFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || voiceTargetIdx === null) return;
+    try {
+      const audioDataUrl = await fileToDataUrl(file);
+      const nextMessages = [...currentBook.messages];
+      nextMessages[voiceTargetIdx] = {
+        ...nextMessages[voiceTargetIdx],
+        voiceUrl: audioDataUrl,
+      };
+
+      const nextBook = { ...currentBook, messages: nextMessages };
+      setCurrentBook(nextBook);
+      await db.memory_books.put(nextBook);
+      onUpdateBook(nextBook);
+      showToast(`已成功录入第 #${voiceTargetIdx + 1} 句语音`);
+    } catch (err) {
+      alert('语音文件上传失败');
+    } finally {
+      setVoiceTargetIdx(null);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  // 移除某句台词的语音
+  const handleRemoveVoice = async (msgIdx: number) => {
+    const nextMessages = [...currentBook.messages];
+    delete nextMessages[msgIdx].voiceUrl;
+    const nextBook = { ...currentBook, messages: nextMessages };
+    setCurrentBook(nextBook);
+    await db.memory_books.put(nextBook);
+    onUpdateBook(nextBook);
+    showToast('已移除语音');
   };
 
   // 确认命名并将素材与角色名绑定保存入 IndexedDB
@@ -330,7 +432,6 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
       await db.galgame_characters.put(newCharAsset);
       await loadCharacters();
 
-      // 如果当前剧本的主角色与此同名，也一并同步更新剧本默认资产
       const nextBook = {
         ...currentBook,
         characterName: trimmedName,
@@ -422,7 +523,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     });
   };
 
-  // 点击角色选择块直接赋予说话人（零输入）
+  // 点击角色选择块直接赋予说话人
   const handleAssignSpeaker = (msgIdx: number, charName: string) => {
     const nextMessages = [...currentBook.messages];
     const isHeroine = charName === '我' || charName === '女主';
@@ -453,10 +554,11 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
         userSelect: 'none',
       }}
     >
-      {/* 隐藏的本地文件选择器 */}
+      {/* 隐藏的文件选择器：背景、立绘、头像、音频语音 */}
       <input ref={bgUploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgUpload} />
       <input ref={spriteUploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleSpriteFileSelect} />
       <input ref={heroineUploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleHeroineFileSelect} />
+      <input ref={voiceUploadRef} type="file" accept="audio/*" style={{ display: 'none' }} onChange={handleVoiceFileSelect} />
 
       {/* 顶部悬浮提示 Toast */}
       {toastMsg && (
@@ -484,7 +586,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
         </div>
       )}
 
-      {/* ================= 模式 1: 视觉小说演播舞台 (动态角色立绘感知驱动) ================= */}
+      {/* ================= 模式 1: 视觉小说演播舞台 ================= */}
       {mode === 'play' && (
         <div
           onClick={handleStageClick}
@@ -515,7 +617,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
             }}
           />
 
-          {/* Layer 2: 动态角色立绘层 (根据当前对白说话人自动切为广陵王/恶魔立绘；旁白时隐去) */}
+          {/* Layer 2: 动态角色立绘层 */}
           {!isNarrator && activeSpriteUrl && (
             <div
               style={{
@@ -607,10 +709,36 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                 >
                   {speakerName}
                 </span>
+
+                {/* 当前台词若有语音条，在姓名栏右侧展示轻量音频标识 */}
+                {currentMsg?.voiceUrl && (
+                  <div
+                    className="voice-player-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      playVoiceAudio(currentMsg.voiceUrl!);
+                    }}
+                    style={{
+                      marginLeft: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      background: 'rgba(99, 102, 241, 0.35)',
+                      padding: '2px 7px',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      border: '1px solid rgba(165, 180, 252, 0.4)',
+                    }}
+                    title="点击重听本句配音"
+                  >
+                    <Volume2 size={11} color={isPlayingVoice ? '#38BDF8' : '#CBD5E1'} />
+                    <span style={{ fontSize: '9px', color: '#E0E7FF' }}>VOICE</span>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* 角色专属头像徽章 (动态展示当前说话人的头像，旁白时隐去) */}
+            {/* 角色专属头像徽章 */}
             {!isNarrator && activeAvatarUrl && (
               <div
                 style={{
@@ -915,7 +1043,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
             </div>
           )}
 
-          {/* ================= 视觉资产设置弹窗 (支持素材命名与绑定管理) ================= */}
+          {/* ================= 视觉资产设置弹窗 ================= */}
           {showAssetModal && (
             <div
               className="asset-modal"
@@ -1011,12 +1139,10 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                 </div>
               </div>
 
-              {/* 2. 角色立绘素材库 (展示所有已绑定名字的角色素材，可上传新立绘并命名) */}
+              {/* 2. 角色立绘素材库 */}
               <div style={{ backgroundColor: '#161C2C', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#C7D2FE' }}>角色素材绑定库</span>
-                  </div>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#C7D2FE' }}>角色素材绑定库</span>
                   <button
                     type="button"
                     onClick={() => spriteUploadRef.current?.click()}
@@ -1176,10 +1302,11 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                       opacity: idx > currentIndex ? 0.4 : 1,
                     }}
                   >
-                    <div style={{ fontSize: '0.85rem', color: '#A5B4FC', fontWeight: 700 }}>
-                      {m.name || (m.sender === 'user' ? '我' : currentBook.characterName)}
+                    <div style={{ fontSize: '0.85rem', color: '#A5B4FC', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>{m.name || (m.sender === 'user' ? '我' : currentBook.characterName)}</span>
+                      {m.voiceUrl && <Volume2 size={11} color="#67E8F9" />}
                       {idx === currentIndex && (
-                        <span style={{ fontSize: '0.7rem', color: '#FCD34D', marginLeft: '6px' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#FCD34D' }}>
                           [当前]
                         </span>
                       )}
@@ -1195,7 +1322,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
         </div>
       )}
 
-      {/* ================= 模式 2: 剧本工坊 (角色快捷选择块联动) ================= */}
+      {/* ================= 模式 2: 剧本工坊 (带麦克风语音上传绑定) ================= */}
       {mode === 'edit' && (
         <div
           style={{
@@ -1392,7 +1519,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
             </div>
           </div>
 
-          {/* 剧本台词条目列表 (带角色小选择块 Chips，零手输直选) */}
+          {/* 剧本台词条目列表 (带麦克风按钮上传语音条) */}
           <div
             style={{
               flex: 1,
@@ -1426,7 +1553,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                       fontSize: '11px',
                     }}
                   >
-                    {/* 说话人动态小选择块 Chips 区域 */}
+                    {/* 左侧区域：序号 + 麦克风语音按钮 + 说话人选择块 */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px' }}>
                       <span
                         style={{
@@ -1441,7 +1568,73 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                         #{idx + 1}
                       </span>
 
-                      {/* 渲染所有已绑定的角色小选择块 (如 弑君的惡魔、广陵王、我、旁白) */}
+                      {/* 麦克风语音上传/试听按钮 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVoiceTargetIdx(idx);
+                            voiceUploadRef.current?.click();
+                          }}
+                          style={{
+                            background: m.voiceUrl ? 'rgba(16, 185, 129, 0.22)' : 'rgba(255, 255, 255, 0.06)',
+                            border: m.voiceUrl ? '1px solid rgba(52, 211, 153, 0.45)' : '1px solid rgba(255, 255, 255, 0.1)',
+                            color: m.voiceUrl ? '#34D399' : '#94A3B8',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            transition: 'all 0.15s ease',
+                          }}
+                          title={m.voiceUrl ? '已绑定语音音频（点击可重新上传覆盖）' : '上传本句角色台词语音'}
+                        >
+                          <Mic size={11} />
+                          {m.voiceUrl && <span>语音</span>}
+                        </button>
+
+                        {/* 若本句已上传语音，支持就地试听与删除 */}
+                        {m.voiceUrl && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => playVoiceAudio(m.voiceUrl!)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#38BDF8',
+                                cursor: 'pointer',
+                                padding: '2px',
+                                display: 'flex',
+                                alignItems: 'center',
+                              }}
+                              title="试听本句语音"
+                            >
+                              <Volume2 size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveVoice(idx)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#F87171',
+                                cursor: 'pointer',
+                                padding: '2px',
+                                display: 'flex',
+                                alignItems: 'center',
+                              }}
+                              title="删除此句语音"
+                            >
+                              <X size={11} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      {/* 渲染所有已绑定的角色小选择块 */}
                       {characterAssets.map((char) => {
                         const isMatch = currentName === char.name;
                         return (
@@ -1692,7 +1885,6 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
               </span>
             </div>
 
-            {/* 素材缩略预览 */}
             <div
               style={{
                 width: '100%',
