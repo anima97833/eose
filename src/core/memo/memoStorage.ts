@@ -58,6 +58,7 @@ export const DEFAULT_MEMO_CHAPTERS: MemoChapter[] = [
       '• 9月22日 暖阳拿铁 ￥18.00\n• 9月22日 手账复古贴纸 ￥25.00\n• 9月22日 治愈晚餐便当 ￥32.00\n\n今日总计：￥75.00 ✨',
     ],
     currentPageIndex: 0,
+    budgetTotal: 500,
     createdAt: Date.now() - 1800000,
     updatedAt: Date.now() - 1800000,
   },

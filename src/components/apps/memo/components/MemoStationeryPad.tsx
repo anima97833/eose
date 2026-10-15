@@ -1,6 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Edit3 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Edit3, Calculator, CheckSquare } from 'lucide-react';
 import { MemoChapter, MemoCategory } from '../../../../core/memo/memoTypes';
+import { MemoBudgetBar } from './MemoBudgetBar';
+import { MemoTodoBar } from './MemoTodoBar';
+import { MemoTodoListInteractive } from './MemoTodoListInteractive';
+import {
+  parseExpensesFromContent,
+  appendOrUpdateSummaryLine,
+} from '../../../../core/memo/budgetCalculator';
+import {
+  parseTodoList,
+  convertTodoListStyle,
+  detectDominantStyle,
+  formatTodoItem,
+  TodoItem,
+  TodoPrefixStyle,
+} from '../../../../core/memo/todoEngine';
 
 interface MemoStationeryPadProps {
   category: MemoCategory | null;
@@ -55,6 +70,9 @@ export const MemoStationeryPad: React.FC<MemoStationeryPadProps> = ({
   const pages = chapter.pages && chapter.pages.length > 0 ? chapter.pages : [''];
   const currentPageIdx = Math.min(chapter.currentPageIndex || 0, pages.length - 1);
   const currentContent = pages[currentPageIdx] || '';
+
+  // 引用受控 textarea，保证光标在中间输入字符时不发生跳跃
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 翻页处理
   const handlePrevPage = () => {
@@ -121,6 +139,116 @@ export const MemoStationeryPad: React.FC<MemoStationeryPadProps> = ({
       updatedAt: Date.now(),
     });
   };
+
+  // 是否属于记账/包含预算属性的分类
+  const isAccountingCategory = Boolean(
+    category.id === 'cat_accounting' ||
+    category.name.includes('账') ||
+    category.name.includes('开销') ||
+    category.name.includes('预算') ||
+    category.name.includes('消费') ||
+    chapter.budgetTotal !== undefined
+  );
+
+  // 可用预算总额（优先取篇章设置的值，默认 500）
+  const budgetTotal = chapter.budgetTotal ?? 500;
+
+  // 响应式解析当前页面书写的各项开销并自动扣减可用金额
+  const calcResult = useMemo(() => {
+    return parseExpensesFromContent(currentContent, budgetTotal);
+  }, [currentContent, budgetTotal]);
+
+  const handleUpdateBudget = (newBudget: number) => {
+    onUpdateChapter({
+      ...chapter,
+      budgetTotal: newBudget,
+      updatedAt: Date.now(),
+    });
+  };
+
+  const handleApplySummaryToNote = () => {
+    const nextText = appendOrUpdateSummaryLine(
+      currentContent,
+      calcResult.totalExpense,
+      calcResult.remainingBalance
+    );
+    handleContentChange(nextText);
+  };
+
+  // 是否属于待办清单分类
+  const isTodoCategory = Boolean(
+    category.id === 'cat_todo' ||
+    category.name.includes('待办') ||
+    category.name.includes('清单') ||
+    category.name.includes('计划') ||
+    category.name.toLowerCase().includes('todo')
+  );
+
+  // 待办模式下：默认启用左侧专属打钩的交互清单模式
+  const [isTodoInteractive, setIsTodoInteractive] = useState<boolean>(true);
+  // 当前符号排列风格（打钩 | 1,2,3 | ①②③ | 圆点 | 星标）
+  const [todoStyle, setTodoStyle] = useState<TodoPrefixStyle>('checkbox');
+
+  // 解析待办条目列表
+  const todoItems = useMemo(() => {
+    return parseTodoList(currentContent);
+  }, [currentContent]);
+
+  // 当切换篇章或页码时，智能侦测当前内容的主导符号风格
+  useEffect(() => {
+    if (isTodoCategory && currentContent) {
+      const dominant = detectDominantStyle(currentContent);
+      setTodoStyle(dominant);
+    }
+  }, [chapter.id, currentPageIdx, isTodoCategory]);
+
+  // 切换排列符号风格（一键批量转换）
+  const handleChangeTodoStyle = (newStyle: TodoPrefixStyle) => {
+    setTodoStyle(newStyle);
+    const converted = convertTodoListStyle(currentContent, newStyle);
+    handleContentChange(converted);
+  };
+
+  // 交互式待办列表更新
+  const handleUpdateTodoItems = (newItems: TodoItem[]) => {
+    const newContent = newItems
+      .map((item, idx) => formatTodoItem(item, todoStyle, idx))
+      .join('\n');
+    handleContentChange(newContent);
+  };
+
+  // 快捷追加一项
+  const handleAddTodoItem = () => {
+    const newItems = [...todoItems];
+    newItems.push({
+      id: `todo_${Date.now()}`,
+      rawText: '',
+      cleanText: '',
+      isDone: false,
+      prefixStyle: todoStyle,
+      prefixDisplay: '',
+    });
+    handleUpdateTodoItems(newItems);
+  };
+
+  // 在指定行插入新项
+  const handleAddNewAt = (targetIdx: number) => {
+    const newItems = [...todoItems];
+    const newItem: TodoItem = {
+      id: `todo_${Date.now()}`,
+      rawText: '',
+      cleanText: '',
+      isDone: false,
+      prefixStyle: todoStyle,
+      prefixDisplay: '',
+    };
+    newItems.splice(targetIdx, 0, newItem);
+    handleUpdateTodoItems(newItems);
+  };
+
+  const todoDoneCount = useMemo(() => {
+    return todoItems.filter((it) => it.isDone).length;
+  }, [todoItems]);
 
   return (
     <div
@@ -208,51 +336,101 @@ export const MemoStationeryPad: React.FC<MemoStationeryPadProps> = ({
             boxShadow: '0 1px 0 #502428',
             flexShrink: 0,
             marginLeft: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
           }}
         >
+          {isAccountingCategory && <Calculator size={10} />}
+          {isTodoCategory && <CheckSquare size={10} />}
           {category.name}
         </div>
       </div>
 
-      {/* 2. 手账纸张正文区（真实横线手写纸设计） */}
-      <div
-        style={{
-          flex: 1,
-          background: '#FFFDF9',
-          border: '2.5px solid #502428',
-          borderTop: 'none',
-          borderBottom: 'none',
-          padding: '8px 12px',
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, #E8DFD5 28px)',
-          backgroundAttachment: 'local',
-          overflow: 'hidden',
-        }}
-      >
-        <textarea
-          value={currentContent}
-          onChange={(e) => handleContentChange(e.target.value)}
-          placeholder={`在此书写【${category.name}】内容...\n• 可以记录每一笔收支明细\n• 可以随笔写下生活灵感\n• 纸张不够可在下方点击【加新纸】`}
+      {/* 2. 吸顶便携预算计算器条（记账场景） */}
+      {isAccountingCategory && (
+        <MemoBudgetBar
+          calcResult={calcResult}
+          onUpdateBudget={handleUpdateBudget}
+        />
+      )}
+
+      {/* 2.5 待办吸顶工具栏（待办场景：进度条 + 符号排列选择器[√]/1,2,3/①②③/•/★） */}
+      {isTodoCategory && (
+        <MemoTodoBar
+          totalCount={todoItems.length}
+          doneCount={todoDoneCount}
+          currentStyle={todoStyle}
+          isInteractiveMode={isTodoInteractive}
+          onChangeStyle={handleChangeTodoStyle}
+          onToggleInteractiveMode={() => setIsTodoInteractive(!isTodoInteractive)}
+          onAddTodo={handleAddTodoItem}
+        />
+      )}
+
+      {/* 3. 手账纸张正文区（待办专属打钩互动清单 vs 自由手写纸） */}
+      {isTodoCategory && isTodoInteractive ? (
+        <MemoTodoListInteractive
+          items={todoItems}
+          currentStyle={todoStyle}
+          onUpdateItems={handleUpdateTodoItems}
+          onAddNewAt={handleAddNewAt}
+        />
+      ) : (
+        <div
           style={{
             flex: 1,
-            width: '100%',
-            height: '100%',
-            background: 'transparent',
-            border: 'none',
-            outline: 'none',
-            resize: 'none',
-            fontSize: '13.5px',
-            lineHeight: '28px',
-            color: '#292524',
-            fontFamily: '"ZCOOL KuaiLe", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            boxSizing: 'border-box',
-            padding: 0,
-            margin: 0,
+            background: '#FFFDF9',
+            border: '2.5px solid #502428',
+            borderTop: 'none',
+            borderBottom: 'none',
+            padding: '8px 12px',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, #E8DFD5 28px)',
+            backgroundAttachment: 'local',
+            overflow: 'hidden',
           }}
-        />
-      </div>
+        >
+          <textarea
+            ref={textareaRef}
+            value={currentContent}
+            onChange={(e) => {
+              const target = e.target;
+              const cursor = target.selectionStart;
+              handleContentChange(target.value);
+              // 双重锁定：在 React 本轮与下一微任务帧中锁定光标位置，杜绝跳到末尾
+              requestAnimationFrame(() => {
+                if (textareaRef.current) {
+                  textareaRef.current.setSelectionRange(cursor, cursor);
+                }
+              });
+            }}
+            placeholder={
+              isAccountingCategory
+                ? `在此记录每一笔收支明细...\n• 格式如：9月22日 暖阳拿铁 ￥18.00\n• 每一笔支出都会自动从上方可用金额中扣减\n• 余额实时计算，点击右上方【盖印总计】可同步写入末尾`
+                : `在此书写【${category.name}】内容...\n• 可以记录每一笔收支明细\n• 可以随笔写下生活灵感\n• 纸张不够可在下方点击【加新纸】`
+            }
+            style={{
+              flex: 1,
+              width: '100%',
+              height: '100%',
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              resize: 'none',
+              fontSize: '13.5px',
+              lineHeight: '28px',
+              color: '#292524',
+              fontFamily: '"ZCOOL KuaiLe", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              boxSizing: 'border-box',
+              padding: 0,
+              margin: 0,
+            }}
+          />
+        </div>
+      )}
 
       {/* 3. 活页纸底部：页码指示、翻页与加新纸按钮 */}
       <div

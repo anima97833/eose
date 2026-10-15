@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>星球碎片录 - 精致植物园版</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ac: {
+              cream: '#FBF7ED', creamDark: '#F3ECE0',
+              leaf: '#55C397', leafDark: '#3DA87E',
+              wood: '#7E5B44', woodLight: '#9E7457',
+              sun: '#FFCC41', sunDark: '#EBB426',
+              peach: '#FF886C', sky: '#7AD4EB', ink: '#4A3B32'
+            }
+          },
+          fontFamily: { ac: ['"Zen Maru Gothic"', '"Nunito"', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overscroll-behavior: none; }
+    body {
+      background-color: #F8F3E6;
+      background-image: radial-gradient(#ece3ce 15%, transparent 16%), radial-gradient(#e5dbc4 15%, transparent 16%);
+      background-size: 28px 28px; background-position: 0 0, 14px 14px;
+      font-family: 'Zen Maru Gothic', 'Nunito', sans-serif;
+      color: #4A3B32; -webkit-tap-highlight-color: transparent; user-select: none; overflow: hidden;
+    }
+    .app-container { height: 100vh; height: 100dvh; position: relative; overflow: hidden; }
+    .safe-px { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+    .safe-pt { padding-top: max(16px, env(safe-area-inset-top)); }
+    .safe-pb { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+
+    .btn-press { transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+    .btn-press:active { transform: scale(0.95) translateY(2px) !important; box-shadow: 0 1px 0 rgba(0,0,0,0.1) !important; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+    .page-slide { transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease; }
+    .page-hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
+    .page-visible { transform: translateX(0); opacity: 1; pointer-events: auto; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    const DB_NAME = 'AC_Fragments_DB'; const DB_VERSION = 2;
+    
+    // 植物款式扩充：增加向日葵、蒲公英等独立渲染配置
+    const TREE_STYLES = [
+      { id: 'style_green', type: 'round', hex: 0x55C397, bg: '#EDF8EE', border: '#55C397', name: '圆球树' },
+      { id: 'style_yellow', type: 'pine', hex: 0xFFCC41, bg: '#FFF9E5', border: '#FFCC41', name: '黄松树' },
+      { id: 'style_pink', type: 'bush', hex: 0xFF886C, bg: '#FFF0ED', border: '#FF886C', name: '粉灌木' },
+      { id: 'style_brown', type: 'pine', hex: 0xD87250, bg: '#F8F1EB', border: '#7E5B44', name: '红松树' },
+      { id: 'style_grass_g', type: 'grass', hex: 0x81C784, bg: '#E8F5E9', border: '#81C784', name: '绿草丛' },
+      { id: 'style_grass_y', type: 'grass', hex: 0xFFD54F, bg: '#FFF8E1', border: '#FFD54F', name: '黄草丛' },
+      { id: 'style_sunflower', type: 'sunflower', hex: 0xFFCA28, bg: '#FFF8E1', border: '#FFCA28', name: '向日葵' },
+      { id: 'style_dandelion', type: 'dandelion', hex: 0xFFFFFF, bg: '#FAFAFA', border: '#E0E0E0', name: '蒲公英' }
+    ];
+
+    const initDB = () => new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('fragments')) db.createObjectStore('fragments', { keyPath: 'id' }).createIndex('timestamp', 'timestamp', { unique: false });
+        if (!db.objectStoreNames.contains('tags')) db.createObjectStore('tags', { keyPath: 'id' });
+      };
+      request.onsuccess = async () => {
+        const db = request.result;
+        const tx = db.transaction('tags', 'readonly');
+        tx.objectStore('tags').count().onsuccess = (e) => {
+          if(e.target.result === 0) {
+            const initTx = db.transaction('tags', 'readwrite'); const store = initTx.objectStore('tags');
+            store.put({ id: 'tag_1', icon: '🌱', label: '新技法', styleId: 'style_green' });
+            store.put({ id: 'tag_2', icon: '🌻', label: '开窍了', styleId: 'style_sunflower' });
+            store.put({ id: 'tag_3', icon: '🌬️', label: '发散期', styleId: 'style_dandelion' });
+          }
+        }
+        resolve(db);
+      };
+      request.onerror = () => reject(request.error);
+    });
+
+    const dbOperate = async (storeName, action, item = null) => {
+      const db = await initDB();
+      return new Promise((res, rej) => {
+        const tx = db.transaction(storeName, action === 'get' ? 'readonly' : 'readwrite');
+        const store = tx.objectStore(storeName);
+        let req = action === 'get' ? store.getAll() : (action === 'put' ? store.put(item) : store.delete(item));
+        req.onsuccess = () => res(req.result); req.onerror = rej;
+      });
+    };
+
+    const ListIcon = () => (<svg className="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>);
+    const PlusIcon = () => (<svg className="w-8 h-8 stroke-[3.5] stroke-current" fill="none" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>);
+    const BackIcon = () => (<svg className="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/></svg>);
+    const TrashIcon = () => (<svg className="w-4 h-4 fill-current opacity-60 hover:opacity-100" viewBox="0 0 24 24"><path d="M19 4h-3.5l-1-1h-5l-1 1H5v2h14M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12z"/></svg>);
+
+    // ==========================================
+    // Three.js 核心引擎
+    // ==========================================
+    class PlanetEngine {
+      constructor(container) {
+        this.container = container;
+        this.plantedCount = 0; 
+        this.maxTrees = 250; 
+        this.treeSpots = [];
+        this.tagsConfig = []; 
+
+        this.initScene();
+        this.createPlanet();
+        this.createClouds();
+        this.generatePlantingSpots();
+        this.initInteraction(); 
+        this.initLabel();       
+        
+        this.animate = this.animate.bind(this);
+        this.animate();
+        window.addEventListener('resize', this.onWindowResize.bind(this));
+      }
+
+      setTags(tags) { this.tagsConfig = tags; }
+      getAspect() { return window.innerWidth / window.innerHeight; }
+      getCameraZoom() { const a = this.getAspect(); return a < 0.6 ? 7.0 : (a < 1 ? 5.5 : 4.5); }
+
+      initScene() {
+        this.scene = new THREE.Scene();
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.container.appendChild(this.renderer.domElement);
+
+        const aspect = this.getAspect(); const d = this.getCameraZoom();
+        this.camera = new THREE.OrthographicCamera(-d*aspect, d*aspect, d, -d, 1, 100);
+        this.camera.position.set(10, 10, 10); this.camera.lookAt(0, 0, 0);
+
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true; this.controls.dampingFactor = 0.05;
+        this.controls.enablePan = false; this.controls.enableZoom = false;
+        this.controls.autoRotate = true; this.controls.autoRotateSpeed = 0.5;
+
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const dirLight = new THREE.DirectionalLight(0xfff5e6, 0.8);
+        dirLight.position.set(-5, 10, 5); dirLight.castShadow = true;
+        this.scene.add(dirLight);
+        this.scene.add(new THREE.DirectionalLight(0x93AFCB, 0.4).position.set(5, -2, -5));
+
+        const canvas = document.createElement('canvas'); canvas.width = 3; canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle='#666'; ctx.fillRect(0,0,1,1); ctx.fillStyle='#b3b3b3'; ctx.fillRect(1,0,1,1); ctx.fillStyle='#fff'; ctx.fillRect(2,0,1,1);
+        this.gradientMap = new THREE.CanvasTexture(canvas); this.gradientMap.magFilter = THREE.NearestFilter; this.gradientMap.minFilter = THREE.NearestFilter;
+
+        this.worldGroup = new THREE.Group(); this.scene.add(this.worldGroup);
+      }
+
+      getToonMaterial(colorHex) { return new THREE.MeshToonMaterial({ color: colorHex, gradientMap: this.gradientMap }); }
+
+      createPlanet() {
+        this.planet = new THREE.Mesh(new THREE.IcosahedronGeometry(2.5, 2), this.getToonMaterial(0x81C784));
+        this.planet.receiveShadow = true; this.planet.castShadow = true; this.worldGroup.add(this.planet);
+        const dirt = new THREE.Mesh(new THREE.IcosahedronGeometry(2.4, 1), this.getToonMaterial(0xAA7952));
+        dirt.position.y = -0.5; this.worldGroup.add(dirt);
+      }
+
+      createClouds() {
+        this.cloudsGroup = new THREE.Group(); const mat = this.getToonMaterial(0xffffff);
+        for(let i=0; i<5; i++) {
+            const cloud = new THREE.Group();
+            cloud.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 0), mat));
+            const b2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), mat); b2.position.set(0.3,-0.1,0); cloud.add(b2);
+            const b3 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.25, 0), mat); b3.position.set(-0.3,-0.1,0.1); cloud.add(b3);
+            const angle = (i/5)*Math.PI*2; const radius = 4.5+Math.random();
+            cloud.position.set(Math.cos(angle)*radius, (Math.random()-0.5)*2, Math.sin(angle)*radius);
+            this.cloudsGroup.add(cloud);
+        }
+        this.worldGroup.add(this.cloudsGroup);
+      }
+
+      generatePlantingSpots() {
+        const samples = this.maxTrees; const r = 2.5; const offset = 2/samples; const inc = Math.PI*(3-Math.sqrt(5));
+        for (let i=0; i<samples; i++) {
+            const y = ((i*offset)-1)+(offset/2);
+            if (y < -0.5) continue; 
+            const rad = Math.sqrt(1-y*y); const phi = ((i+1)%samples)*inc;
+            this.treeSpots.push(new THREE.Vector3(Math.cos(phi)*rad*r, y*r, Math.sin(phi)*rad*r));
+        }
+        this.treeSpots.sort(() => Math.random() - 0.5); 
+      }
+
+      // ==========================================================
+      // 高精度定制植物建模 (向日葵、蒲公英、草丛)
+      // ==========================================================
+      buildTreeMesh(type, color) {
+        const group = new THREE.Group();
+        const leafMat = this.getToonMaterial(color);
+
+        if (type === 'pine' || type === 'bush' || type === 'round') {
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 0.4, 5), this.getToonMaterial(0x7E5B44));
+            trunk.position.y = 0.2; trunk.castShadow = true; trunk.receiveShadow = true; group.add(trunk);
+            if (type === 'pine') {
+                const l1 = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.5, 5), leafMat); l1.position.y = 0.5; l1.castShadow=true;
+                const l2 = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.4, 5), leafMat); l2.position.y = 0.7; l2.castShadow=true; group.add(l1,l2);
+            } else if (type === 'bush') {
+                const l1 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.25, 0), leafMat); l1.position.y = 0.5; l1.castShadow=true;
+                const l2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.15, 0), leafMat); l2.position.set(0.15,0.4,0.1); l2.castShadow=true; group.add(l1,l2);
+            } else {
+                const l = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 1), leafMat); l.position.y = 0.5; l.castShadow=true; group.add(l);
+            }
+        } 
+        else if (type === 'grass') {
+            // 精致错落的三片草叶
+            const g1 = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.35, 4), leafMat); g1.position.set(0, 0.17, 0); g1.rotation.set(0, Math.random(), 0.1); g1.castShadow=true;
+            const g2 = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.25, 4), leafMat); g2.position.set(0.1, 0.12, 0.05); g2.rotation.set(0.2, 0, -0.3); g2.castShadow=true;
+            const g3 = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 4), leafMat); g3.position.set(-0.1, 0.1, -0.05); g3.rotation.set(-0.2, 0, 0.3); g3.castShadow=true;
+            group.add(g1, g2, g3);
+        }
+        else if (type === 'sunflower') {
+            // 向日葵：绿茎 + 8片立体黄色花瓣 + 棕色瓜子盘
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 5), this.getToonMaterial(0x55C397));
+            stem.position.y = 0.15; stem.castShadow = true; group.add(stem);
+
+            const head = new THREE.Group();
+            head.position.y = 0.3; 
+            head.rotation.x = 0.4; // 朝斜上方仰起，迎着阳光
+
+            const center = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.04, 12), this.getToonMaterial(0x5D4037));
+            center.rotation.x = Math.PI / 2;
+            head.add(center);
+
+            for(let i = 0; i < 8; i++) {
+                const petal = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.02), leafMat);
+                const angle = (i / 8) * Math.PI * 2;
+                petal.position.set(Math.cos(angle) * 0.16, Math.sin(angle) * 0.16, -0.01);
+                petal.rotation.z = angle - Math.PI/2; // 指向外侧
+                petal.castShadow = true;
+                head.add(petal);
+            }
+            group.add(head);
+        }
+        else if (type === 'dandelion') {
+            // 蒲公英：绿茎 + 大白绒毛 + 2朵飘落的小绒毛
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 4), this.getToonMaterial(0x55C397));
+            stem.position.y = 0.15; group.add(stem);
+
+            const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18, 1), leafMat);
+            head.position.y = 0.35; head.castShadow = true; group.add(head);
+
+            // 悬浮的小绒球，增加故事感
+            const seed1 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.04, 0), leafMat); seed1.position.set(0.15, 0.45, 0.1);
+            const seed2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.03, 0), leafMat); seed2.position.set(-0.2, 0.3, 0.05);
+            group.add(seed1, seed2);
+        }
+
+        group.scale.set(0.01, 0.01, 0.01); 
+        return group;
+      }
+
+      plantTree(stampId, animate = true) {
+        if (this.plantedCount >= this.treeSpots.length) return;
+        const spot = this.treeSpots[this.plantedCount];
+        const tag = this.tagsConfig.find(s => s.id === stampId) || this.tagsConfig[0];
+        const style = TREE_STYLES.find(s => s.id === (tag?.styleId)) || TREE_STYLES[0];
+        
+        const tree = this.buildTreeMesh(style.type, style.hex);
+        // 绑定数据供射线检测使用
+        tree.userData = { label: tag.label, icon: tag.icon };
+
+        tree.position.copy(spot);
+        tree.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), spot.clone().normalize());
+        tree.rotateY(Math.random() * Math.PI);
+        this.planet.add(tree);
+        this.plantedCount++;
+
+        if (animate) {
+            const s = 0.8 + Math.random()*0.5;
+            new TWEEN.Tween(tree.scale).to({x:s,y:s,z:s}, 1000).easing(TWEEN.Easing.Elastic.Out).start();
+        } else {
+            const s = 0.8 + Math.random()*0.5; tree.scale.set(s,s,s);
+        }
+      }
+
+      syncTrees(items, tags) {
+          this.tagsConfig = tags;
+          for(let i = this.planet.children.length - 1; i >= 0; i--) {
+              if(this.planet.children[i].type === 'Group') this.planet.remove(this.planet.children[i]);
+          }
+          this.plantedCount = 0;
+          items.forEach(item => this.plantTree(item.stampId, false));
+      }
+
+      // 交互：点击射线检测与悬浮 UI
+      initLabel() {
+          this.labelDiv = document.createElement('div');
+          this.labelDiv.style.position = 'absolute';
+          this.labelDiv.style.pointerEvents = 'none';
+          this.labelDiv.style.opacity = '0';
+          this.labelDiv.style.transition = 'opacity 0.3s ease, transform 0.1s linear';
+          this.labelDiv.style.background = 'rgba(255, 255, 255, 0.95)';
+          this.labelDiv.style.padding = '6px 14px';
+          this.labelDiv.style.borderRadius = '20px';
+          this.labelDiv.style.fontWeight = '900';
+          this.labelDiv.style.fontSize = '14px';
+          this.labelDiv.style.color = '#4A3B32';
+          this.labelDiv.style.boxShadow = '0 8px 16px rgba(74, 59, 50, 0.15)';
+          this.labelDiv.style.border = '3px solid white';
+          this.labelDiv.style.transform = 'translate(-50%, -100%)';
+          this.labelDiv.style.zIndex = '40'; 
+          this.container.appendChild(this.labelDiv);
+          this.activeTree = null; this.labelTimeout = null;
+      }
+
+      initInteraction() {
+          this.raycaster = new THREE.Raycaster();
+          this.mouse = new THREE.Vector2();
+          let startPos = { x: 0, y: 0 };
+
+          const dom = this.renderer.domElement;
+          dom.addEventListener('pointerdown', (e) => { startPos = { x: e.clientX, y: e.clientY }; });
+          dom.addEventListener('pointerup', (e) => {
+              if (Math.abs(e.clientX - startPos.x) > 5 || Math.abs(e.clientY - startPos.y) > 5) return;
+
+              this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+              this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+              this.raycaster.setFromCamera(this.mouse, this.camera);
+              
+              const intersects = this.raycaster.intersectObjects(this.planet.children, true);
+              if (intersects.length > 0) {
+                  let obj = intersects[0].object;
+                  while (obj.parent && obj.parent !== this.planet) { obj = obj.parent; }
+                  
+                  if (obj.userData && obj.userData.label) {
+                      this.activeTree = obj;
+                      this.labelDiv.innerHTML = `<span style="font-size:16px; margin-right:4px">${obj.userData.icon}</span> ${obj.userData.label}`;
+                      this.labelDiv.style.opacity = '1';
+                      if (this.labelTimeout) clearTimeout(this.labelTimeout);
+                      this.labelTimeout = setTimeout(() => { this.labelDiv.style.opacity = '0'; this.activeTree = null; }, 3000); // 头顶悬浮 3 秒
+                      
+                      const currentScale = obj.scale.x; 
+                      new TWEEN.Tween(obj.scale).to({x: currentScale*1.4, y: currentScale*1.4, z: currentScale*1.4}, 150)
+                          .yoyo(true).repeat(1).easing(TWEEN.Easing.Quadratic.Out).start();
+                  }
+              }
+          });
+      }
+
+      updateLabelPosition() {
+          if (!this.activeTree || this.labelDiv.style.opacity === '0') return;
+          const vector = new THREE.Vector3();
+          this.activeTree.getWorldPosition(vector);
+          vector.y += 0.8; // 标签在植物头顶上方悬浮
+          vector.project(this.camera);
+          
+          const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+          const y = (vector.y * -0.5 + 0.5) * window.innerHeight;
+          this.labelDiv.style.left = `${x}px`;
+          this.labelDiv.style.top = `${y - 15}px`;
+      }
+
+      onWindowResize() {
+        const aspect = this.getAspect(); const d = this.getCameraZoom();
+        this.camera.left = -d*aspect; this.camera.right = d*aspect; this.camera.top = d; this.camera.bottom = -d;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      animate(time) {
+        this.reqId = requestAnimationFrame(this.animate); 
+        TWEEN.update(time); this.controls.update();
+        this.worldGroup.position.y = Math.sin(Date.now()*0.001)*0.2; 
+        this.cloudsGroup.rotation.y = Date.now()*0.0002;
+        this.updateLabelPosition(); 
+        this.renderer.render(this.scene, this.camera);
+      }
+    }
+
+
+    // ==========================================
+    // React 主应用
+    // ==========================================
+    function App() {
+      const [items, setItems] = useState([]);
+      const [tags, setTags] = useState([]);
+      
+      const [currentView, setCurrentView] = useState('planet'); 
+      const [activeTag, setActiveTag] = useState('all');
+      
+      const [showAddModal, setShowAddModal] = useState(false);
+      const [showTagManager, setShowTagManager] = useState(false);
+
+      const [activity, setActivity] = useState('');
+      const [growth, setGrowth] = useState('');
+      const [selectedStamp, setSelectedStamp] = useState('');
+
+      const canvasContainerRef = useRef(null);
+      const engineRef = useRef(null);
+
+      useEffect(() => { loadAllData(); }, []);
+
+      const loadAllData = async () => {
+        try {
+          setTimeout(async () => {
+              const loadedTags = await dbOperate('tags', 'get');
+              const loadedItems = await dbOperate('fragments', 'get');
+              loadedItems.sort((a, b) => b.timestamp - a.timestamp);
+              
+              setTags(loadedTags); setItems(loadedItems);
+              if (loadedTags.length > 0) setSelectedStamp(loadedTags[0].id);
+              
+              if (!engineRef.current && canvasContainerRef.current) {
+                  engineRef.current = new PlanetEngine(canvasContainerRef.current);
+                  engineRef.current.syncTrees(loadedItems, loadedTags); 
+              }
+          }, 100);
+        } catch (err) {}
+      };
+
+      const handleSaveItem = async (e) => {
+        e.preventDefault(); if (!activity.trim()) return;
+        const newItem = {
+          id: Date.now().toString(),
+          activity: activity.trim(), growth: growth.trim(),
+          stampId: selectedStamp || tags[0]?.id, timestamp: Date.now(),
+          dateStr: new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date())
+        };
+        await dbOperate('fragments', 'put', newItem);
+        setItems([newItem, ...items]);
+        if (engineRef.current) engineRef.current.plantTree(newItem.stampId, true);
+        setActivity(''); setGrowth(''); setShowAddModal(false);
+      };
+
+      const handleDeleteItem = async (id, e) => {
+        e.stopPropagation();
+        await dbOperate('fragments', 'delete', id);
+        const newItems = items.filter(item => item.id !== id);
+        setItems(newItems);
+        if (engineRef.current) engineRef.current.syncTrees(newItems, tags);
+      };
+
+      const TagManagerModal = () => {
+          const [newIcon, setNewIcon] = useState('🌺');
+          const [newLabel, setNewLabel] = useState('');
+          const [newStyle, setNewStyle] = useState(TREE_STYLES[6].id); 
+
+          const addTag = async () => {
+              if(!newLabel.trim()) return;
+              const newTag = { id: 'tag_'+Date.now(), icon: newIcon, label: newLabel.trim(), styleId: newStyle };
+              await dbOperate('tags', 'put', newTag);
+              const updatedTags = [...tags, newTag];
+              setTags(updatedTags);
+              if (engineRef.current) engineRef.current.setTags(updatedTags);
+              setNewLabel('');
+          }
+
+          const deleteTag = async (id) => {
+              await dbOperate('tags', 'delete', id);
+              const updatedTags = tags.filter(t => t.id !== id);
+              setTags(updatedTags);
+              if (engineRef.current) engineRef.current.setTags(updatedTags);
+          }
+
+          return (
+            <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-ac-ink/40 backdrop-blur-sm">
+                <div className="w-full max-w-sm bg-ac-cream rounded-[2rem] border-4 border-white p-5 shadow-ac-card relative">
+                    <div className="flex justify-between items-center mb-4 border-b pb-2">
+                        <span className="font-bold text-ac-wood">管理植物图鉴</span>
+                        <button onClick={() => setShowTagManager(false)} className="bg-ac-creamDark w-8 h-8 rounded-full btn-press">✕</button>
+                    </div>
+                    <div className="max-h-40 overflow-y-auto mb-4 space-y-2 hide-scrollbar">
+                        {tags.map(t => (
+                            <div key={t.id} className="flex justify-between items-center bg-white p-2.5 rounded-xl border">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xl">{t.icon}</span><span className="font-bold text-sm text-ac-wood">{t.label}</span>
+                                </div>
+                                <button onClick={()=>deleteTag(t.id)} className="text-red-400 hover:text-red-600 p-1 active:scale-90"><TrashIcon/></button>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl border-2 border-dashed border-ac-wood/20">
+                        <p className="text-xs font-bold text-ac-wood/60 mb-2">培养新物种 (树/草/花)</p>
+                        <div className="flex gap-2 mb-3">
+                            <input value={newIcon} onChange={e=>setNewIcon(e.target.value)} maxLength={2} className="w-12 text-center bg-gray-50 rounded-lg font-bold outline-none border focus:border-ac-leaf transition-colors" placeholder="Emoji"/>
+                            <input value={newLabel} onChange={e=>setNewLabel(e.target.value)} maxLength={6} className="flex-1 bg-gray-50 rounded-lg px-3 font-bold outline-none border focus:border-ac-leaf transition-colors text-sm" placeholder="分类名称"/>
+                        </div>
+                        <div className="flex gap-3 mb-4 overflow-x-auto pb-2 hide-scrollbar snap-x">
+                            {TREE_STYLES.map(s => (
+                                <div key={s.id} onClick={()=>setNewStyle(s.id)} className="snap-start flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                                    <button className={`w-10 h-10 rounded-full border-2 transition-transform ${newStyle===s.id ? 'scale-110 shadow-md border-ac-ink' : 'opacity-70'}`} style={{backgroundColor: s.bg, borderColor: newStyle===s.id ? '#4A3B32' : s.border}}></button>
+                                    <span className={`text-[10px] font-bold ${newStyle===s.id ? 'text-ac-ink' : 'text-ac-wood/60'}`}>{s.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <button onClick={addTag} className="w-full bg-ac-leaf text-white font-bold py-2.5 rounded-xl btn-press shadow-sm">增加并保存</button>
+                    </div>
+                </div>
+            </div>
+          )
+      }
+
+      const filteredItems = useMemo(() => {
+        if (activeTag === 'all') return items;
+        return items.filter(item => item.stampId === activeTag);
+      }, [items, activeTag]);
+
+      return (
+        <div className="app-container">
+          
+          <div id="canvas-container" ref={canvasContainerRef}></div>
+
+          <div className={`absolute inset-0 pointer-events-none flex flex-col justify-end safe-pb px-8 z-10 page-slide ${currentView === 'planet' ? 'page-visible' : 'page-hidden'}`}>
+              <div className="pointer-events-auto flex justify-center gap-6 mb-6">
+                  <button onClick={() => setCurrentView('list')} className="btn-press bg-white/85 backdrop-blur-xl w-16 h-16 rounded-[1.5rem] border-4 border-white flex justify-center items-center text-ac-wood shadow-[0_8px_20px_rgba(74,59,50,0.1)] active:translate-y-1">
+                      <ListIcon />
+                  </button>
+                  <button onClick={() => setShowAddModal(true)} className="btn-press bg-ac-leaf w-16 h-16 rounded-[1.5rem] border-4 border-white flex justify-center items-center text-white shadow-[0_6px_0_#3DA87E,0_12px_20px_rgba(0,0,0,0.15)] active:translate-y-2 active:shadow-none">
+                      <PlusIcon />
+                  </button>
+              </div>
+          </div>
+
+          <div className={`absolute inset-0 z-20 bg-ac-cream/95 backdrop-blur-2xl flex flex-col safe-pt safe-pb page-slide ${currentView === 'list' ? 'page-visible' : 'page-hidden'}`}>
+              <header className="flex-none px-5 py-3 flex items-center justify-between border-b-2 border-ac-wood/10">
+                  <button onClick={() => setCurrentView('planet')} className="p-2 btn-press bg-white rounded-full shadow-sm text-ac-wood"><BackIcon /></button>
+                  <h2 className="font-extrabold text-lg text-ac-wood tracking-widest">微光碎片集</h2>
+                  <div className="w-10"></div>
+              </header>
+
+              <div className="flex-none px-4 py-3 flex gap-2 overflow-x-auto hide-scrollbar">
+                  <button onClick={() => setActiveTag('all')} className={`btn-press whitespace-nowrap text-xs font-black px-4 py-2 rounded-full border-2 transition-all shrink-0 ${ activeTag === 'all' ? 'bg-ac-wood text-white border-ac-wood shadow-sm' : 'bg-white text-ac-wood border-transparent shadow-sm'}`}>全部 ({items.length}/250)</button>
+                  {tags.map(tag => {
+                      const style = TREE_STYLES.find(s=>s.id===tag.styleId) || TREE_STYLES[0];
+                      return (
+                      <button key={tag.id} onClick={() => setActiveTag(tag.id)} className={`btn-press whitespace-nowrap text-xs font-black px-4 py-2 rounded-full border-2 flex items-center gap-1.5 transition-all shrink-0 ${ activeTag === tag.id ? 'bg-white shadow-md' : 'bg-white/60 border-transparent shadow-sm'}`} style={{ borderColor: activeTag === tag.id ? style.border : 'transparent', color: '#4A3B32' }}>
+                        <span>{tag.icon}</span><span>{tag.label}</span>
+                      </button>
+                  )})}
+                  <button onClick={() => setShowTagManager(true)} className="btn-press whitespace-nowrap text-xs font-black px-4 py-2 rounded-full bg-ac-wood/10 text-ac-wood shrink-0 flex items-center gap-1">
+                      <span>⚙️</span> 管理植物
+                  </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto hide-scrollbar px-5 pt-2 pb-10 space-y-4">
+                  {filteredItems.length === 0 ? (
+                      <div className="mt-16 text-center opacity-50 font-bold text-ac-wood">空空如也，去星球上播种吧 🌱</div>
+                  ) : (
+                    filteredItems.map(item => {
+                        const tag = tags.find(t => t.id === item.stampId) || tags[0];
+                        const style = tag ? (TREE_STYLES.find(s=>s.id===tag.styleId) || TREE_STYLES[0]) : TREE_STYLES[0];
+                        return (
+                            <div key={item.id} className="bg-white rounded-[1.5rem] p-5 shadow-sm border-2 border-transparent relative" style={{borderColor: style.bg}}>
+                                <div className="flex justify-between items-center mb-2 pb-2 border-b border-dashed border-gray-200">
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-8 h-8 rounded-xl flex items-center justify-center text-lg" style={{backgroundColor: style.bg}}>{tag?.icon}</span>
+                                        <span className="font-black text-sm text-ac-wood">{item.activity}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs text-gray-400 font-bold">{item.dateStr}</span>
+                                        <button onClick={(e)=>handleDeleteItem(item.id, e)} className="text-gray-300 hover:text-red-400 p-1 active:scale-90"><TrashIcon/></button>
+                                    </div>
+                                </div>
+                                <p className="text-sm font-bold text-gray-700 leading-relaxed">{item.growth}</p>
+                            </div>
+                        )
+                    })
+                  )}
+              </div>
+          </div>
+
+          {showTagManager && <TagManagerModal />}
+
+          {showAddModal && (
+            <div className="absolute inset-0 z-50 flex items-start justify-center p-4 pt-[15vh] bg-ac-ink/40 backdrop-blur-sm animate-in fade-in duration-200 safe-px">
+              <div className="w-full max-w-sm bg-ac-cream rounded-[2.5rem] border-4 border-white p-6 shadow-ac-pop relative" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-sm font-black text-ac-wood flex items-center gap-1">🌱 播种一颗新记录</span>
+                  <button onClick={() => setShowAddModal(false)} className="w-8 h-8 rounded-full bg-ac-creamDark text-ac-wood font-black text-sm btn-press">✕</button>
+                </div>
+                
+                {tags.length === 0 ? (
+                    <div className="text-center py-4 font-bold text-ac-wood opacity-60">请先在列表页配置您的植物分类</div>
+                ) : (
+                  <form onSubmit={handleSaveItem} className="space-y-4">
+                    <div className="flex gap-2 overflow-x-auto hide-scrollbar py-2 snap-x">
+                      {tags.map(tag => {
+                          const style = TREE_STYLES.find(s=>s.id===tag.styleId) || TREE_STYLES[0];
+                          return (
+                          <button type="button" key={tag.id} onClick={() => setSelectedStamp(tag.id)} className={`snap-start shrink-0 px-4 py-2 rounded-2xl flex flex-col items-center gap-1 border-2 transition-all ${ selectedStamp === tag.id ? 'bg-white shadow-md -translate-y-1' : 'bg-transparent border-transparent opacity-60'}`} style={{ borderColor: selectedStamp === tag.id ? style.border : 'transparent' }}>
+                            <span className="text-2xl">{tag.icon}</span><span className="text-[11px] font-black text-ac-wood">{tag.label}</span>
+                          </button>
+                      )})}
+                    </div>
+                    <div className="bg-white rounded-2xl p-3 border-2 border-ac-wood/10 focus-within:border-ac-leaf">
+                      <input type="text" maxLength={20} placeholder="刚做了什么微小的事？" value={activity} onChange={e => setActivity(e.target.value)} className="w-full bg-transparent text-sm font-extrabold text-ac-ink outline-none" autoFocus />
+                    </div>
+                    <div className="bg-white rounded-2xl p-3 border-2 border-ac-wood/10 focus-within:border-ac-leaf">
+                      <textarea rows={3} maxLength={120} placeholder="有哪些感悟或收获？" value={growth} onChange={e => setGrowth(e.target.value)} className="w-full bg-transparent text-sm font-bold text-ac-ink outline-none resize-none" />
+                    </div>
+                    <button type="submit" disabled={!activity.trim()} className="btn-press w-full py-3.5 bg-ac-sun text-white font-black text-lg rounded-2xl border-2 border-white shadow-[0_6px_0_#C99714] disabled:opacity-50 transition-all mt-2 active:shadow-none active:translate-y-1">
+                      收进心气囊袋
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

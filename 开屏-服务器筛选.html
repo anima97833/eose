@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>生命的变形之旅 (Metamorphosis) - 极致精细版</title>
+    
+    <!-- 引入 Tailwind CSS 用于精美的 UI 叠加层 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Three.js 稳定核心与控制器 -->
+    <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- 引入 GSAP 用于平滑的多维属性插值与弹性动画 -->
+    <script src="https://unpkg.com/gsap@3.12.2/dist/gsap.min.js"></script>
+
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'PingFang SC', 'Segoe UI', sans-serif; background: #000; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+        .ui-overlay { position: absolute; bottom: 40px; left: 0; width: 100%; text-align: center; z-index: 10; pointer-events: none; }
+        .stage-title { font-size: 1.5rem; font-weight: 800; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.2); margin-bottom: 10px; letter-spacing: 2px;}
+        .btn-magic {
+            pointer-events: auto;
+            background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%);
+            color: #5C4033; font-weight: 900; padding: 14px 40px; border-radius: 40px;
+            border: 4px solid white; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 1.2rem;
+        }
+        .btn-magic:hover { transform: translateY(-4px) scale(1.05); box-shadow: 0 15px 30px rgba(0,0,0,0.2); }
+        .btn-magic:active { transform: translateY(2px) scale(0.95); box-shadow: 0 5px 10px rgba(0,0,0,0.1); }
+        .dots { display: flex; justify-content: center; gap: 8px; margin-top: 15px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.4); transition: 0.3s; }
+        .dot.active { background: white; transform: scale(1.3); box-shadow: 0 0 10px white; }
+    </style>
+</head>
+<body>
+
+    <div class="ui-overlay">
+        <div class="stage-title" id="stageName">狗狗的林间晨跑</div>
+        <button class="btn-magic" id="magicBtn">✨ 触发生命流转 (形变)</button>
+        <p class="text-xs font-bold text-white/80 drop-shadow mt-3 tracking-widest">( 拖拽画面可自由旋转视角，滚轮缩放细节 )</p>
+        <div class="dots" id="dotsContainer"></div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        // ==========================================
+        // 0. 主题与色彩剧本编排 (参照 ai_studio_code (45).html 的色彩美学)
+        // ==========================================
+        const stageThemes = [
+            { id: 0, name: "狗狗的林间晨跑", sky: 0x90E0EF, ground: 0x7CB518, dirt: 0x5C8001, light: 0xFFF9E6, poof: 0xFFEA00 },
+            { id: 1, name: "猫咪的午夜探险", sky: 0x2B2D42, ground: 0x8D99AE, dirt: 0x4A4E69, light: 0xE8EAF6, poof: 0x00F0FF },
+            { id: 2, name: "原石的日落翻滚", sky: 0xFFB703, ground: 0xFB8500, dirt: 0x9C6644, light: 0xFFE8D6, poof: 0xFF5722 },
+            { id: 3, name: "彩蝶的春日庭院", sky: 0xFFC8DD, ground: 0xFFAFCC, dirt: 0xB5838D, light: 0xFFFFFF, poof: 0xFF006E },
+            { id: 4, name: "旅人的无尽漫步", sky: 0x48CAE4, ground: 0xADE8F4, dirt: 0x0077B6, light: 0xCAF0F8, poof: 0xFFFFFF }
+        ];
+        let currentStage = 0;
+
+        // ==========================================
+        // 1. 场景与正交相机 (微缩模型/绘本风格)
+        // ==========================================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(stageThemes[0].sky);
+        scene.fog = new THREE.FogExp2(stageThemes[0].sky, 0.02);
+
+        const aspect = window.innerWidth / window.innerHeight;
+        const viewSize = 7.5; // 视野范围
+        const camera = new THREE.OrthographicCamera(-viewSize * aspect, viewSize * aspect, viewSize, -viewSize, 0.1, 100);
+        camera.position.set(12, 10, 12);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2.1; 
+        controls.autoRotate = true; controls.autoRotateSpeed = 0.5;
+
+        // ==========================================
+        // 2. 光影与全局材质系统
+        // ==========================================
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(stageThemes[0].light, 0.85);
+        dirLight.position.set(-10, 15, 10);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024; dirLight.shadow.mapSize.height = 1024;
+        const d = 8;
+        dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d;
+        dirLight.shadow.bias = -0.001;
+        scene.add(dirLight);
+
+        // 卡通光照渐变阶梯纹理
+        const cvs = document.createElement('canvas'); cvs.width = 4; cvs.height = 1;
+        const ctx = cvs.getContext('2d');
+        ctx.fillStyle='#444'; ctx.fillRect(0,0,1,1); ctx.fillStyle='#888'; ctx.fillRect(1,0,1,1);
+        ctx.fillStyle='#ccc'; ctx.fillRect(2,0,1,1); ctx.fillStyle='#fff'; ctx.fillRect(3,0,1,1);
+        const toonGradient = new THREE.CanvasTexture(cvs); 
+        toonGradient.magFilter = THREE.NearestFilter; toonGradient.minFilter = THREE.NearestFilter;
+
+        function getMat(hex) {
+            return new THREE.MeshToonMaterial({ color: hex, gradientMap: toonGradient });
+        }
+
+        // 动态环境材质 (用于随阶段变色)
+        const matGround = getMat(stageThemes[0].ground);
+        const matDirt = getMat(stageThemes[0].dirt);
+
+        // 工具：带锚点偏移的肢体生成
+        function createBone(geo, mat, pivotY) {
+            geo.translate(0, pivotY, 0);
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.castShadow = true; mesh.receiveShadow = true;
+            return mesh;
+        }
+
+        // ==========================================
+        // 3. 构建高精度程序化生物模型
+        // ==========================================
+        const creatures = new THREE.Group();
+        scene.add(creatures);
+
+        // 【1. 柴犬 - 极致细节】
+        const dog = new THREE.Group();
+        const dBodyMat = getMat(0xE07A5F), dBellyMat = getMat(0xF4F1DE), dDarkMat = getMat(0x3D405B), dRedMat = getMat(0xE63946);
+        const dogBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.9, 1.6), dBodyMat);
+        dogBody.position.y = 1.2; dogBody.castShadow = true; dog.add(dogBody);
+        
+        const dogBelly = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.2, 1.4), dBellyMat);
+        dogBelly.position.set(0, -0.36, 0.1); dogBody.add(dogBelly); // 白肚皮
+        
+        const dogNeck = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.4, 0.5), dBellyMat);
+        dogNeck.position.set(0, 0.2, 0.8); dogBody.add(dogNeck); // 脖子围脖
+        
+        const collar = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.15, 0.55), dRedMat);
+        collar.position.set(0, 0.3, 0.78); dogBody.add(collar); // 红项圈
+        const bell = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), getMat(0xF2CC8F));
+        bell.position.set(0, -0.1, 0.3); collar.add(bell);
+
+        const dogHeadGroup = new THREE.Group(); dogHeadGroup.position.set(0, 0.7, 0.9); dogBody.add(dogHeadGroup);
+        const dogHead = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.0, 1.1), dBodyMat); dogHead.castShadow = true; dogHeadGroup.add(dogHead);
+        const dogSnout = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.5), dBellyMat); dogSnout.position.set(0, -0.2, 0.8); dogHeadGroup.add(dogSnout);
+        const dogNose = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.1), dDarkMat); dogNose.position.set(0, 0.2, 0.25); dogSnout.add(dogNose);
+        
+        // 眼睛与眉毛
+        for(let i of [-1, 1]) {
+            const eye = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.2, 0.1), dDarkMat);
+            eye.position.set(i*0.3, 0.15, 0.56); dogHeadGroup.add(eye);
+            const brow = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.1), dBellyMat);
+            brow.position.set(i*0.3, 0.4, 0.56); dogHeadGroup.add(brow);
+            
+            const earGeo = new THREE.BoxGeometry(0.3, 0.4, 0.2); earGeo.translate(0, 0.2, 0);
+            const ear = new THREE.Mesh(earGeo, dBodyMat);
+            const earInner = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.25, 0.1), getMat(0xF4A261));
+            earInner.position.set(0, 0.2, 0.06); ear.add(earInner);
+            ear.position.set(i*0.4, 0.5, -0.2); ear.rotation.z = i*-0.2; ear.rotation.x = 0.1;
+            dogHeadGroup.add(ear);
+        }
+
+        const dogLegs = [];
+        for(let i=0; i<4; i++) {
+            const leg = createBone(new THREE.BoxGeometry(0.3, 0.8, 0.3), dBodyMat, -0.4);
+            leg.position.set(i%2===0 ? 0.45 : -0.45, 0.8, i<2 ? 0.5 : -0.5);
+            const paw = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.2, 0.35), dBellyMat);
+            paw.position.set(0, -0.7, 0.05); leg.add(paw);
+            dog.add(leg); dogLegs.push(leg);
+        }
+        const dogTail = createBone(new THREE.BoxGeometry(0.3, 0.6, 0.3), dBodyMat, 0.3);
+        dogTail.position.set(0, 1.5, -0.7); dogTail.rotation.x = 0.5;
+        const tailTip = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.2, 0.32), dBellyMat);
+        tailTip.position.set(0, 0.6, 0); dogTail.add(tailTip);
+        dogBody.add(dogTail);
+        creatures.add(dog);
+
+        // 【2. 燕尾服猫 - 优雅流线体】
+        const cat = new THREE.Group();
+        const cBlack = getMat(0x1D1E20), cWhite = getMat(0xFFFFFF), cEye = getMat(0xE9C46A);
+        const catBody = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 1.8), cBlack);
+        catBody.position.y = 1.1; catBody.castShadow = true; cat.add(catBody);
+        
+        const catChest = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.6, 0.6), cWhite);
+        catChest.position.set(0, -0.05, 0.65); catBody.add(catChest); // 白胸脯
+        
+        const catHeadGroup = new THREE.Group(); catHeadGroup.position.set(0, 0.5, 1.0); catBody.add(catHeadGroup);
+        const catHead = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.8, 0.9), cBlack); catHead.castShadow = true; catHeadGroup.add(catHead);
+        const catSnout = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.3), cWhite); catSnout.position.set(0, -0.2, 0.46); catHeadGroup.add(catSnout);
+        const catNose = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.1), getMat(0xFFB4A2)); catNose.position.set(0, 0.15, 0.15); catSnout.add(catNose);
+        
+        // 眼睛与竖耳、胡须
+        for(let i of [-1, 1]) {
+            const eye = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.1), cEye); eye.position.set(i*0.25, 0.1, 0.46);
+            const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.15, 0.11), cBlack); eye.add(pupil); catHeadGroup.add(eye);
+            
+            const ear = createBone(new THREE.ConeGeometry(0.2, 0.4, 4), cBlack, 0.2);
+            ear.position.set(i*0.35, 0.4, -0.1); ear.rotation.y = Math.PI/4; catHeadGroup.add(ear);
+
+            // 胡须
+            for(let j=0; j<2; j++) {
+                const whisker = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.02, 0.02), cWhite);
+                whisker.position.set(i*0.4, -0.2 + j*0.1, 0.5); whisker.rotation.z = i*(0.1 - j*0.2); catHeadGroup.add(whisker);
+            }
+        }
+        
+        const catLegs = [];
+        for(let i=0; i<4; i++) {
+            const leg = createBone(new THREE.BoxGeometry(0.2, 0.8, 0.2), cBlack, -0.4);
+            leg.position.set(i%2===0 ? 0.35 : -0.35, 0.8, i<2 ? 0.6 : -0.6);
+            const paw = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.15, 0.25), cWhite); paw.position.set(0, -0.75, 0.05); leg.add(paw);
+            cat.add(leg); catLegs.push(leg);
+        }
+        
+        // 多节柔软尾巴
+        const catTailGroup = new THREE.Group(); catTailGroup.position.set(0, 0.3, -0.9); catBody.add(catTailGroup);
+        const t1 = createBone(new THREE.BoxGeometry(0.15, 0.5, 0.15), cBlack, 0.25); t1.rotation.x = 1.0; catTailGroup.add(t1);
+        const t2 = createBone(new THREE.BoxGeometry(0.15, 0.5, 0.15), cBlack, 0.25); t2.position.set(0, 0.5, 0); t1.add(t2);
+        const t3 = createBone(new THREE.BoxGeometry(0.15, 0.5, 0.15), cWhite, 0.25); t3.position.set(0, 0.5, 0); t2.add(t3);
+        creatures.add(cat); cat.scale.setScalar(0); cat.visible = false;
+
+        // 【3. 原石 - 结晶地质体】
+        const rock = new THREE.Group();
+        const rMat = getMat(0x6C7A89), rMossMat = getMat(0x7CB342), rCrystalMat = getMat(0x4DD0E1);
+        const mainRock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2, 1), rMat);
+        mainRock.position.y = 1.0; mainRock.castShadow = true; rock.add(mainRock);
+        
+        // 添加苔藓层叠
+        const moss1 = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.4, 0.8), rMossMat); moss1.position.set(0.5, 0.8, 0); moss1.rotation.z = -0.4; mainRock.add(moss1);
+        const moss2 = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 1.0), rMossMat); moss2.position.set(-0.6, 0.2, 0.6); moss2.rotation.x = 0.5; mainRock.add(moss2);
+        
+        // 添加发光水晶体
+        for(let i=0; i<3; i++) {
+            const crystal = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.8, 6), rCrystalMat);
+            crystal.position.set(Math.random()-0.5, Math.random()+0.5, Math.random()-0.5);
+            crystal.lookAt(0,0,0); crystal.rotateX(Math.PI/2); mainRock.add(crystal);
+        }
+        creatures.add(rock); rock.scale.setScalar(0); rock.visible = false;
+
+        // 【4. 彩蝶 - 复合层级展翅】
+        const butterfly = new THREE.Group();
+        const bBodyMat = getMat(0x2B2D42), bWingTopMat = getMat(0xFF006E), bWingBotMat = getMat(0xFFBE0B);
+        const thorax = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.5, 4, 8), bBodyMat);
+        thorax.position.y = 2.5; thorax.rotation.x = Math.PI/2; thorax.castShadow = true; butterfly.add(thorax);
+        
+        const bHead = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), bBodyMat); bHead.position.set(0, 0, 0.4); thorax.add(bHead);
+        for(let i of [-1, 1]) {
+            const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.4), bBodyMat);
+            ant.position.set(i*0.1, 0.2, 0.1); ant.rotation.z = i*-0.3; ant.rotation.x = 0.5; bHead.add(ant);
+        }
+        
+        // 复杂双层翅膀
+        const wingGroupL = new THREE.Group(); wingGroupL.position.set(0.1, 0.1, 0); thorax.add(wingGroupL);
+        const wingGroupR = new THREE.Group(); wingGroupR.position.set(-0.1, 0.1, 0); thorax.add(wingGroupR);
+        
+        function createWingPart(geo, mat, px, pz, rz) {
+            geo.translate(px, 0, pz);
+            const w = new THREE.Mesh(geo, mat); w.rotation.y = rz; w.castShadow = true; return w;
+        }
+        const wTop = new THREE.BoxGeometry(1.2, 0.02, 0.8);
+        const wBot = new THREE.BoxGeometry(0.8, 0.02, 1.0);
+        
+        wingGroupL.add(createWingPart(wTop, bWingTopMat, 0.6, 0.2, 0.2));
+        wingGroupL.add(createWingPart(wBot, bWingBotMat, 0.4, -0.4, -0.2));
+        
+        wingGroupR.add(createWingPart(wTop, bWingTopMat, -0.6, 0.2, -0.2));
+        wingGroupR.add(createWingPart(wBot, bWingBotMat, -0.4, -0.4, 0.2));
+        
+        creatures.add(butterfly); butterfly.scale.setScalar(0); butterfly.visible = false;
+
+        // 【5. 旅人 - 全副武装的人类】
+        const human = new THREE.Group();
+        const hSkin = getMat(0xFFC8A2), hHair = getMat(0x3E2723), hJacket = getMat(0x2A9D8F), hPants = getMat(0x264653), hShoe = getMat(0xE76F51);
+        
+        const hTorso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.5), hJacket);
+        hTorso.position.y = 1.6; hTorso.castShadow = true; human.add(hTorso);
+        
+        const backpack = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.8, 0.4), getMat(0xE9C46A));
+        backpack.position.set(0, 0, -0.45); hTorso.add(backpack); // 背包
+        
+        const hHeadGroup = new THREE.Group(); hHeadGroup.position.set(0, 0.7, 0); hTorso.add(hHeadGroup);
+        const hHead = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), hSkin); hHead.castShadow = true; hHeadGroup.add(hHead);
+        const hair = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.2, 0.7), hHair); hair.position.set(0, 0.35, -0.05); hHeadGroup.add(hair);
+        const hairBang = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.2, 0.2), hHair); hairBang.position.set(0, 0.2, 0.3); hHeadGroup.add(hairBang);
+
+        const hArms = [], hLegs = [];
+        for(let i of [-1, 1]) {
+            // 分节手臂 (大臂+小臂)
+            const arm = createBone(new THREE.BoxGeometry(0.25, 0.5, 0.25), hJacket, -0.25);
+            arm.position.set(i*0.55, 0.4, 0); hTorso.add(arm); hArms.push(arm);
+            const lowerArm = createBone(new THREE.BoxGeometry(0.22, 0.4, 0.22), hSkin, -0.2);
+            lowerArm.position.set(0, -0.5, 0); arm.add(lowerArm);
+            
+            // 分节腿部 (大腿+小腿+鞋)
+            const leg = createBone(new THREE.BoxGeometry(0.35, 0.6, 0.35), hPants, -0.3);
+            leg.position.set(i*0.22, -0.5, 0); hTorso.add(leg); hLegs.push(leg);
+            const lowerLeg = createBone(new THREE.BoxGeometry(0.32, 0.5, 0.32), hSkin, -0.25);
+            lowerLeg.position.set(0, -0.6, 0); leg.add(lowerLeg);
+            const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.2, 0.45), hShoe);
+            shoe.position.set(0, -0.6, 0.05); lowerLeg.add(shoe);
+        }
+        creatures.add(human); human.scale.setScalar(0); human.visible = false;
+
+        const forms = [
+            { model: dog, propsName: "dogProps" },
+            { model: cat, propsName: "catProps" },
+            { model: rock, propsName: "rockProps" },
+            { model: butterfly, propsName: "flyProps" },
+            { model: human, propsName: "humanProps" }
+        ];
+
+        // ==========================================
+        // 4. 构建旋转环境底座与五套专属生态 Props
+        // ==========================================
+        const environment = new THREE.Group(); scene.add(environment);
+        const ground = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 1, 48), matGround);
+        ground.position.y = -0.5; ground.receiveShadow = true; environment.add(ground);
+        const dirt = new THREE.Mesh(new THREE.CylinderGeometry(7.8, 7.5, 1.5, 48), matDirt);
+        dirt.position.y = -1.5; environment.add(dirt);
+
+        const propsContainer = new THREE.Group(); environment.add(propsContainer);
+        const propsGroups = [new THREE.Group(), new THREE.Group(), new THREE.Group(), new THREE.Group(), new THREE.Group()];
+        propsGroups.forEach((g, idx) => { 
+            propsContainer.add(g); 
+            if(idx !== 0) g.scale.setScalar(0); // 隐藏非当前阶段道具
+        });
+
+        function polarToCartesian(r, theta) { return { x: r * Math.cos(theta), z: r * Math.sin(theta) }; }
+
+        for(let i=0; i<16; i++) {
+            const angle = (i/16) * Math.PI * 2; const r = 4.5 + Math.random() * 2.5;
+            const {x, z} = polarToCartesian(r, angle);
+
+            // 0: 狗狗 - 树干与栅栏
+            if(i%2===0) {
+                const tree = new THREE.Group();
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 1.5), getMat(0x795548));
+                trunk.position.y = 0.75; tree.add(trunk);
+                const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2), getMat(0x43A047));
+                leaves.position.y = 1.8; tree.add(leaves);
+                tree.position.set(x, 0, z); tree.castShadow = true; propsGroups[0].add(tree);
+            } else {
+                const bush = new THREE.Mesh(new THREE.SphereGeometry(0.6, 6, 6), getMat(0x81C784));
+                bush.position.set(x, 0.2, z); propsGroups[0].add(bush);
+            }
+
+            // 1: 猫咪 - 猫爬架与毛线球
+            if(i%3===0) {
+                const yarn = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12), getMat(0xFF5252));
+                yarn.position.set(x, 0.4, z); propsGroups[1].add(yarn);
+            } else {
+                const box = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 1.2), getMat(0xD7CCC8));
+                box.position.set(x, 0.4, z); box.rotation.y = Math.random(); propsGroups[1].add(box);
+            }
+
+            // 2: 原石 - 竹节与禅意石塔
+            if(i%2===0) {
+                const bamboo = new THREE.Group();
+                for(let j=0; j<4; j++) {
+                    const sec = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.6), getMat(0x8BC34A));
+                    sec.position.y = j*0.62 + 0.3; bamboo.add(sec);
+                }
+                bamboo.position.set(x, 0, z); propsGroups[2].add(bamboo);
+            } else {
+                const flatRock = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.2, 6), getMat(0x546E7A));
+                flatRock.position.set(x, 0.1, z); propsGroups[2].add(flatRock);
+            }
+
+            // 3: 蝴蝶 - 巨型梦幻花卉
+            const flower = new THREE.Group();
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.0), getMat(0x4CAF50));
+            stem.position.y = 1.0; flower.add(stem);
+            const petals = new THREE.Mesh(new THREE.TorusKnotGeometry(0.4, 0.15, 64, 8), getMat(0xFF9800));
+            petals.position.y = 2.0; petals.rotation.x = 0.5; flower.add(petals);
+            flower.position.set(x, 0, z); propsGroups[3].add(flower);
+
+            // 4: 旅人 - 路牌与长椅
+            if(i===0 || i===8) {
+                const sign = new THREE.Group();
+                sign.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05, 2), getMat(0x555555)).translateY(1));
+                const board = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 0.1), getMat(0xFFCC00));
+                board.position.set(0.2, 1.6, 0); sign.add(board);
+                sign.position.set(x, 0, z); propsGroups[4].add(sign);
+            } else {
+                const rockObj = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4), getMat(0x90A4AE));
+                rockObj.position.set(x, 0.2, z); propsGroups[4].add(rockObj);
+            }
+        }
+
+        // ==========================================
+        // 5. 魔法形变粒子特效系统
+        // ==========================================
+        const particleGroup = new THREE.Group(); scene.add(particleGroup);
+        const pGeo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
+        const pMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF }); // 动态改变颜色
+        const particles = [];
+        for(let i=0; i<40; i++) {
+            const p = new THREE.Mesh(pGeo, pMat.clone()); p.visible = false;
+            particleGroup.add(p); particles.push({ mesh: p, vel: new THREE.Vector3() });
+        }
+
+        function triggerBurst(hexColor) {
+            particles.forEach(p => {
+                p.mesh.visible = true;
+                p.mesh.material.color.setHex(hexColor);
+                p.mesh.position.set((Math.random()-0.5)*2, 1.5 + (Math.random()-0.5)*2, (Math.random()-0.5)*2);
+                p.mesh.scale.setScalar(Math.random() * 1.5 + 0.5);
+                p.vel.set((Math.random()-0.5)*6, (Math.random())*5, (Math.random()-0.5)*6);
+            });
+        }
+
+        // ==========================================
+        // 6. UI 与 状态机交互逻辑
+        // ==========================================
+        const dotsContainer = document.getElementById('dotsContainer');
+        stageThemes.forEach((t, i) => {
+            const dot = document.createElement('div');
+            dot.className = `dot ${i === 0 ? 'active' : ''}`;
+            dotsContainer.appendChild(dot);
+        });
+
+        let isTransitioning = false;
+
+        document.getElementById('magicBtn').addEventListener('click', () => {
+            if(isTransitioning) return;
+            isTransitioning = true;
+            
+            const prevStage = currentStage;
+            currentStage = (currentStage + 1) % stageThemes.length;
+            const nextTheme = stageThemes[currentStage];
+            const dots = document.querySelectorAll('.dot');
+            dots[prevStage].classList.remove('active');
+            dots[currentStage].classList.add('active');
+
+            document.getElementById('stageName').innerText = nextTheme.name;
+
+            const currentModel = forms[prevStage].model;
+            const nextModel = forms[currentStage].model;
+            const currentProps = propsGroups[prevStage];
+            const nextProps = propsGroups[currentStage];
+
+            // 1. 旧模型挤压消失
+            gsap.to(currentModel.scale, { x: 0.001, y: 0.001, z: 0.001, duration: 0.3, ease: "back.in(1.5)", onComplete: () => {
+                currentModel.visible = false;
+                triggerBurst(nextTheme.poof); // 爆发粒子
+
+                // 2. 新模型弹性浮现
+                nextModel.visible = true;
+                gsap.to(nextModel.scale, { x: 1, y: 1, z: 1, duration: 0.4, ease: "back.out(1.5)", onComplete: () => isTransitioning = false });
+            }});
+
+            // 3. 道具生态淡入淡出
+            gsap.to(currentProps.scale, { x: 0.001, y: 0.001, z: 0.001, duration: 0.4, ease: "power2.in" });
+            gsap.to(nextProps.scale, { x: 1, y: 1, z: 1, duration: 0.6, ease: "elastic.out(1, 0.7)", delay: 0.2 });
+
+            // 4. 环境色彩全局平滑过渡
+            const tl = gsap.timeline();
+            tl.to(scene.background, { r: new THREE.Color(nextTheme.sky).r, g: new THREE.Color(nextTheme.sky).g, b: new THREE.Color(nextTheme.sky).b, duration: 1.0 }, 0);
+            tl.to(scene.fog.color, { r: new THREE.Color(nextTheme.sky).r, g: new THREE.Color(nextTheme.sky).g, b: new THREE.Color(nextTheme.sky).b, duration: 1.0 }, 0);
+            tl.to(matGround.color, { r: new THREE.Color(nextTheme.ground).r, g: new THREE.Color(nextTheme.ground).g, b: new THREE.Color(nextTheme.ground).b, duration: 1.0 }, 0);
+            tl.to(matDirt.color, { r: new THREE.Color(nextTheme.dirt).r, g: new THREE.Color(nextTheme.dirt).g, b: new THREE.Color(nextTheme.dirt).b, duration: 1.0 }, 0);
+            tl.to(dirLight.color, { r: new THREE.Color(nextTheme.light).r, g: new THREE.Color(nextTheme.light).g, b: new THREE.Color(nextTheme.light).b, duration: 1.0 }, 0);
+        });
+
+        // ==========================================
+        // 7. 动画主循环 (生命动态注入)
+        // ==========================================
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+            const t = clock.getElapsedTime();
+
+            controls.update();
+
+            // 环境传送带旋转
+            environment.rotation.y -= 0.012;
+
+            // 粒子更新
+            particles.forEach(p => {
+                if(p.mesh.visible) {
+                    p.mesh.position.addScaledVector(p.vel, dt);
+                    p.mesh.rotation.x += 0.2; p.mesh.rotation.y += 0.2;
+                    p.mesh.scale.multiplyScalar(0.9);
+                    if(p.mesh.scale.x < 0.05) p.mesh.visible = false;
+                }
+            });
+
+            // -- 各个生物形态的专属精细待机/漫步循环动画 --
+            
+            // 0: 狗狗动画
+            if(dog.visible) {
+                const walkCycle = t * 10;
+                dogBody.position.y = 1.2 + Math.abs(Math.sin(walkCycle)) * 0.1;
+                dogHeadGroup.rotation.x = Math.sin(walkCycle) * 0.05;
+                dogHeadGroup.rotation.y = Math.sin(walkCycle * 0.5) * 0.05;
+                dogTail.rotation.z = Math.sin(t * 15) * 0.4;
+                dogLegs[0].rotation.x = Math.sin(walkCycle) * 0.5;
+                dogLegs[3].rotation.x = Math.sin(walkCycle) * 0.5;
+                dogLegs[1].rotation.x = Math.sin(walkCycle + Math.PI) * 0.5;
+                dogLegs[2].rotation.x = Math.sin(walkCycle + Math.PI) * 0.5;
+            }
+
+            // 1: 猫咪动画
+            if(cat.visible) {
+                const walkCycle = t * 8;
+                catBody.position.y = 1.1 + Math.abs(Math.sin(walkCycle)) * 0.04;
+                catBody.rotation.z = Math.sin(walkCycle * 0.5) * 0.03; // 柔和扭动
+                catHeadGroup.rotation.z = Math.sin(walkCycle * 0.5) * 0.05;
+                t1.rotation.z = Math.sin(t * 3) * 0.3;
+                t2.rotation.z = Math.sin(t * 3 - 0.5) * 0.4;
+                t3.rotation.z = Math.sin(t * 3 - 1.0) * 0.5;
+                catLegs[0].rotation.x = Math.sin(walkCycle) * 0.6;
+                catLegs[3].rotation.x = Math.sin(walkCycle) * 0.6;
+                catLegs[1].rotation.x = Math.sin(walkCycle + Math.PI) * 0.6;
+                catLegs[2].rotation.x = Math.sin(walkCycle + Math.PI) * 0.6;
+            }
+
+            // 2: 原石动画
+            if(rock.visible) {
+                mainRock.rotation.x -= dt * 2.5; // 向前翻滚
+                const bounce = Math.abs(Math.sin(mainRock.rotation.x * 2.5)); // 模拟五边形触地弹跳
+                mainRock.position.y = 1.0 + bounce * 0.15;
+            }
+
+            // 3: 蝴蝶动画
+            if(butterfly.visible) {
+                thorax.position.y = 2.5 + Math.sin(t * 3) * 0.4;
+                thorax.rotation.z = Math.sin(t * 2) * 0.1;
+                const flap = Math.sin(t * 30) * 0.8 + 0.2; // 高频扑动
+                wingGroupL.rotation.z = flap;
+                wingGroupR.rotation.z = -flap;
+            }
+
+            // 4: 旅人动画
+            if(human.visible) {
+                const walkCycle = t * 7;
+                hTorso.position.y = 1.6 + Math.abs(Math.sin(walkCycle)) * 0.06;
+                hTorso.rotation.y = Math.sin(walkCycle) * 0.1; // 肩膀摆动
+                hHeadGroup.rotation.y = -Math.sin(walkCycle) * 0.1; // 头部反向代偿
+                
+                hArms[0].rotation.x = Math.sin(walkCycle) * 0.5;
+                hArms[0].children[0].rotation.x = -0.2 + Math.sin(walkCycle)*0.2; // 肘部微曲
+                hArms[1].rotation.x = Math.sin(walkCycle + Math.PI) * 0.5;
+                hArms[1].children[0].rotation.x = -0.2 - Math.sin(walkCycle)*0.2;
+                
+                hLegs[0].rotation.x = Math.sin(walkCycle + Math.PI) * 0.6;
+                hLegs[0].children[0].rotation.x = Math.max(0, Math.sin(walkCycle + Math.PI - 1.5)) * 0.5; // 膝盖弯曲
+                hLegs[1].rotation.x = Math.sin(walkCycle) * 0.6;
+                hLegs[1].children[0].rotation.x = Math.max(0, Math.sin(walkCycle - 1.5)) * 0.5;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // 窗口适配
+        window.addEventListener('resize', () => {
+            const aspect = window.innerWidth / window.innerHeight;
+            camera.left = -viewSize * aspect; camera.right = viewSize * aspect;
+            camera.top = viewSize; camera.bottom = -viewSize;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>

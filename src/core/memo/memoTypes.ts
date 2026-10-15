@@ -15,6 +15,7 @@ export interface MemoChapter {
   chapterName: string; // 底部深黄托盘展示的篇章名称（如 "第1篇·日常记账" 或 "卷一·初醒"）
   pages: string[]; // 活页纸张内容数组，支持 [第1页, 第2页, ...]
   currentPageIndex: number; // 当前翻到的页码（0-indexed）
+  budgetTotal?: number; // 预算计算器：可用总金额（如 500, 1000）
   createdAt: number;
   updatedAt: number;
 }

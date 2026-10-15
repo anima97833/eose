@@ -128,9 +128,13 @@ export const MemoApp: React.FC<MemoAppProps> = ({ onBack }) => {
 
   // ================= 篇章更新与增删 =================
 
-  const handleUpdateChapter = async (updated: MemoChapter) => {
-    await saveMemoChapterToDB(updated);
+  const handleUpdateChapter = (updated: MemoChapter) => {
+    // 立即同步更新组件内存状态，确保受控输入框（textarea/input）的光标在当前事件循环中绝对精准保留
     setChapters((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    // 异步非阻塞持久化到数据库
+    saveMemoChapterToDB(updated).catch((err) => {
+      console.error('[MemoDB] 保存篇章异常:', err);
+    });
   };
 
   const handleCreateOrEditChapterSave = async (
