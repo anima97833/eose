@@ -138,7 +138,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
   // 文件上传 Refs
   const bgUploadRef = useRef<HTMLInputElement>(null);
   const spriteUploadRef = useRef<HTMLInputElement>(null);
-  const heroineUploadRef = useRef<HTMLInputElement>(null);
+  const avatarUploadRef = useRef<HTMLInputElement>(null);
   const voiceUploadRef = useRef<HTMLInputElement>(null);
 
   // 打字机计时器
@@ -407,14 +407,15 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     }
   };
 
-  // 女主头像上传
-  const handleHeroineFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 角色头像上传：去白底后调出命名绑定弹窗
+  const handleAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
       const dataUrl = await fileToDataUrl(file);
       const cleanUrl = await removeWhiteBackground(dataUrl);
-      setInputAssetName('我');
+      const defaultName = file.name.replace(/\.[^/.]+$/, '').slice(0, 10);
+      setInputAssetName(defaultName || '新角色');
       setNamingModal({
         isOpen: true,
         pendingDataUrl: cleanUrl,
@@ -463,7 +464,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     showToast('已移除语音');
   };
 
-  // 确认命名并将素材与名称绑定保存入 IndexedDB（支持场景背景 / 角色立绘 / 头像）
+  // 确认命名并将素材与名称绑定保存入 IndexedDB（支持场景背景 / 角色立绘 / 角色头像）
   const handleConfirmNaming = async () => {
     const trimmedName = inputAssetName.trim();
     if (!trimmedName) {
@@ -493,14 +494,28 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
 
         showToast(`已绑定场景【${trimmedName}】`);
       } else {
-        // 保存角色立绘/头像
+        // 保存角色立绘或头像（同名自动合并）
         const existing = characterAssets.find((c) => c.name === trimmedName);
         const assetId = existing?.id || `char_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+        let finalSpriteUrl = existing?.spriteUrl || '';
+        let finalAvatarUrl = existing?.avatarUrl || '';
+
+        if (namingModal.targetType === 'sprite') {
+          finalSpriteUrl = namingModal.pendingDataUrl;
+          // 若原本无头像，则立绘同时作为头像兜底
+          if (!finalAvatarUrl) {
+            finalAvatarUrl = namingModal.pendingDataUrl;
+          }
+        } else if (namingModal.targetType === 'avatar') {
+          finalAvatarUrl = namingModal.pendingDataUrl;
+        }
+
         const newCharAsset: GalgameCharacterAsset = {
           id: assetId,
           name: trimmedName,
-          spriteUrl: namingModal.targetType === 'sprite' ? namingModal.pendingDataUrl : (existing?.spriteUrl || namingModal.pendingDataUrl),
-          avatarUrl: namingModal.targetType === 'avatar' ? namingModal.pendingDataUrl : (existing?.avatarUrl || namingModal.pendingDataUrl),
+          spriteUrl: finalSpriteUrl,
+          avatarUrl: finalAvatarUrl,
           createdAt: existing?.createdAt || Date.now(),
         };
 
@@ -510,14 +525,18 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
         const nextBook = {
           ...currentBook,
           characterName: trimmedName,
-          characterSpriteUrl: newCharAsset.spriteUrl,
-          protagonistAvatarUrl: newCharAsset.avatarUrl,
+          characterSpriteUrl: newCharAsset.spriteUrl || currentBook.characterSpriteUrl,
+          protagonistAvatarUrl: newCharAsset.avatarUrl || currentBook.protagonistAvatarUrl,
         };
         setCurrentBook(nextBook);
         await db.memory_books.put(nextBook);
         onUpdateBook(nextBook);
 
-        showToast(`已绑定角色【${trimmedName}】`);
+        showToast(
+          namingModal.targetType === 'sprite'
+            ? `已绑定【${trimmedName}】立绘`
+            : `已绑定【${trimmedName}】头像`
+        );
       }
 
       setNamingModal({ isOpen: false, pendingDataUrl: '', targetType: 'sprite' });
@@ -539,16 +558,41 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     }
   };
 
-  // 删除某自定义角色
-  const handleDeleteCharacter = async (charId: string, charName: string) => {
+  // 解绑或删除某角色立绘
+  const handleDeleteSprite = async (charId: string, charName: string) => {
     if (['弑君的惡魔', '我', '旁白'].includes(charName)) {
       alert('系统默认角色不可删除');
       return;
     }
-    if (window.confirm(`确定删除角色【${charName}】及其素材绑定吗？`)) {
-      await db.galgame_characters.delete(charId);
+    if (window.confirm(`确定解绑【${charName}】的立绘素材吗？`)) {
+      const char = characterAssets.find((c) => c.id === charId);
+      if (!char) return;
+      if (char.avatarUrl) {
+        await db.galgame_characters.put({ ...char, spriteUrl: '' });
+      } else {
+        await db.galgame_characters.delete(charId);
+      }
       await loadAssets();
-      showToast(`已删除角色【${charName}】`);
+      showToast(`已解绑【${charName}】立绘`);
+    }
+  };
+
+  // 解绑或删除某角色头像
+  const handleDeleteAvatar = async (charId: string, charName: string) => {
+    if (['弑君的惡魔', '我', '旁白'].includes(charName)) {
+      alert('系统默认角色不可删除');
+      return;
+    }
+    if (window.confirm(`确定解绑【${charName}】的头像素材吗？`)) {
+      const char = characterAssets.find((c) => c.id === charId);
+      if (!char) return;
+      if (char.spriteUrl) {
+        await db.galgame_characters.put({ ...char, avatarUrl: '' });
+      } else {
+        await db.galgame_characters.delete(charId);
+      }
+      await loadAssets();
+      showToast(`已解绑【${charName}】头像`);
     }
   };
 
@@ -662,7 +706,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
       {/* 隐藏的文件选择器：背景、立绘、头像、音频语音 */}
       <input ref={bgUploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgFileSelect} />
       <input ref={spriteUploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleSpriteFileSelect} />
-      <input ref={heroineUploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleHeroineFileSelect} />
+      <input ref={avatarUploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarFileSelect} />
       <input ref={voiceUploadRef} type="file" accept="audio/*" style={{ display: 'none' }} onChange={handleVoiceFileSelect} />
 
       {/* 顶部悬浮提示 Toast */}
@@ -1273,7 +1317,10 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
               {/* 2. 角色立绘素材库 */}
               <div style={{ backgroundColor: '#161C2C', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#C7D2FE' }}>角色素材绑定库</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#C7D2FE' }}>角色立绘绑定库</span>
+                    <span style={{ fontSize: '10px', color: '#64748B' }}>（用于演播舞台中心立绘）</span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => spriteUploadRef.current?.click()}
@@ -1289,15 +1336,15 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                       alignItems: 'center',
                       gap: '4px',
                     }}
-                    title="上传图片并绑定角色姓名"
+                    title="上传图片并绑定为角色立绘"
                   >
                     <Plus size={11} />
-                    <span>上传并绑定新角色</span>
+                    <span>绑新立绘</span>
                   </button>
                 </div>
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {characterAssets.map((char) => {
+                  {characterAssets.filter(c => c.spriteUrl).map((char) => {
                     const isSelected = currentBook.characterName === char.name;
                     return (
                       <div
@@ -1309,16 +1356,16 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                           background: isSelected ? '#4338CA' : 'rgba(255, 255, 255, 0.08)',
                           border: isSelected ? '1px solid #818CF8' : '1px solid rgba(255, 255, 255, 0.15)',
                           borderRadius: '6px',
-                          padding: '4px 8px',
+                          padding: '3px 8px',
                         }}
                       >
-                        {char.avatarUrl || char.spriteUrl ? (
+                        <div style={{ width: '22px', height: '30px', overflow: 'hidden', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                           <img
-                            src={char.avatarUrl || char.spriteUrl}
+                            src={char.spriteUrl}
                             alt={char.name}
-                            style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover' }}
+                            style={{ height: '100%', maxWidth: '100%', objectFit: 'contain' }}
                           />
-                        ) : null}
+                        </div>
 
                         <span
                           onClick={() => {
@@ -1341,7 +1388,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                         {!['弑君的惡魔', '我', '旁白'].includes(char.name) && (
                           <button
                             type="button"
-                            onClick={() => handleDeleteCharacter(char.id, char.name)}
+                            onClick={() => handleDeleteSprite(char.id, char.name)}
                             style={{
                               background: 'transparent',
                               border: 'none',
@@ -1349,7 +1396,98 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                               cursor: 'pointer',
                               padding: '0 2px',
                             }}
-                            title="删除此角色"
+                            title="解绑立绘"
+                          >
+                            <X size={11} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. 角色头像绑定库 */}
+              <div style={{ backgroundColor: '#161C2C', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#C7D2FE' }}>角色头像绑定库</span>
+                    <span style={{ fontSize: '10px', color: '#64748B' }}>（用于对话框与回溯记录微标）</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => avatarUploadRef.current?.click()}
+                    style={{
+                      background: '#4F46E5',
+                      border: 'none',
+                      color: '#fff',
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                    title="上传正脸特写并绑定为角色头像"
+                  >
+                    <Plus size={11} />
+                    <span>绑新头像</span>
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {characterAssets.filter(c => c.avatarUrl).map((char) => {
+                    const isSelected = currentBook.characterName === char.name;
+                    return (
+                      <div
+                        key={char.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: isSelected ? '#4338CA' : 'rgba(255, 255, 255, 0.08)',
+                          border: isSelected ? '1px solid #818CF8' : '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                        }}
+                      >
+                        <img
+                          src={char.avatarUrl}
+                          alt={char.name}
+                          style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover' }}
+                        />
+
+                        <span
+                          onClick={() => {
+                            const nextBook = {
+                              ...currentBook,
+                              characterName: char.name,
+                              characterSpriteUrl: char.spriteUrl || currentBook.characterSpriteUrl,
+                              protagonistAvatarUrl: char.avatarUrl || currentBook.protagonistAvatarUrl,
+                            };
+                            setCurrentBook(nextBook);
+                            db.memory_books.put(nextBook);
+                            onUpdateBook(nextBook);
+                            showToast(`当前主角色已切为: ${char.name}`);
+                          }}
+                          style={{ fontSize: '11px', cursor: 'pointer', color: '#fff', fontWeight: 500 }}
+                        >
+                          {char.name}
+                        </span>
+
+                        {!['弑君的惡魔', '我', '旁白'].includes(char.name) && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAvatar(char.id, char.name)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#F87171',
+                              cursor: 'pointer',
+                              padding: '0 2px',
+                            }}
+                            title="解绑头像"
                           >
                             <X size={11} />
                           </button>
@@ -1624,14 +1762,15 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                   alignItems: 'center',
                   gap: '4px',
                 }}
+                title="上传并绑定角色全身/半身立绘"
               >
                 <User size={11} />
-                <span>绑新角色</span>
+                <span>绑新立绘</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => heroineUploadRef.current?.click()}
+                onClick={() => avatarUploadRef.current?.click()}
                 style={{
                   background: 'rgba(255, 255, 255, 0.08)',
                   border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -1644,9 +1783,10 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                   alignItems: 'center',
                   gap: '4px',
                 }}
+                title="上传并绑定角色面部特写头像"
               >
                 <Smile size={11} />
-                <span>换女主头像</span>
+                <span>绑新头像</span>
               </button>
             </div>
           </div>
@@ -2151,7 +2291,11 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Tag size={16} color="#818CF8" />
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#F8FAFC' }}>
-                {namingModal.targetType === 'scene' ? '命名场景背景' : '命名角色素材'}
+                {namingModal.targetType === 'scene'
+                  ? '命名场景背景'
+                  : namingModal.targetType === 'sprite'
+                  ? '绑定角色立绘'
+                  : '绑定角色头像'}
               </span>
             </div>
 
@@ -2180,7 +2324,11 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
               autoFocus
               value={inputAssetName}
               onChange={(e) => setInputAssetName(e.target.value)}
-              placeholder={namingModal.targetType === 'scene' ? '输入场景名，如 未央宫正殿' : '输入角色名，如 广陵王'}
+              placeholder={
+                namingModal.targetType === 'scene'
+                  ? '输入场景名，如 未央宫正殿'
+                  : '输入对应角色名，如 广陵王'
+              }
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleConfirmNaming();
               }}
