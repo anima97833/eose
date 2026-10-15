@@ -45,6 +45,14 @@ export interface MemoryBookRecord {
   protagonistAvatarUrl?: string;
 }
 
+export interface GalgameCharacterAsset {
+  id: string;
+  name: string;
+  spriteUrl: string;
+  avatarUrl?: string;
+  createdAt: number;
+}
+
 
 
 export interface BrowserHistoryRecord {
@@ -193,6 +201,7 @@ export class NeumorphicPhoneDatabase extends Dexie {
   virtual_files!: Table<VirtualFileRecord, string>;
   poster_records!: Table<PosterRecord, string>;
   games!: Table<GameRecord, string>;
+  galgame_characters!: Table<GalgameCharacterAsset, string>;
 
   constructor() {
     super('NeumorphicAIDatabase');
@@ -732,6 +741,11 @@ export class NeumorphicPhoneDatabase extends Dexie {
     // 版本 27: 用户自主导入的韩语 Yomitan/TermBank 词库表
     this.version(27).stores({
       storyword_korean_terms: 'id, term, score, *hanja',
+    });
+
+    // 版本 28: 视觉小说角色立绘/头像资产与名称绑定表
+    this.version(28).stores({
+      galgame_characters: 'id, name, createdAt',
     });
   }
 }
