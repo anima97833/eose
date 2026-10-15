@@ -26,6 +26,7 @@ export interface MemoryBookMessage {
   content: string;
   timestamp?: number;
   voiceUrl?: string;
+  bgName?: string;
 }
 
 export interface MemoryBookRecord {
@@ -51,6 +52,13 @@ export interface GalgameCharacterAsset {
   name: string;
   spriteUrl: string;
   avatarUrl?: string;
+  createdAt: number;
+}
+
+export interface GalgameSceneAsset {
+  id: string;
+  name: string;
+  imageUrl: string;
   createdAt: number;
 }
 
@@ -203,6 +211,7 @@ export class NeumorphicPhoneDatabase extends Dexie {
   poster_records!: Table<PosterRecord, string>;
   games!: Table<GameRecord, string>;
   galgame_characters!: Table<GalgameCharacterAsset, string>;
+  galgame_scenes!: Table<GalgameSceneAsset, string>;
 
   constructor() {
     super('NeumorphicAIDatabase');
@@ -747,6 +756,11 @@ export class NeumorphicPhoneDatabase extends Dexie {
     // 版本 28: 视觉小说角色立绘/头像资产与名称绑定表
     this.version(28).stores({
       galgame_characters: 'id, name, createdAt',
+    });
+
+    // 版本 29: 视觉小说场景背景资产与名称绑定表
+    this.version(29).stores({
+      galgame_scenes: 'id, name, createdAt',
     });
   }
 }

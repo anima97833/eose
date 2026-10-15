@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, MemoryBookRecord, MemoryBookMessage, GalgameCharacterAsset } from '../../../core/storage/db';
+import { db, MemoryBookRecord, MemoryBookMessage, GalgameCharacterAsset, GalgameSceneAsset } from '../../../core/storage/db';
 import { removeWhiteBackground, fileToDataUrl } from './imageUtils';
 import {
   ArrowLeft,
@@ -24,7 +24,8 @@ import {
   Tag,
   Mic,
   Volume2,
-  VolumeX
+  VolumeX,
+  Compass
 } from 'lucide-react';
 
 interface GalgameReaderModalProps {
@@ -34,12 +35,32 @@ interface GalgameReaderModalProps {
   onDeleteBook: (bookId: string) => void;
 }
 
-// 预设背景库
-const PRESET_BG_LIST = [
-  { label: '废弃阳光礼拜堂', url: '/galgame/bg.jpg', thumb: '/galgame/bg.jpg' },
-  { label: '暮色古典书房', url: 'https://images.unsplash.com/photo-1507842229451-7975ab938888?auto=format&fit=crop&w=1280&q=80', thumb: 'https://images.unsplash.com/photo-1507842229451-7975ab938888?auto=format&fit=crop&w=240&q=80' },
-  { label: '欧式宫殿长廊', url: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1280&q=80', thumb: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=240&q=80' },
-  { label: '繁星夜空古堡', url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1280&q=80', thumb: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=240&q=80' },
+// 系统默认预置场景库
+const DEFAULT_PRESET_SCENES: GalgameSceneAsset[] = [
+  {
+    id: 'scene_preset_chapel',
+    name: '阳光废弃礼拜堂',
+    imageUrl: '/galgame/bg.jpg',
+    createdAt: 1000,
+  },
+  {
+    id: 'scene_preset_study',
+    name: '暮色古典书房',
+    imageUrl: 'https://images.unsplash.com/photo-1507842229451-7975ab938888?auto=format&fit=crop&w=1280&q=80',
+    createdAt: 2000,
+  },
+  {
+    id: 'scene_preset_palace',
+    name: '欧式宫殿长廊',
+    imageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1280&q=80',
+    createdAt: 3000,
+  },
+  {
+    id: 'scene_preset_castle',
+    name: '繁星夜空古堡',
+    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1280&q=80',
+    createdAt: 4000,
+  },
 ];
 
 // 系统默认预置角色
@@ -80,8 +101,9 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
   const [currentBook, setCurrentBook] = useState<MemoryBookRecord>(book);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
 
-  // 角色库状态（与 IndexedDB galgame_characters 同步）
+  // 角色库状态与场景库状态（与 IndexedDB 同步）
   const [characterAssets, setCharacterAssets] = useState<GalgameCharacterAsset[]>([]);
+  const [sceneAssets, setSceneAssets] = useState<GalgameSceneAsset[]>([]);
 
   // 演播状态
   const [displayedText, setDisplayedText] = useState<string>('');
@@ -91,22 +113,25 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
   const [showSystemMenu, setShowSystemMenu] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  // 剧本工坊当前展开场景选择弹窗的台词索引
+  const [activeScenePickerIdx, setActiveScenePickerIdx] = useState<number | null>(null);
+
   // 语音播放相关状态与引用
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingVoice, setIsPlayingVoice] = useState<boolean>(false);
   const [voiceTargetIdx, setVoiceTargetIdx] = useState<number | null>(null);
 
-  // 素材命名确认弹窗状态
+  // 素材命名确认弹窗状态（支持角色立绘、头像、场景背景命名）
   const [namingModal, setNamingModal] = useState<{
     isOpen: boolean;
     pendingDataUrl: string;
-    targetType: 'sprite' | 'avatar';
+    targetType: 'sprite' | 'avatar' | 'scene';
   }>({
     isOpen: false,
     pendingDataUrl: '',
     targetType: 'sprite',
   });
-  const [inputCharName, setInputCharName] = useState<string>('');
+  const [inputAssetName, setInputAssetName] = useState<string>('');
 
   // 文件上传 Refs
   const bgUploadRef = useRef<HTMLInputElement>(null);
@@ -122,28 +147,56 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     setTimeout(() => setToastMsg(null), 2000);
   };
 
-  // 1. 初始化加载 IndexedDB 中的角色资产表
-  const loadCharacters = async () => {
+  // 1. 初始化加载 IndexedDB 中的角色与场景资产表
+  const loadAssets = async () => {
     try {
-      let stored = await db.galgame_characters.toArray();
-      if (!stored || stored.length === 0) {
+      // 角色资产
+      let storedChars = await db.galgame_characters.toArray();
+      if (!storedChars || storedChars.length === 0) {
         for (const c of DEFAULT_PRESET_CHARACTERS) {
           await db.galgame_characters.put(c);
         }
-        stored = await db.galgame_characters.toArray();
+        storedChars = await db.galgame_characters.toArray();
       }
-      setCharacterAssets(stored);
+      setCharacterAssets(storedChars);
+
+      // 场景背景资产
+      let storedScenes = await db.galgame_scenes.toArray();
+      if (!storedScenes || storedScenes.length === 0) {
+        for (const s of DEFAULT_PRESET_SCENES) {
+          await db.galgame_scenes.put(s);
+        }
+        storedScenes = await db.galgame_scenes.toArray();
+      }
+      setSceneAssets(storedScenes);
     } catch (err) {
-      console.error('Failed to load galgame_characters', err);
+      console.error('Failed to load assets from IndexedDB', err);
     }
   };
 
   useEffect(() => {
-    loadCharacters();
+    loadAssets();
   }, []);
 
   const messages = currentBook.messages || [];
   const currentMsg: MemoryBookMessage | undefined = messages[currentIndex];
+
+  // 计算当前对白生效的场景背景图片
+  // 机制：向上回溯找到第 currentIndex 句或之前最近一句指定了 bgName 的台词，若无则使用剧本默认背景
+  const computeActiveBgUrl = () => {
+    for (let i = currentIndex; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg?.bgName) {
+        const matchedScene = sceneAssets.find((s) => s.name === msg.bgName);
+        if (matchedScene?.imageUrl) {
+          return matchedScene.imageUrl;
+        }
+      }
+    }
+    return currentBook.bgUrl || '/galgame/bg.jpg';
+  };
+
+  const activeBgImage = computeActiveBgUrl();
 
   // 判断当前对白说话人
   const speakerName = currentMsg?.name || (currentMsg?.sender === 'user' ? '我' : currentBook.characterName || '弑君的惡魔');
@@ -153,7 +206,6 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
   const matchedChar = characterAssets.find((c) => c.name === speakerName);
   const activeSpriteUrl = matchedChar?.spriteUrl || currentBook.characterSpriteUrl || '/galgame/demon.png';
   const activeAvatarUrl = matchedChar?.avatarUrl || matchedChar?.spriteUrl || currentBook.protagonistAvatarUrl || '/galgame/heroine.png';
-  const bgImage = currentBook.bgUrl || '/galgame/bg.jpg';
 
   // 格式化文本输出
   const formatDialogueText = (raw: string, isNar: boolean) => {
@@ -201,7 +253,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     };
   }, [currentIndex, mode, currentBook]);
 
-  // 演播模式：当进入新台词时，若有绑定的语音音频，自动播放该句语音
+  // 演播模式：当进入新台词时，自动播放语音
   useEffect(() => {
     if (mode !== 'play') {
       if (currentAudioRef.current) {
@@ -212,21 +264,19 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
       return;
     }
 
-    // 暂停上一句语音
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
       currentAudioRef.current = null;
       setIsPlayingVoice(false);
     }
 
-    // 自动播放本句语音
     if (currentMsg?.voiceUrl) {
       try {
         const audio = new Audio(currentMsg.voiceUrl);
         currentAudioRef.current = audio;
         setIsPlayingVoice(true);
         audio.play().catch((err) => {
-          console.warn('Audio auto-play blocked or failed:', err);
+          console.warn('Audio auto-play blocked:', err);
           setIsPlayingVoice(false);
         });
         audio.onended = () => setIsPlayingVoice(false);
@@ -314,25 +364,27 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     }
   };
 
-  // 背景图片上传
-  const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 场景背景上传：唤起命名弹窗
+  const handleBgFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
       const dataUrl = await fileToDataUrl(file);
-      const nextBook = { ...currentBook, bgUrl: dataUrl };
-      setCurrentBook(nextBook);
-      await db.memory_books.put(nextBook);
-      onUpdateBook(nextBook);
-      showToast('背景已更新');
+      const defaultName = file.name.replace(/\.[^/.]+$/, '').slice(0, 10);
+      setInputAssetName(defaultName || '新场景');
+      setNamingModal({
+        isOpen: true,
+        pendingDataUrl: dataUrl,
+        targetType: 'scene',
+      });
     } catch (err) {
-      alert('图片加载失败');
+      alert('背景图片加载失败');
     } finally {
       if (e.target) e.target.value = '';
     }
   };
 
-  // 角色素材上传：去白底后调出命名绑定弹窗
+  // 角色立绘上传：去白底后调出命名绑定弹窗
   const handleSpriteFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -340,7 +392,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
       const dataUrl = await fileToDataUrl(file);
       const cleanUrl = await removeWhiteBackground(dataUrl);
       const defaultName = file.name.replace(/\.[^/.]+$/, '').slice(0, 10);
-      setInputCharName(defaultName);
+      setInputAssetName(defaultName);
       setNamingModal({
         isOpen: true,
         pendingDataUrl: cleanUrl,
@@ -360,7 +412,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     try {
       const dataUrl = await fileToDataUrl(file);
       const cleanUrl = await removeWhiteBackground(dataUrl);
-      setInputCharName('我');
+      setInputAssetName('我');
       setNamingModal({
         isOpen: true,
         pendingDataUrl: cleanUrl,
@@ -373,7 +425,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     }
   };
 
-  // 语音音频文件上传：转为 Base64 绑定入 IndexedDB
+  // 语音音频文件上传
   const handleVoiceFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || voiceTargetIdx === null) return;
@@ -389,7 +441,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
       setCurrentBook(nextBook);
       await db.memory_books.put(nextBook);
       onUpdateBook(nextBook);
-      showToast(`已成功录入第 #${voiceTargetIdx + 1} 句语音`);
+      showToast(`已录入第 #${voiceTargetIdx + 1} 句语音`);
     } catch (err) {
       alert('语音文件上传失败');
     } finally {
@@ -409,43 +461,79 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     showToast('已移除语音');
   };
 
-  // 确认命名并将素材与角色名绑定保存入 IndexedDB
+  // 确认命名并将素材与名称绑定保存入 IndexedDB（支持场景背景 / 角色立绘 / 头像）
   const handleConfirmNaming = async () => {
-    const trimmedName = inputCharName.trim();
+    const trimmedName = inputAssetName.trim();
     if (!trimmedName) {
-      alert('请输入角色名称');
+      alert('请输入名称');
       return;
     }
 
     try {
-      const existing = characterAssets.find((c) => c.name === trimmedName);
-      let assetId = existing?.id || `char_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-      
-      const newCharAsset: GalgameCharacterAsset = {
-        id: assetId,
-        name: trimmedName,
-        spriteUrl: namingModal.targetType === 'sprite' ? namingModal.pendingDataUrl : (existing?.spriteUrl || namingModal.pendingDataUrl),
-        avatarUrl: namingModal.targetType === 'avatar' ? namingModal.pendingDataUrl : (existing?.avatarUrl || namingModal.pendingDataUrl),
-        createdAt: existing?.createdAt || Date.now(),
-      };
+      if (namingModal.targetType === 'scene') {
+        // 保存场景背景
+        const existing = sceneAssets.find((s) => s.name === trimmedName);
+        const sceneId = existing?.id || `scene_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const newScene: GalgameSceneAsset = {
+          id: sceneId,
+          name: trimmedName,
+          imageUrl: namingModal.pendingDataUrl,
+          createdAt: existing?.createdAt || Date.now(),
+        };
+        await db.galgame_scenes.put(newScene);
+        await loadAssets();
 
-      await db.galgame_characters.put(newCharAsset);
-      await loadCharacters();
+        // 默认将当前剧本的主背景也更新为该场景
+        const nextBook = { ...currentBook, bgUrl: newScene.imageUrl };
+        setCurrentBook(nextBook);
+        await db.memory_books.put(nextBook);
+        onUpdateBook(nextBook);
 
-      const nextBook = {
-        ...currentBook,
-        characterName: trimmedName,
-        characterSpriteUrl: newCharAsset.spriteUrl,
-        protagonistAvatarUrl: newCharAsset.avatarUrl,
-      };
-      setCurrentBook(nextBook);
-      await db.memory_books.put(nextBook);
-      onUpdateBook(nextBook);
+        showToast(`已绑定场景【${trimmedName}】`);
+      } else {
+        // 保存角色立绘/头像
+        const existing = characterAssets.find((c) => c.name === trimmedName);
+        const assetId = existing?.id || `char_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const newCharAsset: GalgameCharacterAsset = {
+          id: assetId,
+          name: trimmedName,
+          spriteUrl: namingModal.targetType === 'sprite' ? namingModal.pendingDataUrl : (existing?.spriteUrl || namingModal.pendingDataUrl),
+          avatarUrl: namingModal.targetType === 'avatar' ? namingModal.pendingDataUrl : (existing?.avatarUrl || namingModal.pendingDataUrl),
+          createdAt: existing?.createdAt || Date.now(),
+        };
+
+        await db.galgame_characters.put(newCharAsset);
+        await loadAssets();
+
+        const nextBook = {
+          ...currentBook,
+          characterName: trimmedName,
+          characterSpriteUrl: newCharAsset.spriteUrl,
+          protagonistAvatarUrl: newCharAsset.avatarUrl,
+        };
+        setCurrentBook(nextBook);
+        await db.memory_books.put(nextBook);
+        onUpdateBook(nextBook);
+
+        showToast(`已绑定角色【${trimmedName}】`);
+      }
 
       setNamingModal({ isOpen: false, pendingDataUrl: '', targetType: 'sprite' });
-      showToast(`已绑定角色【${trimmedName}】`);
     } catch (err: any) {
-      alert('保存角色资产失败：' + err?.message);
+      alert('保存素材失败：' + err?.message);
+    }
+  };
+
+  // 删除某自定义场景
+  const handleDeleteScene = async (sceneId: string, sceneName: string) => {
+    if (['阳光废弃礼拜堂', '暮色古典书房', '欧式宫殿长廊', '繁星夜空古堡'].includes(sceneName)) {
+      alert('系统预置场景不可删除');
+      return;
+    }
+    if (window.confirm(`确定删除场景【${sceneName}】吗？`)) {
+      await db.galgame_scenes.delete(sceneId);
+      await loadAssets();
+      showToast(`已删除场景【${sceneName}】`);
     }
   };
 
@@ -457,7 +545,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     }
     if (window.confirm(`确定删除角色【${charName}】及其素材绑定吗？`)) {
       await db.galgame_characters.delete(charId);
-      await loadCharacters();
+      await loadAssets();
       showToast(`已删除角色【${charName}】`);
     }
   };
@@ -538,6 +626,21 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
     });
   };
 
+  // 点击场景选择块直接指定该台词切入的场景
+  const handleAssignScene = (msgIdx: number, sceneName?: string) => {
+    const nextMessages = [...currentBook.messages];
+    if (sceneName) {
+      nextMessages[msgIdx] = { ...nextMessages[msgIdx], bgName: sceneName };
+    } else {
+      delete nextMessages[msgIdx].bgName;
+    }
+    setCurrentBook({
+      ...currentBook,
+      messages: nextMessages,
+    });
+    setActiveScenePickerIdx(null);
+  };
+
   return (
     <div
       style={{
@@ -555,7 +658,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
       }}
     >
       {/* 隐藏的文件选择器：背景、立绘、头像、音频语音 */}
-      <input ref={bgUploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgUpload} />
+      <input ref={bgUploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgFileSelect} />
       <input ref={spriteUploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleSpriteFileSelect} />
       <input ref={heroineUploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleHeroineFileSelect} />
       <input ref={voiceUploadRef} type="file" accept="audio/*" style={{ display: 'none' }} onChange={handleVoiceFileSelect} />
@@ -586,7 +689,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
         </div>
       )}
 
-      {/* ================= 模式 1: 视觉小说演播舞台 ================= */}
+      {/* ================= 模式 1: 视觉小说演播舞台 (动态场景流转 + 角色驱动) ================= */}
       {mode === 'play' && (
         <div
           onClick={handleStageClick}
@@ -603,17 +706,17 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
             justifyContent: 'flex-end',
           }}
         >
-          {/* Layer 1: 场景背景层 */}
+          {/* Layer 1: 场景背景层 (平滑交叉过渡) */}
           <div
             style={{
               position: 'absolute',
               inset: 0,
               zIndex: 1,
-              backgroundImage: `url(${bgImage})`,
+              backgroundImage: `url(${activeBgImage})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               boxShadow: 'inset 0 0 100px rgba(0, 0, 0, 0.55)',
-              transition: 'background-image 0.4s ease',
+              transition: 'background-image 0.5s ease-in-out',
             }}
           />
 
@@ -710,7 +813,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                   {speakerName}
                 </span>
 
-                {/* 当前台词若有语音条，在姓名栏右侧展示轻量音频标识 */}
+                {/* 语音条状态 */}
                 {currentMsg?.voiceUrl && (
                   <div
                     className="voice-player-btn"
@@ -987,7 +1090,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                 }}
               >
                 <Palette size={13} color="#A78BFA" />
-                <span>更换图片</span>
+                <span>更换资产</span>
               </button>
 
               <button
@@ -1043,7 +1146,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
             </div>
           )}
 
-          {/* ================= 视觉资产设置弹窗 ================= */}
+          {/* ================= 视觉资产设置弹窗 (场景与角色双向命名库) ================= */}
           {showAssetModal && (
             <div
               className="asset-modal"
@@ -1083,10 +1186,10 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                 </button>
               </div>
 
-              {/* 1. 场景背景更换 */}
+              {/* 1. 场景背景命名库 (展示所有已绑定名字的场景，并支持上传命名新场景) */}
               <div style={{ backgroundColor: '#161C2C', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#C7D2FE' }}>场景背景</span>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#C7D2FE' }}>场景背景绑定库</span>
                   <button
                     type="button"
                     onClick={() => bgUploadRef.current?.click()}
@@ -1102,40 +1205,66 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                       alignItems: 'center',
                       gap: '4px',
                     }}
+                    title="上传图片并绑定场景名称"
                   >
-                    <Upload size={11} />
-                    <span>上传</span>
+                    <Plus size={11} />
+                    <span>上传并绑定新场景</span>
                   </button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-                  {PRESET_BG_LIST.map((bg, i) => (
-                    <div
-                      key={i}
-                      onClick={() => {
-                        const nextBook = { ...currentBook, bgUrl: bg.url };
-                        setCurrentBook(nextBook);
-                        db.memory_books.put(nextBook);
-                        onUpdateBook(nextBook);
-                        showToast(`已更换场景`);
-                      }}
-                      style={{
-                        height: '50px',
-                        borderRadius: '5px',
-                        backgroundImage: `url(${bg.thumb})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        border: currentBook.bgUrl === bg.url ? '2px solid #818CF8' : '1px solid rgba(255, 255, 255, 0.1)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'flex-end',
-                        padding: '3px 5px',
-                      }}
-                    >
-                      <span style={{ fontSize: '9px', background: 'rgba(0,0,0,0.7)', padding: '1px 4px', borderRadius: '2px' }}>
-                        {bg.label}
-                      </span>
-                    </div>
-                  ))}
+                  {sceneAssets.map((s) => {
+                    const isSelected = activeBgImage === s.imageUrl;
+                    return (
+                      <div
+                        key={s.id}
+                        onClick={() => {
+                          const nextBook = { ...currentBook, bgUrl: s.imageUrl };
+                          setCurrentBook(nextBook);
+                          db.memory_books.put(nextBook);
+                          onUpdateBook(nextBook);
+                          showToast(`主场景切为: ${s.name}`);
+                        }}
+                        style={{
+                          height: '52px',
+                          borderRadius: '5px',
+                          backgroundImage: `url(${s.imageUrl})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          border: isSelected ? '2px solid #818CF8' : '1px solid rgba(255, 255, 255, 0.1)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          justifyContent: 'space-between',
+                          padding: '3px 5px',
+                        }}
+                      >
+                        <span style={{ fontSize: '9px', background: 'rgba(0,0,0,0.7)', padding: '1px 4px', borderRadius: '2px', color: '#fff' }}>
+                          {s.name}
+                        </span>
+
+                        {!['阳光废弃礼拜堂', '暮色古典书房', '欧式宫殿长廊', '繁星夜空古堡'].includes(s.name) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteScene(s.id, s.name);
+                            }}
+                            style={{
+                              background: 'rgba(0,0,0,0.6)',
+                              border: 'none',
+                              color: '#F87171',
+                              cursor: 'pointer',
+                              borderRadius: '2px',
+                              padding: '1px',
+                            }}
+                            title="删除场景"
+                          >
+                            <X size={10} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1305,6 +1434,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                     <div style={{ fontSize: '0.85rem', color: '#A5B4FC', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span>{m.name || (m.sender === 'user' ? '我' : currentBook.characterName)}</span>
                       {m.voiceUrl && <Volume2 size={11} color="#67E8F9" />}
+                      {m.bgName && <span style={{ fontSize: '9px', background: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '2px' }}>🏞️ {m.bgName}</span>}
                       {idx === currentIndex && (
                         <span style={{ fontSize: '0.7rem', color: '#FCD34D' }}>
                           [当前]
@@ -1322,7 +1452,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
         </div>
       )}
 
-      {/* ================= 模式 2: 剧本工坊 (带麦克风语音上传绑定) ================= */}
+      {/* ================= 模式 2: 剧本工坊 (带角色、场景切分、麦克风语音) ================= */}
       {mode === 'edit' && (
         <div
           style={{
@@ -1474,7 +1604,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                 }}
               >
                 <ImageIcon size={11} />
-                <span>换背景</span>
+                <span>绑新场景</span>
               </button>
 
               <button
@@ -1494,7 +1624,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                 }}
               >
                 <User size={11} />
-                <span>绑角色素材</span>
+                <span>绑新角色</span>
               </button>
 
               <button
@@ -1519,7 +1649,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
             </div>
           </div>
 
-          {/* 剧本台词条目列表 (带麦克风按钮上传语音条) */}
+          {/* 剧本台词条目列表 (带角色小选择块、场景切分胶囊、麦克风语音) */}
           <div
             style={{
               flex: 1,
@@ -1553,7 +1683,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                       fontSize: '11px',
                     }}
                   >
-                    {/* 左侧区域：序号 + 麦克风语音按钮 + 说话人选择块 */}
+                    {/* 左侧区域：序号 + 麦克风 + 场景切分标签 + 角色选择块 */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px' }}>
                       <span
                         style={{
@@ -1568,7 +1698,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                         #{idx + 1}
                       </span>
 
-                      {/* 麦克风语音上传/试听按钮 */}
+                      {/* 麦克风语音按钮 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                         <button
                           type="button"
@@ -1587,7 +1717,6 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                             display: 'flex',
                             alignItems: 'center',
                             gap: '3px',
-                            transition: 'all 0.15s ease',
                           }}
                           title={m.voiceUrl ? '已绑定语音音频（点击可重新上传覆盖）' : '上传本句角色台词语音'}
                         >
@@ -1595,7 +1724,6 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                           {m.voiceUrl && <span>语音</span>}
                         </button>
 
-                        {/* 若本句已上传语音，支持就地试听与删除 */}
                         {m.voiceUrl && (
                           <>
                             <button
@@ -1634,6 +1762,96 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                         )}
                       </div>
 
+                      {/* 场景切分胶囊 (点击展开极简场景选择器) */}
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          type="button"
+                          onClick={() => setActiveScenePickerIdx(activeScenePickerIdx === idx ? null : idx)}
+                          style={{
+                            background: m.bgName ? 'rgba(245, 158, 11, 0.22)' : 'rgba(255, 255, 255, 0.06)',
+                            border: m.bgName ? '1px solid rgba(251, 191, 36, 0.45)' : '1px solid rgba(255, 255, 255, 0.1)',
+                            color: m.bgName ? '#FCD34D' : '#94A3B8',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                          }}
+                          title="指定该对白发生的场景背景"
+                        >
+                          <ImageIcon size={10} />
+                          <span>{m.bgName ? m.bgName : '沿用场景'}</span>
+                        </button>
+
+                        {/* 场景选择下拉浮层 */}
+                        {activeScenePickerIdx === idx && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              position: 'absolute',
+                              top: '24px',
+                              left: 0,
+                              zIndex: 40,
+                              backgroundColor: '#1E2330',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: '6px',
+                              boxShadow: '0 8px 24px rgba(0,0,0,0.8)',
+                              padding: '6px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px',
+                              minWidth: '130px',
+                            }}
+                          >
+                            <span style={{ fontSize: '10px', color: '#94A3B8', padding: '2px 4px' }}>
+                              指定场景背景:
+                            </span>
+
+                            {m.bgName && (
+                              <button
+                                type="button"
+                                onClick={() => handleAssignScene(idx, undefined)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#F87171',
+                                  padding: '4px 6px',
+                                  borderRadius: '3px',
+                                  fontSize: '10px',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                }}
+                              >
+                                ✕ 清除 (沿用上一幕)
+                              </button>
+                            )}
+
+                            {sceneAssets.map((s) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => handleAssignScene(idx, s.name)}
+                                style={{
+                                  background: m.bgName === s.name ? '#4F46E5' : 'rgba(255, 255, 255, 0.06)',
+                                  border: 'none',
+                                  color: '#fff',
+                                  padding: '4px 6px',
+                                  borderRadius: '3px',
+                                  fontSize: '10px',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                🏞️ {s.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
                       {/* 渲染所有已绑定的角色小选择块 */}
                       {characterAssets.map((char) => {
                         const isMatch = currentName === char.name;
@@ -1654,7 +1872,6 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                               display: 'flex',
                               alignItems: 'center',
                               gap: '3px',
-                              transition: 'all 0.15s ease',
                             }}
                           >
                             <span>{char.name}</span>
@@ -1847,7 +2064,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
         </div>
       )}
 
-      {/* ================= 极简角色命名绑定小弹窗 ================= */}
+      {/* ================= 极简素材命名绑定小弹窗 (支持场景背景 / 角色立绘) ================= */}
       {namingModal.isOpen && (
         <div
           className="naming-modal"
@@ -1881,7 +2098,7 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Tag size={16} color="#818CF8" />
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#F8FAFC' }}>
-                命名角色素材
+                {namingModal.targetType === 'scene' ? '命名场景背景' : '命名角色素材'}
               </span>
             </div>
 
@@ -1908,9 +2125,9 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
             <input
               type="text"
               autoFocus
-              value={inputCharName}
-              onChange={(e) => setInputCharName(e.target.value)}
-              placeholder="输入角色名，如 广陵王"
+              value={inputAssetName}
+              onChange={(e) => setInputAssetName(e.target.value)}
+              placeholder={namingModal.targetType === 'scene' ? '输入场景名，如 未央宫正殿' : '输入角色名，如 广陵王'}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleConfirmNaming();
               }}
