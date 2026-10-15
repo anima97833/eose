@@ -115,6 +115,8 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
 
   // 剧本工坊当前展开场景选择弹窗的台词索引
   const [activeScenePickerIdx, setActiveScenePickerIdx] = useState<number | null>(null);
+  // 剧本工坊当前展开角色姓名选择弹窗的台词索引
+  const [activeSpeakerPickerIdx, setActiveSpeakerPickerIdx] = useState<number | null>(null);
 
   // 语音播放相关状态与引用
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -1766,7 +1768,10 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                       <div style={{ position: 'relative' }}>
                         <button
                           type="button"
-                          onClick={() => setActiveScenePickerIdx(activeScenePickerIdx === idx ? null : idx)}
+                          onClick={() => {
+                            setActiveSpeakerPickerIdx(null);
+                            setActiveScenePickerIdx(activeScenePickerIdx === idx ? null : idx);
+                          }}
                           style={{
                             background: m.bgName ? 'rgba(245, 158, 11, 0.22)' : 'rgba(255, 255, 255, 0.06)',
                             border: m.bgName ? '1px solid rgba(251, 191, 36, 0.45)' : '1px solid rgba(255, 255, 255, 0.1)',
@@ -1852,54 +1857,101 @@ export const GalgameReaderModal: React.FC<GalgameReaderModalProps> = ({
                         )}
                       </div>
 
-                      {/* 极简水平一体化角色胶囊条 */}
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          backgroundColor: 'rgba(15, 23, 42, 0.75)',
-                          padding: '2px',
-                          borderRadius: '9999px',
-                          border: '1px solid rgba(255, 255, 255, 0.08)',
-                          gap: '2px',
-                          maxWidth: '100%',
-                          overflowX: 'auto',
-                        }}
-                      >
-                        {characterAssets.map((char) => {
-                          const isMatch = currentName === char.name;
-                          const isNarrator = char.name === '旁白';
-                          return (
-                            <button
-                              key={char.id}
-                              type="button"
-                              onClick={() => handleAssignSpeaker(idx, char.name)}
-                              style={{
-                                background: isMatch
-                                  ? isNarrator
-                                    ? 'linear-gradient(135deg, #475569 0%, #334155 100%)'
-                                    : 'linear-gradient(135deg, #4F46E5 0%, #6366F1 100%)'
-                                  : 'transparent',
-                                color: isMatch ? '#FFFFFF' : '#94A3B8',
-                                border: 'none',
-                                padding: '2px 8px',
-                                borderRadius: '9999px',
-                                fontSize: '10px',
-                                fontWeight: isMatch ? 600 : 400,
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                                boxShadow: isMatch ? '0 1px 4px rgba(0, 0, 0, 0.35)' : 'none',
-                                whiteSpace: 'nowrap',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '3px',
-                              }}
-                            >
-                              {isNarrator && <span style={{ opacity: 0.7, fontSize: '9px' }}>📜</span>}
-                              <span>{char.name}</span>
-                            </button>
-                          );
-                        })}
+                      {/* 角色姓名胶囊 (点击拉出选择条，如同场景选择) */}
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveScenePickerIdx(null);
+                            setActiveSpeakerPickerIdx(activeSpeakerPickerIdx === idx ? null : idx);
+                          }}
+                          style={{
+                            background: currentName === '旁白'
+                              ? 'rgba(100, 116, 139, 0.25)'
+                              : 'rgba(99, 102, 241, 0.22)',
+                            border: currentName === '旁白'
+                              ? '1px solid rgba(148, 163, 184, 0.45)'
+                              : '1px solid rgba(129, 140, 248, 0.45)',
+                            color: currentName === '旁白' ? '#E2E8F0' : '#C7D2FE',
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                          }}
+                          title="选择该句台词的说话人/角色"
+                        >
+                          {currentName === '旁白' ? (
+                            <span style={{ fontSize: '10px' }}>📜</span>
+                          ) : (
+                            <User size={10} />
+                          )}
+                          <span>{currentName}</span>
+                          <ChevronDown size={10} style={{ opacity: 0.7 }} />
+                        </button>
+
+                        {/* 角色选择下拉浮层 */}
+                        {activeSpeakerPickerIdx === idx && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              position: 'absolute',
+                              top: '24px',
+                              left: 0,
+                              zIndex: 40,
+                              backgroundColor: '#1E2330',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: '6px',
+                              boxShadow: '0 8px 24px rgba(0,0,0,0.8)',
+                              padding: '6px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px',
+                              minWidth: '120px',
+                            }}
+                          >
+                            <span style={{ fontSize: '10px', color: '#94A3B8', padding: '2px 4px' }}>
+                              指定说话人:
+                            </span>
+
+                            {characterAssets.map((char) => {
+                              const isMatch = currentName === char.name;
+                              const isNarrator = char.name === '旁白';
+                              return (
+                                <button
+                                  key={char.id}
+                                  type="button"
+                                  onClick={() => {
+                                    handleAssignSpeaker(idx, char.name);
+                                    setActiveSpeakerPickerIdx(null);
+                                  }}
+                                  style={{
+                                    background: isMatch ? '#4F46E5' : 'rgba(255, 255, 255, 0.06)',
+                                    border: 'none',
+                                    color: '#fff',
+                                    padding: '4px 6px',
+                                    borderRadius: '3px',
+                                    fontSize: '10px',
+                                    fontWeight: isMatch ? 600 : 400,
+                                    cursor: 'pointer',
+                                    textAlign: 'left',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {isNarrator ? <span>📜</span> : <User size={10} color="#A5B4FC" />}
+                                  <span>{char.name}</span>
+                                  {isMatch && <Check size={10} style={{ marginLeft: 'auto', color: '#818CF8' }} />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
 
